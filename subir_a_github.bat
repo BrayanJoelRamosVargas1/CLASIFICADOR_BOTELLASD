@@ -1,39 +1,32 @@
 @echo off
-title Subir Proyecto a GitHub - StockVision AI
+title Subir a GitHub - CLASIFICADOR_BOTELLASD
 echo ========================================================
-echo   Subiendo StockVision AI a GitHub (Usuario: brayanjoelrv)
+echo   Subiendo StockVision AI a tu repositorio:
+echo   https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD.git
 echo ========================================================
 echo.
-echo Recuerda haber creado el repositorio vacio previamente en:
-echo https://github.com/new
-echo.
-set /p REPO_NAME="Escribe el nombre del repositorio (ej. stockvision-ia o reciclaapp.io): "
 
-git remote remove origin 2>nul
-git remote add origin https://github.com/brayanjoelrv/%REPO_NAME%.git
-git branch -M main
 git push -u origin main
 
 if errorlevel 1 (
     echo.
-    echo [AVISO] Si fallo la subida, verifica:
-    echo 1. Que hayas creado el repositorio en https://github.com/new con el nombre: %REPO_NAME%
-    echo 2. Que no hayas marcado 'Add a README' en GitHub al crearlo (debe estar vacio).
+    echo Si te sale la ventana de GitHub, dale clic a "Sign in with your browser" para confirmar.
     echo.
 ) else (
     echo.
     echo ========================================================
-    echo   [EXITO] Proyecto subido exitosamente a GitHub!
-    echo   Repositorio: https://github.com/brayanjoelrv/%REPO_NAME%
+    echo   [EXITO TOTAL] Proyecto subido exitosamente a GitHub!
+    echo   Repositorio: https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD
     echo ========================================================
     echo.
-    echo Para activar la pagina web publica (GitHub Pages):
-    echo 1. Abre: https://github.com/brayanjoelrv/%REPO_NAME%/settings/pages
+    echo PASO FINAL PARA TU PAGINA WEB PUBLICA (GitHub Pages):
+    echo 1. Abre este enlace:
+    echo    https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD/settings/pages
     echo 2. En 'Branch', selecciona 'main' y la carpeta '/ (root)'.
-    echo 3. Dale clic a 'Save'.
+    echo 3. Haz clic en 'Save'.
     echo.
-    echo Tu enlace web quedara listo en:
-    echo https://brayanjoelrv.github.io/%REPO_NAME%/
+    echo En 1 minuto tu enlace quedara activo en:
+    echo https://brayanjoelramosvargas1.github.io/CLASIFICADOR_BOTELLASD/
     echo.
 )
 pause
