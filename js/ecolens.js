@@ -2,7 +2,7 @@
  * EcoLens AI v4.0 Pro — Motor de Visión Artificial Multi-Botella
  * Autor: Brayan Joel Ramos Vargas
  * Docente: Ing. Jesús Bautista
- * Arquitectura: SSD-Lite MobileNet v2 + Color/Luminance Material Classifier + Anti-False-Positive Filter + 1-to-1 Smooth IoU Tracking
+ * Arquitectura: Direct-Feed SSD-Lite MobileNet v2 + Color/Luminance Material Classifier + Anti-False-Positive Filter + 1-to-1 Smooth IoU Tracking
  */
 
 (() => {
@@ -22,25 +22,23 @@
     }).catch(() => {});
   }
 
-  // 1. Configuración de Detección Calibrada Antirruido
+  // 1. Configuración de Detección Calibrada
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
-    DEFAULT_THRESHOLD: 0.16,   // 16% Calibrado: detecta botellas oscuras de vidrio y plástico claro sin perder sensibilidad
-    MIN_INFERENCE_SCORE: 0.08, // Descarte temprano de artefactos espurios
-    INFERENCE_WIDTH: 480,      // Buffer 480x360: Nitidez óptima para varias botellas a 30+ FPS en WebGL
-    INFERENCE_HEIGHT: 360,
-    INFERENCE_INTERVAL_MS: 80, // ~12 inferencias por segundo
+    DEFAULT_THRESHOLD: 0.15,   // 15% Calibrado: detecta botellas oscuras de vidrio y botellas PET transparentes
+    MIN_INFERENCE_SCORE: 0.08, // Descarte temprano de ruido
+    INFERENCE_INTERVAL_MS: 75, // ~13 inferencias por segundo en WebGL
     NMS_IOU_THRESHOLD: 0.60,   // Permite envases contiguos sin descartarlos
-    CONFIRMATION_HITS: 3,      // Debe detectarse por 3 frames consecutivos antes de auto-registrar
+    CONFIRMATION_HITS: 2,      // 2 frames consecutivos estables para auto-registrar
     MAX_MISSED_FRAMES: 10,     // Persistencia temporal (sin parpadeos)
-    MIN_BOX_SIZE: 16,
+    MIN_BOX_SIZE: 12,
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
   };
 
   // Clases válidas del dataset COCO correspondientes a botellas y recipientes
-  const RECYCLABLE_CLASSES = ['bottle', 'wine glass', 'cup', 'vase'];
+  const RECYCLABLE_CLASSES = ['bottle', 'wine glass', 'cup', 'vase', 'bowl'];
 
   // Referencias DOM
   const dom = {
@@ -92,11 +90,11 @@
     invTotalUnits: document.getElementById('invTotalUnits')
   };
 
-  // Buffer Offscreen de 480x360 para inferencia fluida en GPU y análisis de píxeles
-  const offscreenCanvas = document.createElement('canvas');
-  offscreenCanvas.width = CONFIG.INFERENCE_WIDTH;
-  offscreenCanvas.height = CONFIG.INFERENCE_HEIGHT;
-  const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+  // Canvas de muestreo espectral de 32x32 para clasificación instantánea de material
+  const sampleCanvas = document.createElement('canvas');
+  sampleCanvas.width = 32;
+  sampleCanvas.height = 32;
+  const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
 
   // Estado del Sistema
   let detector = null;
@@ -194,7 +192,7 @@
     }
   }
 
-  // 4. Geometría y Análisis Espectral de Materiales
+  // 4. Geometría y Clasificación Espectral de Material
   function computeIoU(a, b) {
     const x1 = Math.max(a.x, b.x);
     const y1 = Math.max(a.y, b.y);
@@ -205,59 +203,29 @@
     return union <= 0 ? 0 : inter / union;
   }
 
-  // Filtro Estricto de Geometría: descarta bloques cuadrados (muebles, dispensadores) y líneas delgadas
+  // Filtro de Geometría: descarta muebles masivos o cubos gigantes (como la base del botellón)
   function isValidContainerGeometry(rawClass, bw, bh, srcW, srcH) {
+    if (bw < CONFIG.MIN_BOX_SIZE || bh < CONFIG.MIN_BOX_SIZE) return false;
+
     const area = bw * bh;
     const totalArea = srcW * srcH;
     const areaRatio = area / totalArea;
 
-    // Descartar si llena más del 60% de la pantalla (pared/mueble) o menos del 1.0% (ruido lejano)
-    if (areaRatio > 0.60 || areaRatio < 0.010) {
-      return false;
-    }
+    // Descartar si llena más del 85% de toda la pantalla (pared o mesa completa)
+    if (areaRatio > 0.85) return false;
 
-    const hToW = bh / bw;
-    const wToH = bw / bh;
-
-    // Las botellas son cilíndricas (alargadas vertical u horizontalmente).
-    // Si la relación de aspecto es casi 1:1 (<1.08), es un bloque cúbico/cuadrado (como la base del botellón)
-    if (hToW < 1.08 && wToH < 1.08) {
-      return false;
-    }
-
-    // Descartar cables o postes ultra-finos
-    if (hToW > 6.0 || wToH > 6.0) {
-      return false;
+    // Descartar solo si es un bloque cuadrado gigante (aspect ratio ~1.0 y ocupa más del 30% del cuadro)
+    const ratio = Math.max(bw / bh, bh / bw);
+    if (ratio < 1.05 && areaRatio > 0.30) {
+      return false; // Bloque cuadrado masivo
     }
 
     return true;
   }
 
-  // Clasificador Inteligente de Material de Botella por Muestreo de Píxeles
+  // Clasificador Espectral de Material de Botella por Muestreo en Tiempo Real
   function analyzeBottleMaterial(bx, by, bw, bh, rawClass) {
-    const x = Math.max(0, Math.min(CONFIG.INFERENCE_WIDTH - 2, Math.floor(bx)));
-    const y = Math.max(0, Math.min(CONFIG.INFERENCE_HEIGHT - 2, Math.floor(by)));
-    const w = Math.max(2, Math.min(CONFIG.INFERENCE_WIDTH - x, Math.floor(bw)));
-    const h = Math.max(2, Math.min(CONFIG.INFERENCE_HEIGHT - y, Math.floor(bh)));
-
-    let imgData = null;
-    try {
-      imgData = offscreenCtx.getImageData(x, y, w, h);
-    } catch (e) {
-      imgData = null;
-    }
-
-    // Fallback sin acceso a píxeles
-    if (!imgData || !imgData.data || imgData.data.length < 16) {
-      if (rawClass === 'wine glass') {
-        return {
-          label: 'Botella de Vidrio (Retornable)',
-          tagClass: 'glass',
-          color: '#a855f7',
-          fill: 'rgba(168, 85, 247, 0.22)',
-          icon: 'bx-wine'
-        };
-      }
+    if (!activeSource) {
       return {
         label: 'Botella PET (Plástico Transparente)',
         tagClass: 'pet',
@@ -267,77 +235,92 @@
       };
     }
 
-    const data = imgData.data;
-    const totalPixels = w * h;
-    const step = Math.max(1, Math.floor(totalPixels / 500));
+    try {
+      const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
+      const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
 
-    let totalLum = 0;
-    let sampleCount = 0;
-    let redLabelHits = 0;
-    let darkGlassHits = 0;
-    let greenGlassHits = 0;
+      const sx = Math.max(0, Math.min(srcW - 2, Math.floor(bx)));
+      const sy = Math.max(0, Math.min(srcH - 2, Math.floor(by)));
+      const sw = Math.max(4, Math.min(srcW - sx, Math.floor(bw)));
+      const sh = Math.max(4, Math.min(srcH - sy, Math.floor(bh)));
 
-    for (let i = 0; i < data.length; i += step * 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+      // Muestrear en canvas offscreen ultra-ligero de 32x32 (1024 píxeles)
+      sampleCtx.drawImage(activeSource, sx, sy, sw, sh, 0, 0, 32, 32);
+      const imgData = sampleCtx.getImageData(0, 0, 32, 32);
+      const data = imgData.data;
 
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-      totalLum += lum;
-      sampleCount++;
+      let totalLum = 0;
+      let redCount = 0;
+      let darkCount = 0;
+      let greenCount = 0;
+      const totalPixels = 32 * 32;
 
-      // 1. Detección de etiqueta roja Coca-Cola o bebida con marca roja
-      if (r > 105 && r > g * 1.35 && r > b * 1.35) {
-        redLabelHits++;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalLum += lum;
+
+        // Detección de etiqueta / líquido rojo Coca-Cola
+        if (r > 105 && r > g * 1.30 && r > b * 1.30) {
+          redCount++;
+        }
+        // Vidrio oscuro (vino, cerveza oscura, botella ámbar/negra)
+        if (lum < 75) {
+          darkCount++;
+        }
+        // Vidrio verde (vino verde, cerveza verde)
+        if (g > 65 && g > r * 1.20 && g > b * 1.20) {
+          greenCount++;
+        }
       }
 
-      // 2. Detección de vidrio oscuro (vino, cerveza oscura, botella ámbar/negra)
-      if (lum < 75) {
-        darkGlassHits++;
+      const avgLum = totalLum / totalPixels;
+      const redRatio = redCount / totalPixels;
+      const darkRatio = darkCount / totalPixels;
+      const greenRatio = greenCount / totalPixels;
+
+      // 1. REGLA VIDRIO: copa/wine glass, botella oscura (vino/cerveza) o verde
+      if (rawClass === 'wine glass' || darkRatio > 0.35 || greenRatio > 0.30 || avgLum < 85) {
+        return {
+          label: 'Botella de Vidrio (Retornable)',
+          tagClass: 'glass',
+          color: '#a855f7', // Púrpura Vidrio
+          fill: 'rgba(168, 85, 247, 0.22)',
+          icon: 'bx-wine'
+        };
       }
 
-      // 3. Detección de vidrio verde (vino verde, cerveza verde)
-      if (g > 65 && g > r * 1.25 && g > b * 1.25) {
-        greenGlassHits++;
+      // 2. REGLA COCA-COLA / REFRESCO (Etiqueta roja distintiva)
+      if (redRatio > 0.035) {
+        return {
+          label: 'Botella PET (Coca-Cola / Reciclable)',
+          tagClass: 'coca',
+          color: '#ef4444', // Rojo Coca-Cola
+          fill: 'rgba(239, 68, 68, 0.22)',
+          icon: 'bx-recycle'
+        };
       }
-    }
 
-    const avgLum = sampleCount > 0 ? totalLum / sampleCount : 128;
-    const redRatio = sampleCount > 0 ? redLabelHits / sampleCount : 0;
-    const darkRatio = sampleCount > 0 ? darkGlassHits / sampleCount : 0;
-    const greenRatio = sampleCount > 0 ? greenGlassHits / sampleCount : 0;
-
-    // REGLA 1: BOTELLA DE VIDRIO
-    // Si COCO lo detectó como copa/vidrio, o si la botella es oscura (botella de vino/cerveza) o verde
-    if (rawClass === 'wine glass' || darkRatio > 0.38 || greenRatio > 0.32 || avgLum < 82) {
+      // 3. REGLA PET PLÁSTICO TRANSPARENTE (Agua Vital, botella cristalina)
       return {
-        label: 'Botella de Vidrio (Retornable)',
-        tagClass: 'glass',
-        color: '#a855f7', // Púrpura Vidrio
-        fill: 'rgba(168, 85, 247, 0.22)',
-        icon: 'bx-wine'
+        label: 'Botella PET (Plástico Transparente)',
+        tagClass: 'pet',
+        color: '#06b6d4', // Cyan Cristalino PET
+        fill: 'rgba(6, 182, 212, 0.20)',
+        icon: 'bx-water'
+      };
+    } catch (err) {
+      console.warn('EcoLens: Advertencia en muestreo espectral:', err);
+      return {
+        label: 'Botella PET (Plástico Transparente)',
+        tagClass: 'pet',
+        color: '#06b6d4',
+        fill: 'rgba(6, 182, 212, 0.20)',
+        icon: 'bx-water'
       };
     }
-
-    // REGLA 2: BOTELLA PET RECICLADA (COCA-COLA / BEBIDA CON ETIQUETA ROJA)
-    if (redRatio > 0.040) {
-      return {
-        label: 'Botella PET (Coca-Cola / Reciclable)',
-        tagClass: 'coca',
-        color: '#ef4444', // Rojo Coca-Cola
-        fill: 'rgba(239, 68, 68, 0.22)',
-        icon: 'bx-recycle'
-      };
-    }
-
-    // REGLA 3: BOTELLA PET (PLÁSTICO TRANSPARENTE - AGUA VITAL / CRISTALINA)
-    return {
-      label: 'Botella PET (Plástico Transparente)',
-      tagClass: 'pet',
-      color: '#06b6d4', // Cyan Cristalino PET
-      fill: 'rgba(6, 182, 212, 0.20)',
-      icon: 'bx-water'
-    };
   }
 
   // 5. Dimensionamiento Exacto del Canvas
@@ -369,53 +352,38 @@
     isDetecting = true;
 
     try {
-      // 1. Dibujar frame en buffer offscreen de 480x360
-      offscreenCtx.drawImage(activeSource, 0, 0, CONFIG.INFERENCE_WIDTH, CONFIG.INFERENCE_HEIGHT);
+      // 1. Inferencia Directa sobre activeSource en GPU (Sin distorsión de relación de aspecto)
+      const rawPredictions = await detector.detect(activeSource, 20, CONFIG.MIN_INFERENCE_SCORE);
 
-      // 2. Inferencia en GPU
-      const rawPredictions = await detector.detect(offscreenCanvas, 20, CONFIG.MIN_INFERENCE_SCORE);
-
-      // 3. Proyectar coordenadas a escala real
-      const scaleX = srcW / CONFIG.INFERENCE_WIDTH;
-      const scaleY = srcH / CONFIG.INFERENCE_HEIGHT;
-
-      // 4. SUPRESIÓN DE PERSONAS Y FIGURAS HUMANAS (Kratos, muñecos, torsos)
+      // 2. Supresión de muñecos/figuras humanas (Solo si el objeto coincide casi exactamente con 'person', IoU > 0.60)
       const personBoxes = rawPredictions
-        .filter(p => p.class === 'person' && p.score >= 0.28)
-        .map(p => ({
-          x: p.bbox[0] * scaleX,
-          y: p.bbox[1] * scaleY,
-          w: p.bbox[2] * scaleX,
-          h: p.bbox[3] * scaleY
-        }));
+        .filter(p => p.class === 'person' && p.score >= 0.35)
+        .map(p => ({ x: p.bbox[0], y: p.bbox[1], w: p.bbox[2], h: p.bbox[3] }));
 
       const candidates = [];
       for (const p of rawPredictions) {
         if (!RECYCLABLE_CLASSES.includes(p.class)) continue;
 
-        const bx = p.bbox[0] * scaleX;
-        const by = p.bbox[1] * scaleY;
-        const bw = p.bbox[2] * scaleX;
-        const bh = p.bbox[3] * scaleY;
+        const bx = p.bbox[0];
+        const by = p.bbox[1];
+        const bw = p.bbox[2];
+        const bh = p.bbox[3];
 
         if (bw < CONFIG.MIN_BOX_SIZE || bh < CONFIG.MIN_BOX_SIZE) continue;
 
-        // Comprobar si solapa con una persona / figura
+        // Comprobar si coincide idénticamente con una persona (figura de acción/muñeco detectado como ambos)
         const candidateBox = { x: bx, y: by, w: bw, h: bh };
-        const overlapsPerson = personBoxes.some(pb => computeIoU(candidateBox, pb) > 0.25 || (
-          bx >= pb.x && (bx + bw) <= (pb.x + pb.w) &&
-          by >= pb.y && (by + bh) <= (pb.y + pb.h)
-        ));
-        if (overlapsPerson) continue; // Descartado: es parte de una figura o persona
+        const isPersonClash = personBoxes.some(pb => computeIoU(candidateBox, pb) > 0.60);
+        if (isPersonClash) continue;
 
-        // Comprobar geometría física de envase real (alargado, descarta bloques cuadrados)
+        // Validar geometría física básica (descarta paredes completas o cubos gigantes)
         if (!isValidContainerGeometry(p.class, bw, bh, srcW, srcH)) continue;
 
-        // Umbral uniforme de certeza
+        // Umbral de certeza uniforme
         if (p.score < activeThreshold) continue;
 
-        // Análisis espectral de material sobre el buffer offscreen
-        const meta = analyzeBottleMaterial(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3], p.class);
+        // Clasificación espectral de material directamente desde la imagen real
+        const meta = analyzeBottleMaterial(bx, by, bw, bh, p.class);
 
         candidates.push({
           x: bx,
@@ -430,7 +398,7 @@
         });
       }
 
-      // 5. Non-Maximum Suppression (NMS)
+      // 3. Non-Maximum Suppression (NMS)
       candidates.sort((a, b) => b.score - a.score);
       const filtered = [];
       for (const c of candidates) {
@@ -439,7 +407,7 @@
         }
       }
 
-      // 6. Tracking Multi-Botella 1-a-1 Robusto (IoU + Distancia de Centros)
+      // 4. Tracking Multi-Botella 1-a-1 Robusto (IoU + Distancia de Centros)
       const matchedTrackerIds = new Set();
       const newlyRegistered = [];
 
@@ -457,7 +425,7 @@
           const normDist = dist / Math.max(t.w, t.h, box.w, box.h);
 
           // Coincidencia si hay solapamiento IoU o distancia de centros cercana
-          if (iou > 0.15 || normDist < 0.35) {
+          if (iou > 0.12 || normDist < 0.40) {
             const matchScore = iou * 0.6 + (1 - Math.min(1, normDist)) * 0.4;
             if (matchScore > bestScore) {
               bestScore = matchScore;
@@ -466,7 +434,7 @@
           }
         }
 
-        if (bestMatch && bestScore > 0.20) {
+        if (bestMatch && bestScore > 0.18) {
           bestMatch.x = bestMatch.x * 0.35 + box.x * 0.65;
           bestMatch.y = bestMatch.y * 0.35 + box.y * 0.65;
           bestMatch.w = bestMatch.w * 0.35 + box.w * 0.65;
@@ -478,7 +446,7 @@
           bestMatch.hits++;
           matchedTrackerIds.add(bestMatch.id);
 
-          // Confirmación de Estabilidad (3 frames seguidos)
+          // Confirmación de Estabilidad (2 frames seguidos)
           if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
             bestMatch.registered = true;
             newlyRegistered.push(bestMatch);
@@ -677,10 +645,14 @@
     }
   }
 
-  // 9. Bucle de Inferencia No-Bloqueante
+  // 9. Bucle de Inferencia No-Bloqueante con Captura Segura de Excepciones
   async function runInferenceLoop() {
     if (!isLoopActive) return;
-    await processVisualFrame();
+    try {
+      await processVisualFrame();
+    } catch (e) {
+      console.warn('EcoLens: Advertencia en ciclo visual:', e);
+    }
     if (isLoopActive) {
       loopTimeoutId = setTimeout(runInferenceLoop, CONFIG.INFERENCE_INTERVAL_MS);
     }
@@ -870,8 +842,9 @@
     }
 
     playSound('click');
-    dom.statusText.textContent = 'Capturando botellas visibles...';
+    dom.statusText.textContent = 'Analizando escena en alta sensibilidad...';
 
+    // 1. Si ya hay botellas visibles, registrarlas de inmediato
     const unreg = visibleBoxes.filter(b => !b.registered);
     if (unreg.length > 0) {
       for (const b of unreg) {
@@ -883,24 +856,29 @@
       return;
     }
 
-    // Escaneo profundo con umbral bajo si aún no se fijó automáticamente
-    const prevThreshold = activeThreshold;
-    activeThreshold = 0.10;
-    await processVisualFrame();
-    activeThreshold = prevThreshold;
+    // 2. Si aún no las fijó el tracking, forzar un frame con umbral extra sensible (8%)
+    try {
+      const prevThreshold = activeThreshold;
+      activeThreshold = 0.08;
+      isDetecting = false; // desbloquear si estaba ocupado
+      await processVisualFrame();
+      activeThreshold = prevThreshold;
 
-    const newlyFound = visibleBoxes.filter(b => !b.registered);
-    if (newlyFound.length > 0) {
-      for (const b of newlyFound) {
-        b.registered = true;
+      const newlyFound = visibleBoxes.filter(b => !b.registered);
+      if (newlyFound.length > 0) {
+        for (const b of newlyFound) {
+          b.registered = true;
+        }
+        onNewBottlesRegistered(newlyFound);
+        renderCanvasHUD();
+        dom.statusText.textContent = `✓ ¡${newlyFound.length} botella(s) registrada(s) con éxito!`;
+        return;
       }
-      onNewBottlesRegistered(newlyFound);
-      renderCanvasHUD();
-      dom.statusText.textContent = `✓ ¡${newlyFound.length} botella(s) registrada(s) con éxito!`;
-      return;
+    } catch (e) {
+      console.warn('Error en escaneo manual:', e);
     }
 
-    dom.statusText.textContent = 'Apunta claramente hacia las botellas para capturarlas.';
+    dom.statusText.textContent = 'Enfoca tus botellas hacia la cámara para capturarlas.';
   }
 
   // 13. Persistencia en LocalStorage
