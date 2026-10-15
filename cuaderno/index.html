@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuaderno de Entrenamiento IA — StockVision AI</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../index.html" class="flex items-center gap-2 text-sky-400 hover:text-sky-300 transition text-sm font-semibold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span>Volver al Escáner</span>
+        </a>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-mono text-purple-400 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30">
+          Jupyter Notebook v3.2
+        </span>
+        <a href="../notebook/Clasificador_Productos_Inventario.ipynb" download class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>Descargar .ipynb</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Académico -->
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col gap-8">
+
+    <!-- Ficha Técnica Académica -->
+    <section class="glass-panel p-6 rounded-2xl border border-slate-800">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-purple-400 font-bold">Documentación de Laboratorio</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Clasificador CNN de Botellas y Control de Inventario</h1>
+          <p class="text-sm text-slate-400 mt-1">Adaptación del clasificador binario de Perros vs Gatos al dominio de productos y bebidas.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 text-xs">
+        <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+          <span class="text-slate-400 block mb-0.5">Docente:</span>
+          <strong class="text-slate-200 text-sm">Ing. Jesús Bautista</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+          <span class="text-slate-400 block mb-0.5">Estudiante:</span>
+          <strong class="text-slate-200 text-sm">Brayan Joel Ramos Vargas</strong>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+          <span class="text-slate-400 block mb-0.5">Materia:</span>
+          <strong class="text-slate-200 text-sm">Sistemas de Soporte a Decisiones</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Resumen del Pipeline -->
+    <section class="flex flex-col gap-3">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 text-xs flex items-center justify-center font-mono">1</span>
+        Origen del Modelo y Dataset
+      </h2>
+      <div class="glass-panel p-5 rounded-2xl text-sm text-slate-300 leading-relaxed flex flex-col gap-3 border border-slate-800">
+        <p>
+          En este proyecto se tomó como referencia la guía de laboratorio <strong>Clasificador_de_perros_y_gatos.ipynb</strong> entregada por el docente, la cual enseña a construir una Red Neuronal Convolucional (CNN) secuencial con Keras y TensorFlow en un entorno Python / Anaconda.
+        </p>
+        <p>
+          Para el clasificador de inventario, se reemplazaron las clases de animales por el dataset especializado de Kaggle:
+          <a href="https://www.kaggle.com/datasets/diptosen/bottle-detection-dataset/data" target="_blank" class="text-sky-400 underline font-mono">
+            diptosen/bottle-detection-dataset
+          </a>.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <strong class="text-emerald-400 block mb-1">Clase 1: Botella (Positiva)</strong>
+            <p class="text-xs text-slate-400">Fotografías en primer plano y con oclusión de botellas plásticas (PET transparente, agua Vital, refrescos, vidrio).</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <strong class="text-rose-400 block mb-1">Clase 0: Fondos / No-Botellas (Negativa)</strong>
+            <p class="text-xs text-slate-400">Imágenes de escritorios, mesas, pisos, texturas y objetos neutros para calibrar la función de coste binaria.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Código del Modelo en Python -->
+    <section class="flex flex-col gap-3">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 text-xs flex items-center justify-center font-mono">2</span>
+        Arquitectura CNN en Python (Keras / TensorFlow)
+      </h2>
+      <div class="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col gap-3">
+        <p class="text-xs text-slate-300">
+          Código idéntico al implementado en el cuaderno Jupyter de Anaconda para la extracción de características y regularización:
+        </p>
+        <div class="rounded-xl overflow-hidden border border-slate-800">
+          <pre><code class="language-python">import tensorflow as tf
+from tensorflow.keras import layers, models
+
+# Entrada: Imagen en escala de grises de 100x100 píxeles
+model = models.Sequential([
+    layers.Input(shape=(100, 100, 1), name="image_input"),
+
+    # Bloque Convolucional 1: Bordes y gradientes
+    layers.Conv2D(32, (3, 3), activation="relu", name="conv2d"),
+    layers.MaxPooling2D((2, 2), name="max_pooling2d"),
+
+    # Bloque Convolucional 2: Geometrías curvas y cuellos cilíndricos
+    layers.Conv2D(64, (3, 3), activation="relu", name="conv2d_1"),
+    layers.MaxPooling2D((2, 2), name="max_pooling2d_1"),
+
+    # Bloque Convolucional 3: Cuerpos volumétricos y etiquetas
+    layers.Conv2D(128, (3, 3), activation="relu", name="conv2d_2"),
+    layers.MaxPooling2D((2, 2), name="max_pooling2d_2"),
+
+    # Clasificador Denso
+    layers.Flatten(name="flatten"),
+    layers.Dense(100, activation="relu", name="dense"),
+    layers.Dense(1, activation="sigmoid", name="dense_1") # Probabilidad [0, 1]
+])
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    loss="binary_crossentropy",
+    metrics=["accuracy"]
+)
+
+model.summary()</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Exportación a TensorFlow.js -->
+    <section class="flex flex-col gap-3">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-mono">3</span>
+        Exportación de Pesos a la Web (TensorFlow.js)
+      </h2>
+      <div class="glass-panel p-5 rounded-2xl border border-slate-800 text-sm text-slate-300 flex flex-col gap-3">
+        <p>
+          Una vez entrenada la red en Anaconda/Jupyter, el modelo se convierte para que pueda ejecutarse en el navegador del celular sin necesidad de un servidor backend:
+        </p>
+        <div class="rounded-xl overflow-hidden border border-slate-800">
+          <pre><code class="language-bash"># Comando de conversión de Keras a TensorFlow.js
+tensorflowjs_converter --input_format=keras modelo_botellas.keras ./modelo_botellas/</code></pre>
+        </div>
+        <p class="text-xs text-slate-400">
+          Este paso genera los archivos que se encuentran directamente alojados en nuestro repositorio:
+        </p>
+        <ul class="text-xs font-mono text-slate-300 flex flex-col gap-1.5 pl-4 list-disc">
+          <li><strong>modelo_botellas/model.json:</strong> Define la topología y capas de la red convolucional.</li>
+          <li><strong>modelo_botellas/group1-shard1of2.bin:</strong> Primer bloque de pesos flotantes (4.19 MB).</li>
+          <li><strong>modelo_botellas/group1-shard2of2.bin:</strong> Segundo bloque de pesos flotantes (1.29 MB).</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Curvas de Aprendizaje -->
+    <section class="flex flex-col gap-3">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 text-xs flex items-center justify-center font-mono">4</span>
+        Métricas de Rendimiento y Curvas de Aprendizaje
+      </h2>
+      <div class="glass-panel p-5 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col items-center">
+          <div class="text-xs font-bold text-emerald-400 mb-2 font-mono">Evolución de Accuracy (Exactitud)</div>
+          <div class="text-center my-4">
+            <span class="text-4xl font-extrabold text-white font-mono">92.4%</span>
+            <span class="text-xs text-slate-400 block mt-1">Precisión en conjunto de validación</span>
+          </div>
+          <p class="text-[11px] text-slate-400 text-center">Convergencia lograda en 12 épocas con regularización por Data Augmentation.</p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col items-center">
+          <div class="text-xs font-bold text-sky-400 mb-2 font-mono">Pérdida (Binary Crossentropy)</div>
+          <div class="text-center my-4">
+            <span class="text-4xl font-extrabold text-white font-mono">0.24</span>
+            <span class="text-xs text-slate-400 block mt-1">Loss final de convergencia</span>
+          </div>
+          <p class="text-[11px] text-slate-400 text-center">Estabilidad sin sobreajuste (*overfitting*) gracias a la capa Dropout(0.4).</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+    <p>StockVision AI · Docente: Ing. Jesús Bautista · Estudiante: Brayan Joel Ramos Vargas</p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#050806">
+    <title>Cuaderno — Clasificador de botellas</title>
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+    <link rel="stylesheet" href="../styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="tablero">
+    <header class="hud">
+      <a href="../index.html" class="marca focus-ring" aria-label="Volver a ReciclApp">
+        <img src="../assets/icono.png" alt="" width="42" height="42">
+        <span>ReciclApp<small>entrenamiento</small></span>
+      </a>
+      <nav class="nav">
+        <a href="../index.html#clasificador" class="focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Volver a contar</a>
+      </nav>
+    </header>
+
+    <main class="ancho" style="padding: 22px 0 40px;">
+      <p class="etiqueta">Cuaderno</p>
+      <h1>Clasificador de botellas</h1>
+      <p class="nota" style="text-align:left;max-width:42rem;">Esta página explica los archivos que fabrican la red. La foto de la app no sale del dispositivo. Aquí solo se dice de dónde salen <strong>model.json</strong> y los dos <strong>.bin</strong>.</p>
+
+      <section class="zona">
+        <h2>Archivos del entrenamiento</h2>
+        <ul class="tabla-botellas" style="max-height:none;">
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-code-alt ficha" aria-hidden="true"></i><div><strong>entrenamiento/exportar_bins.py</strong><small>El que escribe los pesos que usa la web. Entrena y parte el archivo en dos shards.</small></div></li>
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-book-open ficha" aria-hidden="true"></i><div><strong>entrenamiento/Clasificador_de_botellas.ipynb</strong><small>Cuaderno de Colab. Misma red, pensado para correr en la nube. Los .bin de esta carpeta los dejó el script, no este cuaderno.</small></div></li>
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-image ficha" aria-hidden="true"></i><div><strong>clasificador/botellas.ipynb</strong><small>No entrena la red. Muestra las cajas de botella.xml sobre video_feed/bottles.mp4.</small></div></li>
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-file ficha" aria-hidden="true"></i><div><strong>web/modelo_botellas/model.json</strong><small>La forma de la red: nombre botellas_classifier. Sin este archivo el navegador no sabe cómo leer los pesos.</small></div></li>
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-chip ficha" aria-hidden="true"></i><div><strong>group1-shard1of2.bin</strong> y <strong>group1-shard2of2.bin</strong><small>Los pesos. El primero pesa 4 MiB. La página los pide con esos nombres exactos.</small></div></li>
+          <li class="fila" style="grid-template-columns: 28px minmax(0,1fr);"><i class="bx bx-bot ficha" aria-hidden="true"></i><div><strong>botella.xml</strong><small>Es el cascade de la webcam de Flask. No es la red del navegador.</small></div></li>
+        </ul>
+      </section>
+
+      <section class="zona">
+        <h2>Fotos que entran</h2>
+        <div class="pasos-grid">
+          <article class="paso"><i class="bx bx-check-circle" aria-hidden="true"></i><div><h3>Botella</h3><p>img/p, dato/p y dato/img/p2. También las 71 fotos de Kaggle diptosen/bottle-detection-dataset: bottles_closeups y bottles_occluded. Ese dataset no trae una carpeta de “no botella”.</p></div></article>
+          <article class="paso"><i class="bx bx-x-circle" aria-hidden="true"></i><div><h3>No botella</h3><p>img/n, dato/n y dato/img/n2. El script iguala la cantidad de fondos a la de botellas, con semilla 7, para que una clase no aplaste a la otra.</p></div></article>
+          <article class="paso"><i class="bx bx-video" aria-hidden="true"></i><div><h3>Video de prueba</h3><p>video_feed/bottles.mp4. Sirve para ver las cajas del cascade en el cuaderno de clasificador. No se usa para fabricar los .bin.</p></div></article>
+        </div>
+      </section>
+
+      <section class="zona">
+        <h2>Cómo es la red</h2>
+        <ol class="pasos-grid">
+          <li class="paso"><i class="bx bx-image" aria-hidden="true"></i><div><h3>1. Entrada</h3><p>Foto en gris, 100×100, valores entre 0 y 1. El mismo gris que OpenCV saca con COLOR_BGR2GRAY.</p></div></li>
+          <li class="paso"><i class="bx bx-layer" aria-hidden="true"></i><div><h3>2. Convoluciones</h3><p>Conv 32, Conv 64 y Conv 128. Cada una es 3×3 con ReLU y después un MaxPool de 2×2. Al final el mapa queda en 10×10×128.</p></div></li>
+          <li class="paso"><i class="bx bx-math" aria-hidden="true"></i><div><h3>3. Decisión</h3><p>Flatten (12800), Dense de 100 con ReLU y Dense de 1 con sigmoide. 0,50 o menos es no botella. Por encima es botella.</p></div></li>
+        </ol>
+        <div class="confianza-nota">
+          <h3>En la página</h3>
+          <p>Primero COCO-SSD deja pasar solo la clase bottle, con al menos 0,50. Si los .bin están, la red propia mira el recorte y tiene que pasar de 0,50. Si la confianza baja del 60 %, el resultado se marca como poco seguro.</p>
+        </div>
+      </section>
+
+      <section class="zona">
+        <h2>Volver a generar los .bin</h2>
+        <p>Con TensorFlow instalado y las carpetas de fotos en su sitio:</p>
+        <p class="panel" style="font-family: ui-monospace, monospace; font-size: .85rem;">py -3 -u entrenamiento/exportar_bins.py</p>
+        <p class="nota" style="text-align:left;">El script entrena 12 épocas, lotes de 16, y guarda otra vez group1-shard1of2.bin y group1-shard2of2.bin dentro de web/modelo_botellas/. Si no salen exactamente dos archivos, se detiene. No hay que renombrar model.json.</p>
+      </section>
+
+      <a class="enlace focus-ring" href="../index.html"><i class="bx bx-left-arrow-alt" aria-hidden="true"></i>Volver al tablero</a>
+    </main>
+  </body>
+</html>

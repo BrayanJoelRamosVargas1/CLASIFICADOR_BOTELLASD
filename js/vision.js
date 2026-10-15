@@ -44,6 +44,15 @@ class VisionEngine {
       }
 
       this.isModelLoaded = true;
+
+      // Cargar la red neuronal propia entrenada en Keras / Jupyter
+      try {
+        this.customModel = await tf.loadLayersModel('./modelo_botellas/model.json');
+        console.log('[OK] Red neuronal propia (Keras CNN de botellas) cargada exitosamente.');
+      } catch (errCustom) {
+        console.warn('Red propia en modo auxiliar:', errCustom);
+      }
+
       if (onProgress) onProgress('Modelo IA Listo y Acelerado.');
       return true;
     } catch (error) {
