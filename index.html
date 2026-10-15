@@ -1,351 +1,1226 @@
-<!DOCTYPE html>
-<html lang="es" class="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>StockVision AI — Clasificador Inteligente de Productos e Inventario</title>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#cfe8b0">
+    <meta name="description" content="Cuenta botellas de plástico con un clasificador local. Usa la cámara o sube una foto. La imagen no sale del dispositivo.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Botellas IA — ¿Hay botellas?">
+    <meta property="og:description" content="Una forma sencilla de contar botellas de plástico y guardar el inventario en el mismo dispositivo.">
+    <meta property="og:image" content="assets/botellas.svg">
+    <link rel="icon" type="image/png" href="assets/icono.png">
+    <meta name="author" content="Brayan Joel Ramos Vargas">
+    <link rel="manifest" href="manifest.webmanifest">
+    <title>Botellas IA — Clasificador Inteligente de Botellas | Brayan Ramos</title>
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="tablero">
+    <header class="hud">
+      <a href="#" class="marca focus-ring" aria-label="ReciclApp, inicio">
+        <img src="assets/icono.png" alt="" width="42" height="42">
+        <span>ReciclApp<small>caza botellas</small></span>
+      </a>
+      <nav class="nav" aria-label="Navegación principal">
+        <a href="#clasificador" class="focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Jugar</a>
+        <a href="#historial" class="focus-ring"><i class="bx bx-list-ul" aria-hidden="true"></i>Inventario</a>
+        <a href="#mapa-basureros" class="focus-ring"><i class="bx bx-map" aria-hidden="true"></i>Mapa</a>
+        <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" class="focus-ring"><i class="bx bxl-github" aria-hidden="true"></i>GitHub</a>
+        <a href="cuaderno/index.html" class="focus-ring cuaderno"><i class="bx bx-book-open" aria-hidden="true"></i>Cuaderno</a>
+        <button id="install-app" type="button" class="boton boton-chico hidden"><i class="bx bx-download" aria-hidden="true"></i><span class="solo-ancho">Instalar</span></button>
+        <p class="marcador" aria-label="Botellas acumuladas"><img src="assets/icono.png" alt="" width="28" height="28"><strong id="marcador-total">0</strong></p>
+      </nav>
+    </header>
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0f9ff',
-              100: '#e0f2fe',
-              500: '#0ea5e9',
-              600: '#0284c7',
-              700: '#0369a1',
+    <main>
+      <section class="ancho hero">
+        <div>
+          <p class="pista"><i class="bx bx-recycle" aria-hidden="true"></i> Misión de reciclaje</p>
+          <h1>Caza la <span>botella</span> y súmala al marcador</h1>
+          <p>Cámara, foto o video. Si salen dos, entran las dos. La misma no se cuenta otra vez.</p>
+          <a href="#clasificador" class="boton boton-papel focus-ring"><i class="bx bx-play" aria-hidden="true"></i>A jugar</a>
+        </div>
+        <img class="hero-arte" src="assets/botellas.svg" alt="Botella frente a un basurero amarillo, un contenedor verde y un punto de reciclaje azul" width="640" height="360">
+      </section>
+
+      <section id="clasificador" class="zona">
+        <div class="ancho">
+          <div class="titulo-zona">
+            <p class="etiqueta">Tu turno</p>
+            <h2>¿Cuántas botellas salen?</h2>
+            <p>La cámara y el video cuentan solos. Si hay dos, entran las dos. La misma no se vuelve a registrar.</p>
+          </div>
+          <div class="juego">
+            <div class="panel">
+              <div class="escenario">
+                <video id="video" class="hidden" playsinline autoplay muted aria-label="Vista previa de la cámara o del video"></video>
+                <img id="foto-preview" class="hidden" alt="Imagen seleccionada para clasificar">
+                <canvas id="canvas" width="400" height="400" class="hidden" aria-hidden="true"></canvas>
+                <div id="placeholder" class="espera">
+                  <img src="assets/icono.png" alt="" width="72" height="72">
+                  <p>Tu foto aparecerá aquí</p>
+                  <span>JPG, PNG, WEBP, MP4 o cámara en vivo</span>
+                </div>
+                <div id="camera-tag" class="chip hidden">Contando</div>
+                <div id="conteo-vivo" class="hidden">En vista: <span id="en-vista">0</span> · En esta toma: <span id="en-toma">0</span></div>
+              </div>
+              <div class="teclas">
+                <button id="start-camera" type="button" class="tecla tecla-verde focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Cámara</button>
+                <label for="image-upload" class="tecla tecla-azul focus-ring"><i class="bx bx-image-add" aria-hidden="true"></i>Foto</label>
+                <input id="image-upload" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <label for="video-upload" class="tecla tecla-papel focus-ring"><i class="bx bx-video" aria-hidden="true"></i>Video</label>
+                <input id="video-upload" class="sr-only" type="file" accept="video/mp4,video/webm,video/quicktime">
+                <button id="switch-camera" type="button" class="tecla hidden focus-ring" aria-label="Cambiar entre cámara frontal y trasera"><i class="bx bx-refresh" aria-hidden="true"></i>Cambiar cámara</button>
+                <button id="classify" type="button" disabled class="boton boton-jugar focus-ring"><i class="bx bx-scan" aria-hidden="true"></i>Registrar ahora</button>
+              </div>
+              <p id="status" role="status" aria-live="polite">Preparando el modelo de IA…</p>
+              <button id="nueva-toma" type="button" class="tecla hidden focus-ring">Nueva toma</button>
+            </div>
+            <aside>
+              <section class="panel resultado" aria-labelledby="result-heading">
+                <p id="result-heading" class="etiqueta">Resultado</p>
+                <div id="result-icon" aria-hidden="true"><i class="bx bx-recycle"></i></div>
+                <p id="result-label">Aún no lo sabemos</p>
+                <p id="result-confidence"></p>
+                <button id="speak-result" type="button" class="boton boton-chico hidden focus-ring" aria-label="Escuchar el resultado"><i class="bx bx-volume-full" aria-hidden="true"></i>Escuchar</button>
+              </section>
+              <section class="panel privacidad" aria-labelledby="privacy-heading">
+                <h3 id="privacy-heading"><i class="bx bx-lock-alt" aria-hidden="true"></i> Tu privacidad importa</h3>
+                <p>Tus fotos no salen de tu dispositivo. Aquí solo se guarda el inventario: etiqueta, fecha, cantidad, confianza y cajas.</p>
+              </section>
+              <section class="panel" style="margin-top:10px;padding:12px;background:linear-gradient(160deg,#fffdf8,#f3edf9);border-color:rgba(147,51,234,0.2);" aria-labelledby="academic-heading">
+                <h3 id="academic-heading" style="margin:0 0 4px;font-size:1rem;color:#6b21a8;"><i class="bx bx-brain" aria-hidden="true"></i> Red Neuronal Propia</h3>
+                <p style="margin:0 0 6px;font-size:0.86rem;color:var(--suave);">Adaptada de la arquitectura de perros y gatos del Ing. Jesús Bautista (92.4% exactitud en Keras).</p>
+                <a href="cuaderno/index.html" class="boton boton-chico focus-ring" style="background:#f3e8ff;border-color:#d8b4fe;color:#6b21a8;font-size:0.82rem;"><i class="bx bx-book-open"></i>Ver cuaderno</a>
+              </section>
+            </aside>
+          </div>
+          <p class="nota">La IA puede equivocarse si la imagen está oscura, borrosa o las botellas se tapan entre sí.</p>
+        </div>
+      </section>
+
+      <section id="historial" class="ancho inventario">
+        <div class="cabecera-fila">
+          <div>
+            <p class="etiqueta">Botín</p>
+            <h2>Inventario</h2>
+            <p>Total: <span id="inventory-total">0</span> botellas</p>
+          </div>
+          <div class="acciones">
+            <button id="export-json" type="button" class="boton boton-chico hidden focus-ring"><i class="bx bx-download" aria-hidden="true"></i>JSON</button>
+            <button id="export-csv" type="button" class="boton boton-chico hidden focus-ring"><i class="bx bx-spreadsheet" aria-hidden="true"></i>CSV</button>
+            <button id="clear-history" type="button" class="boton boton-chico boton-texto hidden focus-ring"><i class="bx bx-trash" aria-hidden="true"></i>Borrar</button>
+          </div>
+        </div>
+        <p id="history-empty" class="vacio"><i class="bx bx-package" aria-hidden="true"></i> Todavía no hay registros. Cada botella entra sola, una sola vez.</p>
+        <div class="tabla-cabecera" aria-hidden="true">
+          <span></span>
+          <span>Registro</span>
+          <span>Confianza</span>
+          <span>Cant.</span>
+          <span></span>
+        </div>
+        <ul id="history-list" class="tabla-botellas" aria-label="Inventario de botellas"></ul>
+      </section>
+
+      <section id="mapa-basureros" class="ancho mapa-zona">
+        <p class="etiqueta">Cerca de ti</p>
+        <h2>Busca un basurero</h2>
+        <p>Lima es un basurero, verde un contenedor y menta un punto de reciclaje. La foto sigue en tu dispositivo.</p>
+        <div class="buscar">
+          <button id="buscar-basureros" type="button" class="boton boton-azul focus-ring"><i class="bx bx-current-location" aria-hidden="true"></i>Mi ubicación</button>
+          <input id="lugar-basureros" type="search" placeholder="Ciudad o dirección" aria-label="Ciudad o dirección">
+          <button id="buscar-lugar" type="button" class="boton boton-papel focus-ring"><i class="bx bx-search" aria-hidden="true"></i>Buscar</button>
+        </div>
+        <p id="mapa-estado">Todavía no hay una búsqueda.</p>
+        <ul class="leyenda" aria-label="Tipos de basurero">
+          <li><i class="bin bin-papel" aria-hidden="true"></i>Basurero</li>
+          <li><i class="bin bin-vidrio" aria-hidden="true"></i>Contenedor</li>
+          <li><i class="bin bin-plastico" aria-hidden="true"></i>Reciclaje</li>
+        </ul>
+        <div id="mapa" role="region" aria-label="Mapa de basureros"></div>
+        <ul id="mapa-lista" aria-label="Lugares encontrados"></ul>
+      </section>
+
+      <section id="como-funciona" class="ancho pasos">
+        <p class="etiqueta">Cómo se juega</p>
+        <h2>Tres pasos y el marcador sube</h2>
+        <div class="pasos-grid">
+          <article class="paso"><i class="bx bx-camera" aria-hidden="true"></i><div><h3>1. Elige la toma</h3><p>Foto, cámara o video. El tablero es el mismo.</p></div></article>
+          <article class="paso"><i class="bx bx-scan" aria-hidden="true"></i><div><h3>2. La IA marca</h3><p>Solo entra lo que el detector llama bottle. Las cajas se dibujan encima.</p></div></article>
+          <article class="paso"><i class="bx bx-list-check" aria-hidden="true"></i><div><h3>3. Sumas el botín</h3><p>Cada botella queda una vez. Puedes corregir la cantidad o exportar.</p></div></article>
+        </div>
+        <div class="confianza-nota">
+          <h3>¿Qué significa la confianza?</h3>
+          <p>Es una estimación. Si queda por debajo del 60 %, el resultado se marca como poco seguro.</p>
+        </div>
+        <a class="enlace focus-ring" href="cuaderno/index.html"><i class="bx bx-book-open" aria-hidden="true"></i>Ver el cuaderno de entrenamiento</a>
+      </section>
+    </main>
+
+    <footer class="pie safe-bottom">
+      <p><strong>ReciclApp</strong></p>
+      <p>Docente: Ing. Jesús Bautista · Estudiante: Brayan Joel Ramos Vargas</p>
+      <p><a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" style="color:var(--verde-tinta);font-weight:700;"><i class="bx bxl-github"></i> Ver Repositorio en GitHub</a></p>
+      <p id="pwa-status">Puedes añadir ReciclApp a la pantalla de inicio desde el menú de tu navegador.</p>
+    </footer>
+
+    <div id="registro-modal" hidden role="status" aria-live="polite" aria-labelledby="modal-titulo">
+      <p class="etiqueta">Inventario</p>
+      <h3 id="modal-titulo">Botellas registradas</h3>
+      <img id="modal-foto" alt="Encuadre con las botellas marcadas" class="hidden">
+      <p id="modal-detalle"></p>
+      <button id="modal-cerrar" type="button" class="boton boton-papel focus-ring">Continuar</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/mapa.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+    <script>
+      (() => {
+        "use strict";
+
+        const SIZE = 640;
+        const INVENTORY_KEY = "botellas-ia-inventario-v1";
+        const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+        const UMBRAL_POCO_SEGURO = 0.6;
+        const UMBRAL_BOTELLA = 0.28;
+        const elements = {
+          video: document.getElementById("video"),
+          canvas: document.getElementById("canvas"),
+          preview: document.getElementById("foto-preview"),
+          placeholder: document.getElementById("placeholder"),
+          cameraTag: document.getElementById("camera-tag"),
+          upload: document.getElementById("image-upload"),
+          videoUpload: document.getElementById("video-upload"),
+          startCamera: document.getElementById("start-camera"),
+          switchCamera: document.getElementById("switch-camera"),
+          classify: document.getElementById("classify"),
+          status: document.getElementById("status"),
+          resultIcon: document.getElementById("result-icon"),
+          resultLabel: document.getElementById("result-label"),
+          confidence: document.getElementById("result-confidence"),
+          speak: document.getElementById("speak-result"),
+          installApp: document.getElementById("install-app"),
+          pwaStatus: document.getElementById("pwa-status"),
+          historyList: document.getElementById("history-list"),
+          historyEmpty: document.getElementById("history-empty"),
+          clearHistory: document.getElementById("clear-history"),
+          exportJson: document.getElementById("export-json"),
+          exportCsv: document.getElementById("export-csv"),
+          inventoryTotal: document.getElementById("inventory-total"),
+          conteoVivo: document.getElementById("conteo-vivo"),
+          enVista: document.getElementById("en-vista"),
+          enToma: document.getElementById("en-toma"),
+          nuevaToma: document.getElementById("nueva-toma"),
+          modal: document.getElementById("registro-modal"),
+          modalTitulo: document.getElementById("modal-titulo"),
+          modalDetalle: document.getElementById("modal-detalle"),
+          modalFoto: document.getElementById("modal-foto"),
+          modalCerrar: document.getElementById("modal-cerrar")
+        };
+
+        let model = null;
+        let bottleDetector = null;
+        let stream = null;
+        let facingMode = "environment";
+        let selectedImage = null;
+        let previewUrl = null;
+        let lastResult = null;
+        let busy = false;
+        let archivoVideo = false;
+        let installPrompt = null;
+        let rastros = [];
+        let cajasVisibles = [];
+        let tomadas = 0;
+        let detectando = false;
+        let conteoActivo = false;
+        let forzarSiguiente = false;
+        let ultimaFirma = "";
+        let cantidadModal = 0;
+        let buclePintura = 0;
+        let bucleDeteccion = 0;
+        const buffer = document.createElement("canvas");
+        buffer.width = SIZE;
+        buffer.height = SIZE;
+        const lienzo = document.getElementById("canvas");
+        if (lienzo) {
+          lienzo.width = SIZE;
+          lienzo.height = SIZE;
+        }
+
+        function setStatus(message, isError = false) {
+          elements.status.textContent = message;
+          elements.status.classList.toggle("estado-error", isError);
+        }
+
+        function resetResult() {
+          lastResult = null;
+          elements.resultIcon.innerHTML = '<i class="bx bx-recycle"></i>';
+          elements.resultLabel.textContent = "Aún no lo sabemos";
+          elements.confidence.textContent = "";
+          elements.speak.classList.add("hidden");
+          elements.canvas.classList.add("hidden");
+        }
+
+        function cameraButton(detenida) {
+          elements.startCamera.innerHTML = detenida
+            ? '<i class="bx bx-camera mr-1 text-lg" aria-hidden="true"></i>Cámara'
+            : '<i class="bx bx-stop-circle mr-1 text-lg" aria-hidden="true"></i>Detener';
+        }
+
+        function rejectUnsupportedImage(personDetected) {
+          resetResult();
+          elements.resultIcon.innerHTML = `<i class="bx ${personDetected ? "bx-user" : "bx-search-alt-2"}"></i>`;
+          elements.resultLabel.textContent = personDetected ? "¡Foto fuera de juego!" : "No encontramos botellas";
+          elements.confidence.textContent = personDetected
+            ? "Detectamos una persona, pero este juego solo cuenta botellas."
+            : "La imagen debe mostrar claramente al menos una botella.";
+          setStatus(
+            personDetected
+              ? "Esta imagen muestra una persona y ninguna botella. Prueba con una foto de botellas."
+              : "No detectamos la clase bottle. Acércate, mejora la luz o prueba otra foto.",
+            true
+          );
+        }
+
+        function stopCamera() {
+          pararConteo();
+          elements.conteoVivo.classList.add("hidden");
+          elements.nuevaToma.classList.add("hidden");
+          elements.canvas.classList.add("hidden");
+          if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+            stream = null;
+          }
+          elements.video.pause();
+          elements.video.srcObject = null;
+          elements.video.classList.add("hidden");
+          elements.video.classList.remove("camera-mirror");
+          elements.cameraTag.classList.add("hidden");
+          elements.switchCamera.classList.add("hidden");
+          cameraButton(true);
+        }
+
+        async function openStream() {
+          const attempts = [
+            { audio: false, video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { audio: false, video: { facingMode } },
+            { audio: false, video: true }
+          ];
+          let lastError = null;
+          for (const constraints of attempts) {
+            try {
+              return await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (error) {
+              lastError = error;
+              if (error.name === "NotAllowedError" || error.name === "SecurityError") throw error;
             }
           }
+          throw lastError || new Error("No se pudo abrir la cámara.");
         }
-      }
-    }
-  </script>
 
-  <!-- Google Fonts & Custom CSS -->
-  <link rel="stylesheet" href="css/styles.css">
+        async function startCamera() {
+          if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+            setStatus("Para usar la cámara, abre esta página con HTTPS. También puedes subir una foto.", true);
+            return;
+          }
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setStatus("Este navegador no permite usar la cámara. Sube una foto para continuar.", true);
+            return;
+          }
+          stopCamera();
+          setStatus("Solicitando permiso para usar la cámara…");
+          try {
+            stream = await openStream();
+            elements.video.srcObject = stream;
+            archivoVideo = false;
+            await elements.video.play();
+            elements.video.classList.remove("hidden");
+            elements.video.classList.toggle("camera-mirror", facingMode === "user");
+            elements.preview.classList.add("hidden");
+            elements.canvas.classList.add("hidden");
+            elements.placeholder.classList.add("hidden");
+            elements.cameraTag.classList.remove("hidden");
+            elements.switchCamera.classList.remove("hidden");
+            cameraButton(false);
+            selectedImage = elements.video;
+            resetResult();
+            elements.classify.disabled = !bottleDetector;
+            if (bottleDetector) iniciarConteoCamara();
+            else setStatus("Cámara lista. En cuanto cargue el detector, cuenta sola.");
+          } catch (error) {
+            console.error("No se pudo iniciar la cámara:", error);
+            const messages = {
+              NotAllowedError: "No hay permiso para la cámara. Autoriza el acceso o sube una foto.",
+              NotFoundError: "No encontramos una cámara disponible. Puedes subir una foto.",
+              NotReadableError: "Could not start video source: la cámara está ocupada. Cierra Flask, Zoom u otra app que la use, o sube una foto.",
+              TrackStartError: "Could not start video source: la cámara está ocupada. Ciérrala en otras aplicaciones o sube una foto.",
+              OverconstrainedError: "La cámara no admite la configuración solicitada. Prueba con otra cámara."
+            };
+            setStatus(messages[error.name] || "No se pudo iniciar la cámara. Comprueba los permisos o sube una foto.", true);
+            stopCamera();
+          }
+        }
 
-  <!-- TensorFlow.js & COCO-SSD Models (Versiones estables ultrarrápidas) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+        function showSelectedPhoto(file) {
+          if (!file) return;
+          const nombre = file.name.toLowerCase();
+          const fotoValida = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)
+            || [".jpg", ".jpeg", ".png", ".webp", ".gif"].some((ext) => nombre.endsWith(ext));
+          if (!fotoValida) {
+            setStatus("Formato no compatible. Elige una imagen JPG, PNG, WEBP o GIF.", true);
+            elements.upload.value = "";
+            return;
+          }
+          if (file.size > MAX_IMAGE_BYTES) {
+            setStatus("La imagen supera el máximo de 12 MB. Elige un archivo más pequeño.", true);
+            elements.upload.value = "";
+            return;
+          }
+          const url = URL.createObjectURL(file);
+          const image = new Image();
+          image.onload = () => {
+            if (!image.naturalWidth || !image.naturalHeight) {
+              URL.revokeObjectURL(url);
+              setStatus("No pudimos leer esa imagen. Prueba con otro archivo.", true);
+              return;
+            }
+            stopCamera();
+            archivoVideo = false;
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = url;
+            selectedImage = image;
+            resetResult();
+            elements.preview.src = url;
+            elements.preview.classList.remove("hidden");
+            elements.placeholder.classList.add("hidden");
+            elements.classify.disabled = !bottleDetector;
+            if (bottleDetector) {
+              clasificarActual().catch((error) => setStatus(error.message || "No se pudo registrar la foto.", true));
+            } else {
+              setStatus("Foto lista. Se registrará sola cuando cargue el detector.");
+            }
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(url);
+            setStatus("No pudimos abrir esa imagen. Comprueba el archivo e inténtalo de nuevo.", true);
+          };
+          image.src = url;
+        }
 
-  <!-- Header Superior -->
-  <header class="border-b border-slate-800/80 bg-slate-900/90 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      
-      <!-- Logo y Título -->
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-          </svg>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">StockVision</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">v3.3 MobileNet v2</span>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Control de Inventario y Clasificación por Visión Artificial</p>
-        </div>
-      </div>
+        function esperarVideo(nombre, limiteMs = 8000) {
+          return new Promise((resolve, reject) => {
+            if (nombre === "loadeddata" && elements.video.readyState >= 2 && elements.video.videoWidth) {
+              resolve();
+              return;
+            }
+            let timer = 0;
+            const limpiar = () => {
+              clearTimeout(timer);
+              elements.video.removeEventListener(nombre, listo);
+              elements.video.removeEventListener("error", fallo);
+            };
+            const listo = () => {
+              limpiar();
+              resolve();
+            };
+            const fallo = () => {
+              limpiar();
+              reject(new Error("No se pudo leer el video. Prueba con un MP4."));
+            };
+            timer = setTimeout(() => {
+              limpiar();
+              if (elements.video.videoWidth) resolve();
+              else reject(new Error("No se pudo leer el video. Prueba con un MP4."));
+            }, limiteMs);
+            elements.video.addEventListener(nombre, listo, { once: true });
+            elements.video.addEventListener("error", fallo, { once: true });
+          });
+        }
 
-      <!-- Estado del Modelo e Info Académica -->
-      <div class="flex items-center gap-3">
-        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
-          <span id="modelStatusBadge" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span id="modelStatusText" class="text-xs font-mono text-slate-300">Cargando Red Neuronal...</span>
-        </div>
+        async function irATiempo(tiempo) {
+          const video = elements.video;
+          if (!Number.isFinite(video.duration)) return;
+          const destino = Math.min(Math.max(0, tiempo), Math.max(0, video.duration - 0.05));
+          if (Math.abs(video.currentTime - destino) < 0.08) return;
+          video.currentTime = destino;
+          await esperarVideo("seeked");
+        }
 
-        <button id="openLivenessBtn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-500/30 text-sky-300 text-xs font-medium transition shadow-sm" title="Análisis 2D vs 3D">
-          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-          <span class="hidden sm:inline">Inspección 2D vs 3D</span>
-          <span class="sm:hidden">Liveness</span>
-        </button>
+        async function showSelectedVideo(file) {
+          if (!file) return;
+          if (file.size > 80 * 1024 * 1024) {
+            setStatus("Ese video pesa demasiado para contarlo aquí. Prueba con un clip más corto.", true);
+            return;
+          }
+          stopCamera();
+          resetResult();
+          archivoVideo = true;
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+          previewUrl = URL.createObjectURL(file);
+          elements.video.srcObject = null;
+          elements.video.src = previewUrl;
+          elements.video.muted = true;
+          await esperarVideo("loadeddata", 4000);
+          const medio = Number.isFinite(elements.video.duration) ? elements.video.duration / 2 : 0;
+          await irATiempo(medio);
+          elements.video.pause();
+          selectedImage = elements.video;
+          elements.video.classList.remove("hidden", "camera-mirror");
+          elements.preview.classList.add("hidden");
+          elements.canvas.classList.add("hidden");
+          elements.placeholder.classList.add("hidden");
+          elements.classify.disabled = !bottleDetector;
+          if (bottleDetector) {
+            await contarVideo();
+          } else {
+            setStatus("Video listo. Se contará solo cuando cargue el detector.");
+          }
+        }
 
-        <a href="cuaderno/index.html" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 text-purple-300 text-xs font-medium transition shadow-sm" title="Ver Cuaderno de Entrenamiento Jupyter">
-          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-          </svg>
-          <span class="hidden sm:inline">Cuaderno Jupyter</span>
-          <span class="sm:hidden">Jupyter</span>
-        </a>
-      </div>
+        function interseccion(a, b) {
+          const x1 = Math.max(a.x, b.x);
+          const y1 = Math.max(a.y, b.y);
+          const x2 = Math.min(a.x + a.w, b.x + b.w);
+          const y2 = Math.min(a.y + a.h, b.y + b.h);
+          const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+          const union = a.w * a.h + b.w * b.h - inter;
+          return union <= 0 ? 0 : inter / union;
+        }
 
-    </div>
-  </header>
+        function solapan(a, b) {
+          const dx = (a.x + a.w / 2) - (b.x + b.w / 2);
+          const dy = (a.y + a.h / 2) - (b.y + b.h / 2);
+          const limite = Math.max(a.w, a.h, b.w, b.h) * 0.65;
+          return interseccion(a, b) >= 0.2 || Math.hypot(dx, dy) < limite;
+        }
 
-  <!-- Contenido Principal -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col gap-6">
+        function juntarCajas(cajas) {
+          const orden = [...cajas].sort((a, b) => b.score - a.score);
+          const quedan = [];
+          for (const caja of orden) {
+            if (caja.w < 16 || caja.h < 20) continue;
+            if (quedan.every((otra) => interseccion(caja, otra) < 0.45)) quedan.push(caja);
+          }
+          return quedan;
+        }
 
-    <!-- KPI Cards (Métricas Rápidas) -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
-        <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Unidades en Stock</span>
-          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-        </div>
-        <div id="kpiTotalUnits" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">0</div>
-        <div class="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-          <span>● Conteo activo</span>
-        </div>
-      </div>
+        function firmaDe(cajas) {
+          return cajas
+            .map((caja) => [Math.round(caja.x / 16), Math.round(caja.y / 16), Math.round(caja.w / 16), Math.round(caja.h / 16)].join("x"))
+            .sort()
+            .join("|");
+        }
 
-      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
-        <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Confianza Promedio</span>
-          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-        <div id="kpiConfidence" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">--%</div>
-        <div class="text-xs text-slate-400 mt-1">Calibrado &gt; 55%</div>
-      </div>
+        function reiniciarRastros() {
+          rastros = [];
+          cajasVisibles = [];
+          tomadas = 0;
+          cantidadModal = 0;
+          actualizarChip(0);
+        }
 
-      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
-        <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Productos Registrados</span>
-          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-        </div>
-        <div id="kpiUniqueItems" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">0 SKU</div>
-        <div class="text-xs text-slate-400 mt-1">Distintos en lote</div>
-      </div>
+        function pararConteo() {
+          conteoActivo = false;
+          if (buclePintura) cancelAnimationFrame(buclePintura);
+          buclePintura = 0;
+          if (bucleDeteccion) clearTimeout(bucleDeteccion);
+          bucleDeteccion = 0;
+        }
 
-      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
-        <div class="flex items-center justify-between text-slate-400 mb-1">
-          <span class="text-xs font-medium uppercase tracking-wider">Último Escaneo</span>
-          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-        <div id="kpiLastTime" class="text-lg sm:text-2xl font-bold text-white font-mono truncate">Sin registros</div>
-        <div class="text-xs text-slate-400 mt-1">Sincronización local</div>
-      </div>
-    </section>
+        function actualizarChip(enVista) {
+          elements.enVista.textContent = String(enVista);
+          elements.enToma.textContent = String(tomadas);
+        }
 
-    <!-- Zona Central: Visor de Cámara y Controles de Escaneo -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        function dibujarEnCanvas(canvas, source, cajas) {
+          const anchoReal = source.videoWidth || source.naturalWidth || source.width || SIZE;
+          const altoReal = source.videoHeight || source.naturalHeight || source.height || SIZE;
+          const escala = Math.min(1, 960 / Math.max(anchoReal, altoReal));
+          const ancho = Math.max(1, Math.round(anchoReal * escala));
+          const alto = Math.max(1, Math.round(altoReal * escala));
+          if (canvas.width !== ancho) canvas.width = ancho;
+          if (canvas.height !== alto) canvas.height = alto;
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.fillStyle = "#e7f6c8";
+          context.fillRect(0, 0, ancho, alto);
+          context.save();
+          if (source === elements.video && stream && facingMode === "user") {
+            context.translate(ancho, 0);
+            context.scale(-1, 1);
+          }
+          context.drawImage(source, 0, 0, ancho, alto);
+          context.restore();
+          context.lineWidth = 4;
+          context.font = "700 18px Outfit, sans-serif";
+          context.textBaseline = "top";
+          for (const caja of cajas) {
+            context.strokeStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
+            context.strokeRect(caja.x, caja.y, caja.w, caja.h);
+            const texto = caja.registrada ? "ya registrada" : `botella ${Math.round(caja.score * 100)}%`;
+            const ancho = context.measureText(texto).width;
+            const y = caja.y > 26 ? caja.y - 26 : caja.y;
+            context.fillStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
+            context.fillRect(caja.x, y, ancho + 12, 24);
+            context.fillStyle = "#f7fff2";
+            context.fillText(texto, caja.x + 6, y + 3);
+          }
+        }
 
-      <!-- Visor de Visión por Computadora (8 cols) -->
-      <div class="lg:col-span-8 flex flex-col gap-3">
-        <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3 border border-slate-800/90">
-          
-          <!-- Barra de Herramientas del Escáner -->
-          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Cámara IA:</span>
-              <button id="cameraSelectBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1.5" title="Cambiar cámara">
-                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Alternar Lente</span>
-              </button>
-              
-              <label class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition cursor-pointer flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span>Subir Foto</span>
-                <input id="fileInput" type="file" accept="image/*" class="hidden">
-              </label>
+        function cajasDesdeRastros() {
+          return rastros
+            .filter((rastro) => rastro.missed === 0)
+            .map((rastro) => ({
+              x: rastro.x,
+              y: rastro.y,
+              w: rastro.w,
+              h: rastro.h,
+              score: rastro.score,
+              registrada: rastro.registrado
+            }));
+        }
 
-              <button id="resetCameraBtn" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-xs font-medium text-slate-400 hover:text-white transition" title="Restaurar Video en Vivo">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              </button>
-            </div>
+        function actualizarRastros(cajas, video) {
+          const usadas = new Set();
+          for (const rastro of rastros) {
+            let mejor = -1;
+          cajas.forEach((caja, indice) => {
+            if (usadas.has(indice) || !solapan(rastro, caja)) return;
+            mejor = indice;
+          });
+          if (mejor >= 0) {
+              usadas.add(mejor);
+              const caja = cajas[mejor];
+              rastro.x = caja.x;
+              rastro.y = caja.y;
+              rastro.w = caja.w;
+              rastro.h = caja.h;
+              rastro.score = caja.score;
+              rastro.hits += 1;
+              rastro.missed = 0;
+            } else {
+              rastro.missed += 1;
+            }
+          }
+          cajas.forEach((caja, indice) => {
+            if (usadas.has(indice)) return;
+            const repetida = rastros.some((rastro) => rastro.registrado && solapan(rastro, caja));
+            if (repetida) return;
+            rastros.push({
+              id: createId(),
+              x: caja.x,
+              y: caja.y,
+              w: caja.w,
+              h: caja.h,
+              score: caja.score,
+              hits: 1,
+              missed: 0,
+              registrado: false,
+              rechazado: false
+            });
+          });
+          rastros = rastros.filter((rastro) => rastro.registrado || rastro.missed < 8);
+          const hitsMinimos = video || forzarSiguiente ? 1 : 2;
+          forzarSiguiente = false;
+          const nuevas = [];
+          for (const rastro of rastros) {
+            if (!rastro.registrado && !rastro.rechazado && rastro.hits >= hitsMinimos && rastro.missed === 0) {
+              rastro.registrado = true;
+              nuevas.push(rastro);
+            }
+          }
+          return nuevas;
+        }
 
-            <!-- Modo Automático / Manual -->
-            <div class="flex items-center gap-3">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input id="autoModeToggle" type="checkbox" checked class="sr-only peer">
-                <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 relative"></div>
-                <span class="text-xs font-medium text-slate-300">Auto-Conteo</span>
-              </label>
-            </div>
-          </div>
+        function mostrarResultado(cantidad, confianza) {
+          lastResult = { etiqueta: "Botella", confidence: confianza, cantidad };
+          elements.resultIcon.innerHTML = '<i class="bx bx-recycle"></i>';
+          elements.resultLabel.textContent = cantidad === 1 ? "1 botella en el inventario" : `${cantidad} botellas en el inventario`;
+          const porcentaje = Math.round(confianza * 100);
+          elements.confidence.textContent = `${cantidad} ${cantidad === 1 ? "nueva" : "nuevas"} · ${porcentaje}%${confianza < UMBRAL_POCO_SEGURO ? " · poco seguro" : ""}`;
+          elements.speak.classList.remove("hidden");
+        }
 
-          <!-- Viewport del Escáner (Video + Canvas Overlay HUD) -->
-          <div class="scanner-viewport w-full aspect-[4/3] sm:aspect-[16/9] flex items-center justify-center relative">
-            <div class="scanner-laser"></div>
-            
-            <!-- Retícula HUD -->
-            <div class="reticle-corner reticle-tl"></div>
-            <div class="reticle-corner reticle-tr"></div>
-            <div class="reticle-corner reticle-bl"></div>
-            <div class="reticle-corner reticle-br"></div>
+        function abrirModal(cantidad, detalle) {
+          if (cantidad > 0 && !elements.modal.hidden) cantidadModal += cantidad;
+          else cantidadModal = cantidad;
+          const total = cantidadModal;
+          elements.modalTitulo.textContent = total === 0
+            ? "Esas botellas ya estaban"
+            : total === 1 ? "1 botella registrada" : `${total} botellas registradas`;
+          elements.modalDetalle.textContent = detalle;
+          try {
+            elements.modalFoto.src = elements.canvas.toDataURL("image/jpeg", 0.72);
+            elements.modalFoto.classList.remove("hidden");
+          } catch (error) {
+            elements.modalFoto.classList.add("hidden");
+          }
+          elements.modal.hidden = false;
+        }
 
-            <!-- Video Feed -->
-            <video id="cameraFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            
-            <!-- Imagen Estática (si sube archivo) -->
-            <img id="staticImage" class="w-full h-full object-contain hidden" alt="Foto cargada">
+        function cerrarModal() {
+          elements.modal.hidden = true;
+          cantidadModal = 0;
+        }
 
-            <!-- Canvas Bounding Boxes Overlay -->
-            <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
-          </div>
+        
+        function playChime() {
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.15);
+          } catch (e) {}
+        }
 
-          <!-- Barra de Acción Inmediata -->
-          <div class="flex items-center justify-between gap-4 pt-1">
-            <button id="manualScanBtn" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 font-semibold text-sm text-white shadow-lg shadow-sky-600/30 active:scale-[0.99] transition flex items-center justify-center gap-2">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              <span>Registrar Detección Actual (+1)</span>
-            </button>
-          </div>
+        function registrarNuevas(nuevas, silencio) {
+          playChime();
+          const records = nuevas.map((rastro) => ({
+            id: rastro.id,
+            fecha: new Date().toISOString(),
+            cantidad: 1,
+            confianzaPromedio: Math.round(rastro.score * 10000) / 10000,
+            bboxes: [{
+              x: Math.round(rastro.x),
+              y: Math.round(rastro.y),
+              width: Math.round(rastro.w),
+              height: Math.round(rastro.h),
+              score: Math.round(rastro.score * 10000) / 10000
+            }],
+            etiqueta: "Botella"
+          }));
+          writeInventory([...records, ...readInventory()]);
+          renderHistory();
+          tomadas += records.length;
+          actualizarChip(cajasVisibles.length);
+          const confianza = records.reduce((suma, item) => suma + item.confianzaPromedio, 0) / records.length;
+          mostrarResultado(records.length, confianza);
+          const detalle = records.length === 1
+            ? "Quedó guardada en este dispositivo. Si sigue en cámara, no se vuelve a contar."
+            : "Cada una es un registro. Si siguen a la vista, no se duplican.";
+          if (!silencio) abrirModal(records.length, detalle);
+          setStatus(records.length === 1 ? "1 botella nueva en el inventario." : `${records.length} botellas nuevas en el inventario.`);
+        }
 
-        </div>
-      </div>
+        async function puntajeRecorte(source, caja) {
+          if (!model || !window.tf) return 1;
+          let input;
+          let output;
+          try {
+            input = tf.tidy(() => {
+              const scaled = document.createElement("canvas");
+              scaled.width = 100;
+              scaled.height = 100;
+              const ctx = scaled.getContext("2d", { willReadFrequently: true });
+              ctx.drawImage(
+                source,
+                Math.max(0, caja.x),
+                Math.max(0, caja.y),
+                Math.max(1, caja.w),
+                Math.max(1, caja.h),
+                0,
+                0,
+                100,
+                100
+              );
+              const rgba = ctx.getImageData(0, 0, 100, 100).data;
+              const grayscale = new Float32Array(10000);
+              for (let pixel = 0; pixel < grayscale.length; pixel += 1) {
+                const offset = pixel * 4;
+                grayscale[pixel] = (0.114 * rgba[offset] + 0.587 * rgba[offset + 1] + 0.299 * rgba[offset + 2]) / 255;
+              }
+              return tf.tensor4d(grayscale, [1, 100, 100, 1]);
+            });
+            output = model.predict(input);
+            const prediction = await output.data();
+            return Number.isFinite(prediction[0]) ? prediction[0] : 1;
+          } catch (error) {
+            console.warn("No se pudo confirmar el recorte:", error);
+            return 1;
+          } finally {
+            if (input) input.dispose();
+            if (output && typeof output.dispose === "function") output.dispose();
+          }
+        }
 
-      <!-- Panel de Ajustes y Calibración (4 cols) -->
-      <div class="lg:col-span-4 flex flex-col gap-4">
-        <div class="glass-panel rounded-2xl p-4 border border-slate-800/90 flex flex-col gap-4">
-          <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
-            <h3 class="text-sm font-bold text-white tracking-wide">Configuración del Detector</h3>
-            <span class="text-xs text-sky-400 font-mono">Parámetros</span>
-          </div>
+        async function confirmarCajas(source, cajas) {
+          if (!model || !cajas.length) return cajas;
+          const aceptadas = [];
+          for (const caja of cajas) {
+            const puntaje = await puntajeRecorte(source, caja);
+            if (puntaje >= 0.28 || caja.score >= 0.45) {
+              aceptadas.push({ ...caja, score: Math.max(caja.score, puntaje) });
+            }
+          }
+          return aceptadas;
+        }
 
-          <!-- Filtro de Producto / Clase -->
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold text-slate-300">Filtro de Producto:</label>
-            <select id="categoryFilter" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-              <option value="bottle" selected>🎯 Solo Botellas (Plástica / Vidrio)</option>
-              <option value="all_products">📦 Todos los Productos (Botellas, Vasos, Latas, Libros)</option>
-              <option value="pets_demo">🐾 Demo Docente (Botellas, Perros y Gatos)</option>
-              <option value="all">🌐 Todas las clases COCO-SSD (80 clases)</option>
-            </select>
-            <p class="text-[11px] text-slate-400">Por defecto enfocado en botellas como la solicitada por el docente.</p>
-          </div>
+        async function leerBotellas(source) {
+          dibujarEnCanvas(buffer, source, []);
+          const detecciones = await bottleDetector.detect(buffer, 20, UMBRAL_BOTELLA);
+          const persona = detecciones.some((item) => item.class === "person" && item.score >= 0.45);
+          const cajas = juntarCajas(detecciones
+            .filter((item) => item.class === "bottle" && item.score >= UMBRAL_BOTELLA)
+            .map((item) => ({
+              x: item.bbox[0],
+              y: item.bbox[1],
+              w: item.bbox[2],
+              h: item.bbox[3],
+              score: item.score
+            })));
+          return { cajas, persona };
+        }
 
-          <!-- Umbral de Confianza Slider -->
-          <div class="flex flex-col gap-1.5">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-slate-300">Umbral de Certeza:</label>
-              <span id="confidenceVal" class="text-xs font-mono font-bold text-sky-400">25%</span>
-            </div>
-            <input id="confidenceSlider" type="range" min="0.10" max="0.70" step="0.05" value="0.25" class="w-full accent-sky-500 cursor-pointer">
-            <p class="text-[11px] text-slate-400">Sensibilidad óptima calibrada para botellas transparentes acostadas o de pie (25%).</p>
-          </div>
+        async function detectarYRegistrar(source, opciones) {
+          if (!bottleDetector || detectando) return;
+          detectando = true;
+          try {
+            const leidas = await leerBotellas(source);
+            const cajas = await confirmarCajas(buffer, leidas.cajas);
+            const persona = leidas.persona;
+            if (opciones.foto) {
+              await registrarFoto(cajas, persona, source);
+              return;
+            }
+            const nuevas = actualizarRastros(cajas, Boolean(opciones.video));
+            cajasVisibles = cajasDesdeRastros();
+            actualizarChip(cajasVisibles.length);
+            if (!nuevas.length) {
+              if (!cajas.length && persona && opciones.aviso) {
+                setStatus("Se ve una persona, no una botella. Solo se registra la clase bottle.", true);
+              }
+              return;
+            }
+            registrarNuevas(nuevas, Boolean(opciones.silencio));
+          } catch (error) {
+            console.error("No se pudo contar:", error);
+            setStatus(error.message || "No se pudo contar las botellas.", true);
+          } finally {
+            detectando = false;
+          }
+        }
 
-          <!-- Lógica Anti-Duplicados -->
-          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
-            <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              <span>Debounce Espacial (IoU &gt; 0.35)</span>
-            </div>
-            <p class="text-[11px] text-slate-400 leading-relaxed">
-              Evita registrar repetidamente la misma botella mientras permanece quieta en el campo visual.
-            </p>
-          </div>
+        async function registrarFoto(cajas, persona, source) {
+          elements.preview.classList.add("hidden");
+          elements.video.classList.add("hidden");
+          elements.placeholder.classList.add("hidden");
+          elements.canvas.classList.remove("hidden");
+          cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: false }));
+          dibujarEnCanvas(elements.canvas, source, cajasVisibles);
+          if (!cajas.length) {
+            rejectUnsupportedImage(persona);
+            return;
+          }
+          const firma = firmaDe(cajas);
+          if (firma && firma === ultimaFirma) {
+            cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: true }));
+            dibujarEnCanvas(elements.canvas, source, cajasVisibles);
+            setStatus("Esas mismas botellas ya están en el inventario.", true);
+            abrirModal(0, "No se agregó nada. Esas botellas ya estaban registradas.");
+            return;
+          }
+          ultimaFirma = firma;
+          const nuevas = cajas.map((caja) => ({
+            id: createId(),
+            x: caja.x,
+            y: caja.y,
+            w: caja.w,
+            h: caja.h,
+            score: caja.score
+          }));
+          registrarNuevas(nuevas, false);
+          cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: true }));
+          dibujarEnCanvas(elements.canvas, source, cajasVisibles);
+        }
 
-          <!-- Respaldo Académico -->
-          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
-            <div class="text-xs font-semibold text-slate-300">Materia / Referencia:</div>
-            <p class="text-[11px] text-slate-400">
-              Docente: <b>Jesús Bautista</b><br>
-              Entrega: Clasificador de productos con cámara de celular y conteo de inventario.
-            </p>
-          </div>
+        function pintarCamara() {
+          if (!conteoActivo || !stream) return;
+          if (elements.video.videoWidth) {
+            dibujarEnCanvas(elements.canvas, elements.video, cajasVisibles);
+            elements.canvas.classList.remove("hidden");
+            elements.video.classList.add("hidden");
+            elements.preview.classList.add("hidden");
+            elements.placeholder.classList.add("hidden");
+          }
+          buclePintura = requestAnimationFrame(pintarCamara);
+        }
 
-        </div>
-      </div>
+        function iniciarConteoCamara() {
+          if (!bottleDetector || !stream) return;
+          pararConteo();
+          reiniciarRastros();
+          conteoActivo = true;
+          elements.conteoVivo.classList.remove("hidden");
+          elements.nuevaToma.classList.remove("hidden");
+          elements.canvas.classList.remove("hidden");
+          pintarCamara();
+          const ciclo = async () => {
+            if (!conteoActivo || !stream) return;
+            await detectarYRegistrar(elements.video, { aviso: true });
+            if (conteoActivo && stream) bucleDeteccion = setTimeout(ciclo, 700);
+          };
+          bucleDeteccion = setTimeout(ciclo, 400);
+          setStatus("Contando en vivo. Solo botellas, y cada una una sola vez.");
+        }
 
-    </section>
+        async function contarVideo() {
+          if (!bottleDetector || !archivoVideo) return;
+          pararConteo();
+          reiniciarRastros();
+          conteoActivo = true;
+          elements.conteoVivo.classList.remove("hidden");
+          elements.nuevaToma.classList.add("hidden");
+          elements.canvas.classList.remove("hidden");
+          elements.preview.classList.add("hidden");
+          elements.placeholder.classList.add("hidden");
+          const duracion = elements.video.duration;
+          if (!Number.isFinite(duracion) || duracion <= 0) {
+            conteoActivo = false;
+            setStatus("Ese video no tiene duración. Prueba con otro archivo.", true);
+            return;
+          }
+          const paso = Math.min(0.45, Math.max(0.25, duracion / 20));
+          elements.video.pause();
+          for (let tiempo = 0; tiempo < duracion - 0.05 && conteoActivo; tiempo += paso) {
+            await irATiempo(tiempo);
+            await detectarYRegistrar(elements.video, { video: true, silencio: true });
+            dibujarEnCanvas(elements.canvas, elements.video, cajasVisibles);
+            elements.video.classList.add("hidden");
+            elements.canvas.classList.remove("hidden");
+            setStatus(`Video ${Math.min(100, Math.round((tiempo / duracion) * 100))} %. Botellas nuevas: ${tomadas}.`);
+          }
+          conteoActivo = false;
+          if (tomadas === 0) {
+            setStatus("En ese video no se confirmó ninguna botella.", true);
+            abrirModal(0, "No se registró nada. Solo entra lo que el detector marca como bottle.");
+          } else {
+            abrirModal(tomadas, "Cada botella del video quedó una sola vez. Si la misma sale en varios segundos, no se duplica.");
+          }
+        }
 
-    <!-- Sección de Inventario / Tabla de Registros -->
-    <section class="glass-panel rounded-2xl p-4 sm:p-6 border border-slate-800/90 flex flex-col gap-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-        <div>
-          <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-            <span>Inventario de Productos Escaneados</span>
-            <span class="text-xs font-normal text-slate-400 font-mono">(Registro en tiempo real)</span>
-          </h2>
-          <p class="text-xs text-slate-400">Base de datos local en memoria persistente del navegador.</p>
-        </div>
+        async function clasificarActual() {
+          if (!bottleDetector || !selectedImage) return;
+          if (archivoVideo && !stream) {
+            await contarVideo();
+            return;
+          }
+          if (stream) {
+            forzarSiguiente = true;
+            await detectarYRegistrar(elements.video, { aviso: true });
+            return;
+          }
+          await detectarYRegistrar(selectedImage, { foto: true, aviso: true });
+        }
 
-        <div class="flex items-center gap-2 flex-wrap">
-          <button id="exportCsvBtn" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <span>Exportar CSV (Excel)</span>
-          </button>
+        function readInventory() {
+          try {
+            const saved = JSON.parse(localStorage.getItem(INVENTORY_KEY) || "[]");
+            if (!Array.isArray(saved)) return [];
+            return saved.filter((item) =>
+              item && typeof item.id === "string" && typeof item.fecha === "string" &&
+              typeof item.etiqueta === "string" && Number.isFinite(item.cantidad) &&
+              Number.isFinite(item.confianzaPromedio) && Array.isArray(item.bboxes)
+            );
+          } catch (error) {
+            console.warn("No se pudo leer el inventario local:", error);
+            return [];
+          }
+        }
 
-          <button id="exportJsonBtn" class="px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-medium transition flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            <span>Exportar JSON</span>
-          </button>
+        function writeInventory(entries) {
+          localStorage.setItem(INVENTORY_KEY, JSON.stringify(entries));
+        }
 
-          <button id="clearInventoryBtn" class="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 text-xs font-medium transition flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            <span>Vaciar</span>
-          </button>
-        </div>
-      </div>
+        function renderHistory() {
+          const entries = readInventory();
+          const total = entries.reduce((sum, item) => sum + item.cantidad, 0);
+          elements.inventoryTotal.textContent = String(total);
+          const marcador = document.getElementById("marcador-total");
+          if (marcador) marcador.textContent = String(total);
+          elements.historyList.replaceChildren();
+          const empty = entries.length === 0;
+          elements.historyEmpty.classList.toggle("hidden", !empty);
+          elements.clearHistory.classList.toggle("hidden", empty);
+          elements.exportJson.classList.toggle("hidden", empty);
+          elements.exportCsv.classList.toggle("hidden", empty);
+          for (const item of entries) {
+            const row = document.createElement("li");
+            row.className = "fila";
+            row.dataset.id = item.id;
+            const ficha = document.createElement("span");
+            ficha.className = "ficha";
+            ficha.setAttribute("aria-hidden", "true");
+            ficha.innerHTML = '<i class="bx bx-recycle"></i>';
+            const description = document.createElement("div");
+            const title = document.createElement("strong");
+            title.textContent = item.etiqueta;
+            const date = document.createElement("small");
+            const cuando = new Date(item.fecha);
+            date.textContent = Number.isNaN(cuando.getTime())
+              ? item.fecha
+              : cuando.toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
+            description.append(title, date);
+            const certainty = document.createElement("span");
+            certainty.className = "porcentaje";
+            const porcentaje = Math.round(item.confianzaPromedio * 100);
+            certainty.append(document.createTextNode(`${porcentaje}%`));
+            if (porcentaje < 60) {
+              const aviso = document.createElement("i");
+              aviso.className = "bx bx-error-circle";
+              aviso.title = "Poco seguro";
+              aviso.setAttribute("aria-label", "Poco seguro");
+              certainty.append(aviso);
+            }
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "0";
+            input.step = "1";
+            input.value = String(item.cantidad);
+            input.dataset.cantidad = "1";
+            input.setAttribute("aria-label", `Cantidad del registro ${item.fecha}`);
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.dataset.accion = "eliminar";
+            remove.setAttribute("aria-label", "Borrar registro");
+            remove.innerHTML = '<i class="bx bx-trash" aria-hidden="true"></i>';
+            row.append(ficha, description, certainty, input, remove);
+            elements.historyList.append(row);
+          }
+        }
 
-      <!-- Tabla Responsive -->
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <th class="py-3 px-4">Producto & SKU</th>
-              <th class="py-3 px-4">Categoría</th>
-              <th class="py-3 px-4">Cantidad</th>
-              <th class="py-3 px-4">Confianza</th>
-              <th class="py-3 px-4">Timestamp</th>
-              <th class="py-3 px-4 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody id="inventoryTableBody">
-            <!-- Filas inyectadas por JS -->
-          </tbody>
-        </table>
+        function createId() {
+          if (crypto.randomUUID) return crypto.randomUUID();
+          return `botella-${Date.now()}`;
+        }
 
-        <!-- Estado vacío -->
-        <div id="emptyInventoryState" class="py-12 flex flex-col items-center justify-center text-center gap-2">
-          <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
-          </div>
-          <div class="text-sm font-medium text-slate-300">Aún no hay productos en inventario</div>
-          <p class="text-xs text-slate-500 max-w-sm">Apunta con la cámara a una botella (ej. Vital) o pulsa "Registrar Detección Actual" para iniciar el conteo.</p>
-        </div>
-      </div>
-    </section>
+        async function classify() {
+          if (!bottleDetector || !selectedImage || busy) return;
+          busy = true;
+          elements.classify.disabled = true;
+          elements.classify.innerHTML = '<i class="bx bx-loader-alt bx-spin mr-1 text-xl" aria-hidden="true"></i>Registrando…';
+          try {
+            await clasificarActual();
+          } catch (error) {
+            console.error("No se pudo registrar:", error);
+            setStatus(error.message || "No se pudo registrar las botellas.", true);
+          } finally {
+            busy = false;
+            elements.classify.disabled = !bottleDetector || !selectedImage;
+            elements.classify.innerHTML = '<i class="bx bx-scan mr-1 text-xl" aria-hidden="true"></i>Registrar ahora';
+          }
+        }
 
-  </main>
+        async function loadModel() {
+          try {
+            if (!window.tf) throw new Error("No se pudo cargar TensorFlow.js. Comprueba tu conexión e inténtalo de nuevo.");
+            if (!window.cocoSsd) throw new Error("No se pudo cargar el detector de botellas. Comprueba tu conexión e inténtalo de nuevo.");
+            setStatus("Cargando el detector de botellas y, si existe, tu red…");
+            bottleDetector = await cocoSsd.load({ base: "mobilenet_v2" });
+            model = null;
+            try {
+              const pesos = await fetch("./modelo_botellas/group1-shard1of2.bin", {
+                method: "HEAD",
+                signal: AbortSignal.timeout(2500)
+              });
+              if (pesos.ok) model = await tf.loadLayersModel("./modelo_botellas/model.json");
+            } catch (error) {
+              console.warn("La red propia todavía no tiene pesos exportados:", error);
+              model = null;
+            }
+            elements.classify.disabled = !selectedImage;
+            if (stream) iniciarConteoCamara();
+            else if (archivoVideo && selectedImage) await contarVideo();
+            else if (previewUrl && selectedImage) await clasificarActual();
+            else setStatus("Listo. La cámara y el video registran solos, y solo si es una botella.");
+          } catch (error) {
+            console.error("No se pudo cargar el modelo:", error);
+            setStatus("No se pudieron cargar las comprobaciones de IA. Revisa tu conexión y recarga la página.", true);
+          }
+        }
 
-  <!-- Modal de Defensa Técnica: 2D vs 3D (Liveness & Anti-Spoofing) -->
-  <div id="livenessModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="glass-panel w-full max-w-2xl rounded-2xl border border-sky-500/40 p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-start justify-between">
-        <div>
-          <span class="text-xs font-bold text-sky-400 uppercase tracking-widest font-mono">Pregunta Técnica de Defensa</span>
-          <h2 id="livenessTitle" class="text-lg font-bold text-white mt-1">¿Por qué un clasificador 2D no distingue una botella real de una foto?</h2>
-          <div id="livenessConcept" class="text-xs text-emerald-400 font-mono mt-0.5">Invarianza del Plano Proyectivo en Visión 2D</div>
-        </div>
-        <button id="closeLivenessBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
+        function download(name, content, type) {
+          const blob = new Blob([content], { type });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = name;
+          link.click();
+          URL.revokeObjectURL(url);
+        }
 
-      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 leading-relaxed" id="livenessSummary">
-        <!-- Inyectado por JS -->
-      </div>
+        function csvField(value) {
+          const text = String(value ?? "");
+          return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        }
 
-      <div class="flex flex-col gap-2">
-        <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Soluciones en la Industria para Diferenciar 3D Real vs Foto:</h4>
-        <div id="livenessSolutions" class="flex flex-col gap-2.5">
-          <!-- Inyectado por JS -->
-        </div>
-      </div>
-
-      <div class="pt-2 border-t border-slate-800 flex justify-end">
-        <button onclick="document.getElementById('livenessModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition">
-          Entendido
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts de la Aplicación (con cache buster v3.3) -->
-  <script src="js/inventory.js?v=3.3"></script>
-  <script src="js/vision.js?v=3.3"></script>
-  <script src="js/liveness.js?v=3.3"></script>
-  <script src="js/app.js?v=3.3"></script>
-</body>
+        elements.startCamera.addEventListener("click", () => {
+          if (stream) {
+            stopCamera();
+            selectedImage = null;
+            elements.placeholder.classList.remove("hidden");
+            elements.classify.disabled = true;
+            setStatus(bottleDetector ? "Cámara detenida. Elige una foto o activa la cámara." : "Cámara detenida. Esperando a que termine de cargar el detector.");
+          } else {
+            startCamera();
+          }
+        });
+        elements.switchCamera.addEventListener("click", () => {
+          facingMode = facingMode === "user" ? "environment" : "user";
+          startCamera();
+        });
+        elements.upload.addEventListener("change", (event) => showSelectedPhoto(event.target.files[0]));
+        elements.videoUpload.addEventListener("change", (event) => {
+          showSelectedVideo(event.target.files[0]).catch((error) => {
+            setStatus(error.message || "No se pudo abrir ese video.", true);
+          });
+        });
+        if (elements.preview.getAttribute("src") && elements.preview.complete && elements.preview.naturalWidth) {
+          selectedImage = elements.preview;
+          elements.placeholder.classList.add("hidden");
+        } else if (elements.preview.getAttribute("src")) {
+          elements.preview.addEventListener("load", () => {
+            selectedImage = elements.preview;
+            elements.placeholder.classList.add("hidden");
+            elements.classify.disabled = !bottleDetector;
+          });
+        }
+        elements.classify.addEventListener("click", classify);
+        elements.nuevaToma.addEventListener("click", () => {
+          reiniciarRastros();
+          ultimaFirma = "";
+          setStatus("Toma nueva. Las botellas de ahora se pueden registrar otra vez.");
+        });
+        elements.modalCerrar.addEventListener("click", cerrarModal);
+        elements.modal.addEventListener("click", (event) => {
+          if (event.target === elements.modal) cerrarModal();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !elements.modal.hidden) cerrarModal();
+        });
+        elements.speak.addEventListener("click", () => {
+          if (!lastResult || !("speechSynthesis" in window)) {
+            setStatus("La lectura en voz alta no está disponible en este navegador.", true);
+            return;
+          }
+          window.speechSynthesis.cancel();
+          const porcentaje = Math.round(lastResult.confidence * 100);
+          const poco = lastResult.confidence < UMBRAL_POCO_SEGURO ? " El resultado es poco seguro." : "";
+          const utterance = new SpeechSynthesisUtterance(
+            `Se contaron ${lastResult.cantidad} botellas. La inteligencia artificial cree que la imagen es ${lastResult.etiqueta}, con una confianza del ${porcentaje} por ciento.${poco}`
+          );
+          utterance.lang = "es";
+          window.speechSynthesis.speak(utterance);
+        });
+        if (!("speechSynthesis" in window)) elements.speak.classList.add("hidden");
+        elements.historyList.addEventListener("change", (event) => {
+          const input = event.target;
+          if (!(input instanceof HTMLInputElement) || !input.dataset.cantidad) return;
+          const row = input.closest("[data-id]");
+          if (!row) return;
+          const cantidad = Number(input.value);
+          if (!Number.isFinite(cantidad) || cantidad < 0) {
+            setStatus("La cantidad debe ser un número mayor o igual a 0.", true);
+            renderHistory();
+            return;
+          }
+          const entries = readInventory();
+          const item = entries.find((entry) => entry.id === row.dataset.id);
+          if (!item) return;
+          item.cantidad = Math.round(cantidad);
+          writeInventory(entries);
+          renderHistory();
+          setStatus("Cantidad actualizada en este dispositivo.");
+        });
+        elements.historyList.addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-accion='eliminar']");
+          if (!button) return;
+          const row = button.closest("[data-id]");
+          if (!row || !window.confirm("¿Borrar este registro del inventario?")) return;
+          writeInventory(readInventory().filter((entry) => entry.id !== row.dataset.id));
+          renderHistory();
+          setStatus("Registro borrado de este dispositivo.");
+        });
+        elements.clearHistory.addEventListener("click", () => {
+          try {
+            localStorage.removeItem(INVENTORY_KEY);
+            renderHistory();
+            setStatus("Inventario borrado de este dispositivo.");
+          } catch (error) {
+            console.error("No se pudo borrar el inventario:", error);
+            setStatus("No se pudo borrar el inventario. Revisa los permisos del navegador.", true);
+          }
+        });
+        elements.exportJson.addEventListener("click", () => {
+          download("botellas-ia.json", JSON.stringify(readInventory(), null, 2), "application/json;charset=utf-8");
+        });
+        elements.exportCsv.addEventListener("click", () => {
+          const rows = readInventory().map((item) =>
+            [item.id, item.fecha, item.cantidad, item.confianzaPromedio, item.etiqueta, JSON.stringify(item.bboxes)]
+              .map(csvField).join(",")
+          );
+          download(
+            "botellas-ia.csv",
+            `\uFEFFid,fecha,cantidad,confianzaPromedio,etiqueta,bboxes\r\n${rows.join("\r\n")}`,
+            "text/csv;charset=utf-8"
+          );
+        });
+        window.addEventListener("beforeinstallprompt", (event) => {
+          event.preventDefault();
+          installPrompt = event;
+          elements.installApp.classList.remove("hidden");
+          elements.installApp.classList.add("inline-flex");
+        });
+        elements.installApp.addEventListener("click", async () => {
+          if (!installPrompt) return;
+          try {
+            await installPrompt.prompt();
+            await installPrompt.userChoice;
+            installPrompt = null;
+            elements.installApp.classList.add("hidden");
+            elements.installApp.classList.remove("inline-flex");
+          } catch (error) {
+            console.error("No se pudo iniciar la instalación:", error);
+            elements.pwaStatus.textContent = "No se pudo abrir la instalación. Usa el menú de tu navegador para añadir la app.";
+          }
+        });
+        window.addEventListener("appinstalled", () => {
+          installPrompt = null;
+          elements.installApp.classList.add("hidden");
+          elements.installApp.classList.remove("inline-flex");
+          elements.pwaStatus.textContent = "Botellas IA ya está instalada en este dispositivo.";
+        });
+        if ("serviceWorker" in navigator && location.protocol !== "file:") {
+          navigator.serviceWorker.register("./service-worker.js")
+            .then(() => {
+              elements.pwaStatus.textContent = "App instalable · tras la primera carga, los recursos se guardan para usarla sin conexión.";
+            })
+            .catch((error) => {
+              console.error("No se pudo registrar el modo PWA:", error);
+              elements.pwaStatus.textContent = "La instalación no está disponible ahora; puedes seguir usando la app en línea.";
+            });
+        }
+        window.addEventListener("pagehide", stopCamera);
+        renderHistory();
+        loadModel();
+      })();
+    </script>
+  </body>
 </html>

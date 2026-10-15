@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "Botellas IA — Reciclaje",
+  "short_name": "Botellas IA",
+  "description": "Cuenta botellas de plástico en tiempo real y guarda el inventario en este dispositivo.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e3f6cf",
+  "theme_color": "#cfe8b0",
+  "icons": [
+    {
+      "src": "assets/icono.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
