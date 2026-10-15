@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const autoModeToggle = document.getElementById('autoModeToggle');
   const confidenceSlider = document.getElementById('confidenceSlider');
   const confidenceVal = document.getElementById('confidenceVal');
+  if (confidenceSlider && confidenceVal) {
+    confidenceSlider.value = 0.38;
+    confidenceVal.textContent = '38%';
+  }
   const categoryFilter = document.getElementById('categoryFilter');
   const cameraSelectBtn = document.getElementById('cameraSelectBtn');
   const manualScanBtn = document.getElementById('manualScanBtn');
@@ -213,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       video.onloadedmetadata = () => {
         video.play();
         isProcessingVideo = true;
-        processVideoLoop();
+        startAsyncVisionLoops();
       };
     } catch (err) {
       console.error('Error al acceder a la cámara:', err);
@@ -221,16 +225,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Bucle de inferencia en tiempo real
-  async function processVideoLoop() {
-    if (!isProcessingVideo) return;
+  let inferenceIntervalId = null;
 
-    if (video.readyState >= 2 && vision.isModelLoaded) {
-      lastPredictions = await vision.detectFrame(video);
-      vision.renderOverlay(overlayCanvas, lastPredictions, video);
+  // Doble bucle desacoplado: 60 FPS de UI + Inferencia acelerada sin lag
+  function startAsyncVisionLoops() {
+    // 1. Loop de renderizado continuo (HUD a 60 FPS sin tirones)
+    function renderLoop() {
+      if (!isProcessingVideo) return;
+      if (video.readyState >= 2 && !video.classList.contains('hidden')) {
+        vision.renderOverlay(overlayCanvas, lastPredictions, video);
+      }
+      requestAnimationFrame(renderLoop);
     }
+    requestAnimationFrame(renderLoop);
 
-    requestAnimationFrame(processVideoLoop);
+    // 2. Loop de inferencia IA throttled (cada 120ms sin bloquear el hilo principal)
+    if (inferenceIntervalId) clearInterval(inferenceIntervalId);
+    inferenceIntervalId = setInterval(async () => {
+      if (!isProcessingVideo || !vision.isModelLoaded || video.readyState < 2 || video.classList.contains('hidden')) return;
+      const predictions = await vision.detectFrame(video);
+      if (predictions !== null) {
+        lastPredictions = predictions;
+      }
+    }, 120);
   }
 
   // Escaneo manual al presionar botón

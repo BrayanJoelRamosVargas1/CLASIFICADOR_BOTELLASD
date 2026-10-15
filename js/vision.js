@@ -1,27 +1,34 @@
 /**
- * StockVision AI - Motor de Visión por Computadora e Inferencia
- * Utiliza TensorFlow.js + COCO-SSD (MobileNet) con tracking espacial (IoU) y anti-duplicados.
+ * StockVision AI - Motor de Visión por Computadora Ultra Optimizado
+ * Utiliza TensorFlow.js + COCO-SSD (lite_mobilenet_v2) para máximo rendimiento móvil.
  */
 
 class VisionEngine {
   constructor() {
     this.model = null;
     this.isModelLoaded = false;
-    this.isDetecting = false;
-    this.confidenceThreshold = 0.55;
-    this.selectedClassFilter = 'bottle'; // 'bottle' | 'all_products' | 'all'
+    this.isInferencing = false;
+    this.confidenceThreshold = 0.38; // Calibrado óptimo para botellas transparentes (PET / Vital)
+    this.selectedClassFilter = 'bottle';
 
-    // Seguimiento espacial (IoU) para evitar registrar duplicados continuos en cámara
+    // Tracking espacial (IoU) para anti-duplicados
     this.trackedObjects = new Map();
     this.nextTrackId = 1;
     this.onAutoDetectCallback = null;
 
-    // Diccionario de traducción amigable de clases COCO
+    // Canvas interno reducido para inferencia ultrarrápida (320x240)
+    this.inferenceCanvas = document.createElement('canvas');
+    this.inferenceCtx = this.inferenceCanvas.getContext('2d', { willReadFrequently: true });
+    this.inferenceWidth = 320;
+    this.inferenceHeight = 240;
+    this.inferenceCanvas.width = this.inferenceWidth;
+    this.inferenceCanvas.height = this.inferenceHeight;
+
+    // Etiquetas y categorías
     this.classLabels = {
-      bottle: { name: 'Botella (Plástica/Vidrio)', category: 'Bebidas y Envases' },
-      cup: { name: 'Vaso / Taza', category: 'Vajilla y Contenedores' },
-      wine_glass: { name: 'Copa de Cristal', category: 'Cristalería' },
-      bowl: { name: 'Tazón / Bowl', category: 'Vajilla' },
+      bottle: { name: 'Botella Plástica / Vidrio', category: 'Bebidas y Envases' },
+      cup: { name: 'Vaso / Envase Plástico', category: 'Bebidas y Envases' },
+      wine_glass: { name: 'Copa / Botella de Vidrio', category: 'Cristalería' },
       can: { name: 'Lata de Bebida', category: 'Bebidas y Envases' },
       cell_phone: { name: 'Teléfono Móvil', category: 'Electrónica' },
       book: { name: 'Libro / Cuaderno', category: 'Papelería' },
@@ -30,14 +37,28 @@ class VisionEngine {
     };
   }
 
-  // Carga del modelo TensorFlow.js
+  // Carga del modelo ultraliviano lite_mobilenet_v2
   async initModel(onProgress) {
     try {
-      if (onProgress) onProgress('Descargando arquitectura MobileNet + pesos COCO-SSD...');
-      // Cargar modelo base MobileNet v2 optimizado para inferencia en navegador
-      this.model = await cocoSsd.load({ base: 'mobilenet_v2' });
+      if (onProgress) onProgress('Configurando aceleración WebGL...');
+      
+      // Asegurar backend WebGL para aceleración por GPU móvil
+      try {
+        if (window.tf) {
+          await tf.setBackend('webgl');
+          await tf.ready();
+        }
+      } catch (e) {
+        console.warn('WebGL fallback a CPU:', e);
+      }
+
+      if (onProgress) onProgress('Cargando Red Neuronal Ultraligera (Lite MobileNet)...');
+      
+      // lite_mobilenet_v2 es hasta 4x más rápida y no congela la cámara
+      this.model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
       this.isModelLoaded = true;
-      if (onProgress) onProgress('Modelo IA cargado exitosamente.');
+      
+      if (onProgress) onProgress('Modelo IA Listo y Acelerado.');
       return true;
     } catch (error) {
       console.error('Error al cargar modelo de visión:', error);
@@ -45,7 +66,7 @@ class VisionEngine {
     }
   }
 
-  // Calcular Intersection over Union (IoU) entre dos rectángulos [x, y, w, h]
+  // IoU entre rectángulos [x, y, w, h]
   calculateIoU(boxA, boxB) {
     const xA = Math.max(boxA[0], boxB[0]);
     const yA = Math.max(boxA[1], boxB[1]);
@@ -60,21 +81,52 @@ class VisionEngine {
     return unionArea > 0 ? interArea / unionArea : 0;
   }
 
-  // Ejecuta la detección sobre un frame (video o imagen)
+  // Detección asíncrona optimizada con downscaling a 320x240
   async detectFrame(sourceElement) {
-    if (!this.isModelLoaded || !this.model) return [];
+    if (!this.isModelLoaded || !this.model || this.isInferencing) return null;
 
+    this.isInferencing = true;
     try {
-      const predictions = await this.model.detect(sourceElement);
+      const srcW = sourceElement.videoWidth || sourceElement.naturalWidth || sourceElement.width;
+      const srcH = sourceElement.videoHeight || sourceElement.naturalHeight || sourceElement.height;
+
+      if (!srcW || !srcH) {
+        this.isInferencing = false;
+        return [];
+      }
+
+      // Dibujar en canvas reducido para que la inferencia tome < 50ms en celulares
+      this.inferenceCtx.drawImage(sourceElement, 0, 0, this.inferenceWidth, this.inferenceHeight);
+
+      // Inferencia sobre resolución optimizada
+      const rawPredictions = await this.model.detect(this.inferenceCanvas, 10, this.confidenceThreshold);
+
+      // Re-escalar coordenadas de la caja a la resolución original del video
+      const scaleX = srcW / this.inferenceWidth;
+      const scaleY = srcH / this.inferenceHeight;
+
+      const predictions = rawPredictions.map(p => ({
+        class: p.class,
+        score: p.score,
+        bbox: [
+          p.bbox[0] * scaleX,
+          p.bbox[1] * scaleY,
+          p.bbox[2] * scaleX,
+          p.bbox[3] * scaleY
+        ]
+      }));
+
+      // Filtro de clases inteligente (para botellas transparentes que a veces COCO llama 'cup')
       const filtered = predictions.filter(pred => {
         if (pred.score < this.confidenceThreshold) return false;
 
         if (this.selectedClassFilter === 'bottle') {
-          return pred.class === 'bottle';
+          // Acepta botella o envases afines para no fallar con botellas PET de agua
+          return pred.class === 'bottle' || pred.class === 'cup';
         } else if (this.selectedClassFilter === 'all_products') {
           return ['bottle', 'cup', 'wine glass', 'bowl', 'can', 'cell phone', 'book'].includes(pred.class);
         } else if (this.selectedClassFilter === 'pets_demo') {
-          return ['cat', 'dog', 'bottle'].includes(pred.class);
+          return ['cat', 'dog', 'bottle', 'cup'].includes(pred.class);
         }
         return true;
       });
@@ -82,34 +134,34 @@ class VisionEngine {
       // Actualizar tracker espacial para auto-registro
       this.updateSpatialTracking(filtered, sourceElement);
 
+      this.isInferencing = false;
       return filtered;
     } catch (err) {
-      console.warn('Fallo en inferencia de frame:', err);
+      console.warn('Error en inferencia:', err);
+      this.isInferencing = false;
       return [];
     }
   }
 
-  // Actualiza los objetos en seguimiento y dispara auto-conteo cuando un objeto nuevo se estabiliza
+  // Actualiza los objetos en seguimiento y dispara auto-conteo rápido
   updateSpatialTracking(predictions, sourceElement) {
     const now = Date.now();
     const matchedTrackIds = new Set();
 
     predictions.forEach(pred => {
       let bestMatchId = null;
-      let highestIoU = 0.35; // Umbral de solapamiento para considerar que es el mismo objeto
+      let highestIoU = 0.30;
 
       for (const [trackId, tracked] of this.trackedObjects.entries()) {
-        if (tracked.class === pred.class) {
-          const iou = this.calculateIoU(pred.bbox, tracked.bbox);
-          if (iou > highestIoU) {
-            highestIoU = iou;
-            bestMatchId = trackId;
-          }
+        const iou = this.calculateIoU(pred.bbox, tracked.bbox);
+        if (iou > highestIoU) {
+          highestIoU = iou;
+          bestMatchId = trackId;
         }
       }
 
       if (bestMatchId) {
-        // Objeto existente que sigue en cuadro
+        // Objeto que sigue visible
         const tracked = this.trackedObjects.get(bestMatchId);
         tracked.bbox = pred.bbox;
         tracked.score = pred.score;
@@ -117,12 +169,12 @@ class VisionEngine {
         tracked.framesSeen += 1;
         matchedTrackIds.add(bestMatchId);
 
-        // Si se mantiene estable durante 6 frames consecutivos y no se ha registrado aún:
-        if (!tracked.registered && tracked.framesSeen >= 6) {
+        // Registro rápido: solo 2 detecciones seguidas son suficientes
+        if (!tracked.registered && tracked.framesSeen >= 2) {
           tracked.registered = true;
           if (this.onAutoDetectCallback) {
             const thumbnail = this.extractThumbnail(sourceElement, pred.bbox);
-            const friendly = this.classLabels[pred.class] || { name: pred.class, category: 'Producto General' };
+            const friendly = this.classLabels[pred.class] || { name: 'Botella Plástica', category: 'Bebidas' };
             this.onAutoDetectCallback({
               label: friendly.name,
               category: friendly.category,
@@ -134,7 +186,7 @@ class VisionEngine {
           }
         }
       } else {
-        // Nuevo objeto entrando al cuadro
+        // Nuevo objeto
         const newId = this.nextTrackId++;
         this.trackedObjects.set(newId, {
           id: newId,
@@ -150,24 +202,23 @@ class VisionEngine {
       }
     });
 
-    // Limpiar objetos que desaparecieron del cuadro durante más de 1200ms
+    // Limpiar objetos que desaparecieron por más de 1 segundo
     for (const [trackId, tracked] of this.trackedObjects.entries()) {
-      if (!matchedTrackIds.has(trackId) && (now - tracked.lastSeen > 1200)) {
+      if (!matchedTrackIds.has(trackId) && (now - tracked.lastSeen > 1000)) {
         this.trackedObjects.delete(trackId);
       }
     }
   }
 
-  // Extrae un recorte (thumbnail) de alta calidad del bounding box
+  // Extrae thumbnail del bounding box
   extractThumbnail(sourceElement, bbox) {
     try {
       const [bx, by, bw, bh] = bbox;
       const canvas = document.createElement('canvas');
-      canvas.width = 120;
-      canvas.height = 120;
+      canvas.width = 100;
+      canvas.height = 100;
       const ctx = canvas.getContext('2d');
 
-      // Añadir margen del 10% alrededor del objeto
       const padX = bw * 0.1;
       const padY = bh * 0.1;
       const sx = Math.max(0, bx - padX);
@@ -175,16 +226,17 @@ class VisionEngine {
       const sw = Math.min(sourceElement.videoWidth || sourceElement.naturalWidth || sourceElement.width, bw + padX * 2);
       const sh = Math.min(sourceElement.videoHeight || sourceElement.naturalHeight || sourceElement.height, bh + padY * 2);
 
-      ctx.drawImage(sourceElement, sx, sy, sw, sh, 0, 0, 120, 120);
-      return canvas.toDataURL('image/jpeg', 0.85);
+      ctx.drawImage(sourceElement, sx, sy, sw, sh, 0, 0, 100, 100);
+      return canvas.toDataURL('image/jpeg', 0.8);
     } catch (e) {
-      console.warn('No se pudo extraer thumbnail:', e);
       return null;
     }
   }
 
-  // Dibuja los Bounding Boxes interactivos con diseño HUD Industrial
+  // Dibuja los Bounding Boxes fluidamente a 60 FPS
   renderOverlay(canvas, predictions, sourceElement) {
+    if (!canvas || !predictions) return;
+
     const ctx = canvas.getContext('2d');
     const displayWidth = canvas.clientWidth || canvas.width;
     const displayHeight = canvas.clientHeight || canvas.height;
@@ -208,78 +260,64 @@ class VisionEngine {
       const rw = w * scaleX;
       const rh = h * scaleY;
 
-      const isBottle = pred.class === 'bottle';
+      const isBottle = pred.class === 'bottle' || pred.class === 'cup';
       const colorPrimary = isBottle ? '#38bdf8' : '#10b981';
-      const colorGlow = isBottle ? 'rgba(56, 189, 248, 0.3)' : 'rgba(16, 185, 129, 0.3)';
 
-      // 1. Fondo suave translúcido
-      ctx.fillStyle = colorGlow;
+      // 1. Fondo suave
+      ctx.fillStyle = isBottle ? 'rgba(56, 189, 248, 0.25)' : 'rgba(16, 185, 129, 0.25)';
       ctx.fillRect(rx, ry, rw, rh);
 
-      // 2. Bounding Box Borde
+      // 2. Borde HUD
       ctx.strokeStyle = colorPrimary;
       ctx.lineWidth = 2;
       ctx.strokeRect(rx, ry, rw, rh);
 
-      // 3. Esquinas reforzadas estilo retícula HUD
+      // 3. Esquinas reforzadas
       const cornerLen = Math.min(rw, rh) * 0.25;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3.5;
       ctx.strokeStyle = '#ffffff';
 
-      // Arriba-Izquierda
       ctx.beginPath();
       ctx.moveTo(rx, ry + cornerLen);
       ctx.lineTo(rx, ry);
       ctx.lineTo(rx + cornerLen, ry);
       ctx.stroke();
 
-      // Arriba-Derecha
       ctx.beginPath();
       ctx.moveTo(rx + rw - cornerLen, ry);
       ctx.lineTo(rx + rw, ry);
       ctx.lineTo(rx + rw, ry + cornerLen);
       ctx.stroke();
 
-      // Abajo-Izquierda
       ctx.beginPath();
       ctx.moveTo(rx, ry + rh - cornerLen);
       ctx.lineTo(rx, ry + rh);
       ctx.lineTo(rx + cornerLen, ry + rh);
       ctx.stroke();
 
-      // Abajo-Derecha
       ctx.beginPath();
       ctx.moveTo(rx + rw - cornerLen, ry + rh);
       ctx.lineTo(rx + rw, ry + rh);
       ctx.lineTo(rx + rw, ry + rh - cornerLen);
       ctx.stroke();
 
-      // 4. Etiqueta superior con nombre y % de certeza
-      const friendly = this.classLabels[pred.class] || { name: pred.class };
+      // 4. Etiqueta superior
+      const friendly = this.classLabels[pred.class] || { name: 'Botella' };
       const scorePct = Math.round(pred.score * 100);
-      const text = `${friendly.name.split(' ')[0]} ${scorePct}%`;
+      const labelText = `${friendly.name.split(' ')[0]} ${scorePct}%`;
 
       ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
-      const textWidth = ctx.measureText(text).width;
+      const textWidth = ctx.measureText(labelText).width;
+      const labelH = 22;
+      const labelY = ry > labelH ? ry - labelH : ry;
 
-      const labelHeight = 22;
-      const labelY = ry > labelHeight ? ry - labelHeight : ry;
-
-      // Caja de texto
-      ctx.fillStyle = isBottle ? 'rgba(2, 132, 199, 0.95)' : 'rgba(5, 150, 105, 0.95)';
+      ctx.fillStyle = 'rgba(2, 132, 199, 0.95)';
       ctx.beginPath();
-      ctx.roundRect(rx, labelY, textWidth + 24, labelHeight, 4);
+      ctx.roundRect(rx, labelY, textWidth + 20, labelH, 4);
       ctx.fill();
 
-      // Punto indicador
       ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(rx + 8, labelY + labelHeight / 2, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Texto
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(text, rx + 16, labelY + 15);
+      ctx.fillText(labelText, rx + 10, labelY + 15);
     });
   }
 }
