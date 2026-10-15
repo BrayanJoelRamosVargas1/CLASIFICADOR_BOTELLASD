@@ -8,7 +8,7 @@ class VisionEngine {
     this.model = null;
     this.isModelLoaded = false;
     this.isInferencing = false;
-    this.confidenceThreshold = 0.38; // Calibrado óptimo para botellas transparentes (PET / Vital)
+    this.confidenceThreshold = 0.30; // Calibrado óptimo para botellas transparentes acostadas (PET / Vital)
     this.selectedClassFilter = 'bottle';
 
     // Tracking espacial (IoU) para anti-duplicados
@@ -27,7 +27,8 @@ class VisionEngine {
     // Etiquetas y categorías
     this.classLabels = {
       bottle: { name: 'Botella Plástica / Vidrio', category: 'Bebidas y Envases' },
-      cup: { name: 'Vaso / Envase Plástico', category: 'Bebidas y Envases' },
+      cup: { name: 'Botella / Envase', category: 'Bebidas y Envases' },
+      vase: { name: 'Botella / Envase', category: 'Bebidas y Envases' },
       wine_glass: { name: 'Copa / Botella de Vidrio', category: 'Cristalería' },
       can: { name: 'Lata de Bebida', category: 'Bebidas y Envases' },
       cell_phone: { name: 'Teléfono Móvil', category: 'Electrónica' },
@@ -116,17 +117,17 @@ class VisionEngine {
         ]
       }));
 
-      // Filtro de clases inteligente (para botellas transparentes que a veces COCO llama 'cup')
+      // Filtro de clases inteligente (para botellas transparentes acostadas que a veces COCO llama 'cup' o 'vase')
       const filtered = predictions.filter(pred => {
         if (pred.score < this.confidenceThreshold) return false;
 
         if (this.selectedClassFilter === 'bottle') {
-          // Acepta botella o envases afines para no fallar con botellas PET de agua
-          return pred.class === 'bottle' || pred.class === 'cup';
+          // Acepta botella, vaso o jarrón/cilindro (clave para botellas transparentes acostadas)
+          return ['bottle', 'cup', 'vase', 'wine glass', 'can'].includes(pred.class);
         } else if (this.selectedClassFilter === 'all_products') {
-          return ['bottle', 'cup', 'wine glass', 'bowl', 'can', 'cell phone', 'book'].includes(pred.class);
+          return ['bottle', 'cup', 'vase', 'wine glass', 'bowl', 'can', 'cell phone', 'book'].includes(pred.class);
         } else if (this.selectedClassFilter === 'pets_demo') {
-          return ['cat', 'dog', 'bottle', 'cup'].includes(pred.class);
+          return ['cat', 'dog', 'bottle', 'cup', 'vase'].includes(pred.class);
         }
         return true;
       });
@@ -260,7 +261,7 @@ class VisionEngine {
       const rw = w * scaleX;
       const rh = h * scaleY;
 
-      const isBottle = pred.class === 'bottle' || pred.class === 'cup';
+      const isBottle = ['bottle', 'cup', 'vase', 'wine glass', 'can'].includes(pred.class);
       const colorPrimary = isBottle ? '#38bdf8' : '#10b981';
 
       // 1. Fondo suave

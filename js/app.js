@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const confidenceSlider = document.getElementById('confidenceSlider');
   const confidenceVal = document.getElementById('confidenceVal');
   if (confidenceSlider && confidenceVal) {
-    confidenceSlider.value = 0.38;
-    confidenceVal.textContent = '38%';
+    confidenceSlider.value = 0.30;
+    confidenceVal.textContent = '30%';
   }
   const categoryFilter = document.getElementById('categoryFilter');
   const cameraSelectBtn = document.getElementById('cameraSelectBtn');
@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     statusBadge.className = 'w-2 h-2 rounded-full bg-emerald-400 pulse-indicator';
-    statusText.textContent = 'Modelo Listo (MobileNet V2)';
+    statusText.textContent = 'Modelo Listo (Lite Turbo v3.1)';
     statusText.className = 'text-xs font-mono text-emerald-400';
 
     // Iniciar cámara por defecto
