@@ -1,6 +1,6 @@
 /**
- * StockVision AI - Motor de Visión por Computadora de Alto Rendimiento
- * Inferencia nativa WebGL sobre hardware GPU y tracking espacial IoU
+ * StockVision AI - Motor de Visión por Computadora de Alta Precisión
+ * Modelo MobileNet v2 optimizado para detección robusta de botellas y envases
  */
 
 class VisionEngine {
@@ -8,7 +8,7 @@ class VisionEngine {
     this.model = null;
     this.isModelLoaded = false;
     this.isInferencing = false;
-    this.confidenceThreshold = 0.30; // 30% óptimo para botellas PET transparentes acostadas
+    this.confidenceThreshold = 0.25; // 25% sensible para botellas de plástico transparente
     this.selectedClassFilter = 'bottle';
 
     // Tracking espacial (IoU) para conteo inteligente anti-duplicados
@@ -30,19 +30,13 @@ class VisionEngine {
     };
   }
 
-  // Carga del modelo MobileNet optimizado para WebGL
+  // Carga del modelo MobileNet v2 de alta precisión
   async initModel(onProgress) {
     try {
-      if (onProgress) onProgress('Iniciando red neuronal...');
+      if (onProgress) onProgress('Cargando Red Neuronal MobileNet v2...');
       
-      // Intentamos cargar lite_mobilenet_v2 o mobilenet_v2
-      try {
-        this.model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
-      } catch (e1) {
-        console.warn('Lite MobileNet no disponible, usando base estándar:', e1);
-        this.model = await cocoSsd.load({ base: 'mobilenet_v2' });
-      }
-
+      // Cargamos MobileNet v2 estándar (el modelo robusto usado en el proyecto)
+      this.model = await cocoSsd.load({ base: 'mobilenet_v2' });
       this.isModelLoaded = true;
 
       // Cargar la red neuronal propia entrenada en Keras / Jupyter
@@ -76,7 +70,7 @@ class VisionEngine {
     return unionArea > 0 ? interArea / unionArea : 0;
   }
 
-  // Inferencia nativa directa por GPU (sin copias a RAM innecesarias)
+  // Inferencia nativa directa por GPU con filtro sensible
   async detectFrame(sourceElement) {
     if (!this.isModelLoaded || !this.model || this.isInferencing) return null;
 
@@ -90,8 +84,8 @@ class VisionEngine {
         return [];
       }
 
-      // Inferencia directa sobre el elemento de video/imagen por GPU
-      const rawPredictions = await this.model.detect(sourceElement, 8, this.confidenceThreshold);
+      // Solicitamos predicciones con corte base bajo (0.15) para no descartar botellas transparentes
+      const rawPredictions = await this.model.detect(sourceElement, 12, 0.15);
 
       // Filtro de clases inteligente (reconoce botellas acostadas clasificadas como cup o vase)
       const filtered = rawPredictions.filter(pred => {
@@ -126,7 +120,7 @@ class VisionEngine {
 
     predictions.forEach(pred => {
       let bestMatchId = null;
-      let highestIoU = 0.28;
+      let highestIoU = 0.25;
 
       for (const [trackId, tracked] of this.trackedObjects.entries()) {
         const iou = this.calculateIoU(pred.bbox, tracked.bbox);
@@ -207,7 +201,7 @@ class VisionEngine {
     }
   }
 
-  // Dibuja el HUD y los Bounding Boxes sin causar reflow de pantalla
+  // Dibuja el HUD con alineación geométrica precisa para CSS object-cover
   renderOverlay(canvas, predictions, sourceElement) {
     if (!canvas) return;
 
@@ -226,22 +220,25 @@ class VisionEngine {
 
     const srcW = sourceElement.videoWidth || sourceElement.naturalWidth || canvas.width;
     const srcH = sourceElement.videoHeight || sourceElement.naturalHeight || canvas.height;
-    const scaleX = canvas.width / srcW;
-    const scaleY = canvas.height / srcH;
+
+    // Compensación geométrica exacta para object-cover
+    const scale = Math.max(canvas.width / srcW, canvas.height / srcH);
+    const offsetX = (canvas.width - srcW * scale) / 2;
+    const offsetY = (canvas.height - srcH * scale) / 2;
 
     for (let i = 0; i < predictions.length; i++) {
       const pred = predictions[i];
       const [x, y, w, h] = pred.bbox;
-      const rx = x * scaleX;
-      const ry = y * scaleY;
-      const rw = w * scaleX;
-      const rh = h * scaleY;
+      const rx = x * scale + offsetX;
+      const ry = y * scale + offsetY;
+      const rw = w * scale;
+      const rh = h * scale;
 
       const isBottle = ['bottle', 'cup', 'vase', 'wine glass', 'can'].includes(pred.class);
       const colorPrimary = isBottle ? '#38bdf8' : '#10b981';
 
       // 1. Fondo semitransparente suave
-      ctx.fillStyle = isBottle ? 'rgba(56, 189, 248, 0.20)' : 'rgba(16, 185, 129, 0.20)';
+      ctx.fillStyle = isBottle ? 'rgba(56, 189, 248, 0.22)' : 'rgba(16, 185, 129, 0.22)';
       ctx.fillRect(rx, ry, rw, rh);
 
       // 2. Borde HUD
@@ -249,37 +246,32 @@ class VisionEngine {
       ctx.lineWidth = 2.5;
       ctx.strokeRect(rx, ry, rw, rh);
 
-      // 3. Esquinas HUD reforzadas (un solo path para velocidad máxima)
-      const cornerLen = Math.min(rw, rh, 22);
+      // 3. Esquinas HUD reforzadas
+      const cornerLen = Math.min(rw, rh, 24);
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = '#ffffff';
 
       ctx.beginPath();
-      // Esquina superior izquierda
       ctx.moveTo(rx, ry + cornerLen);
       ctx.lineTo(rx, ry);
       ctx.lineTo(rx + cornerLen, ry);
 
-      // Esquina superior derecha
       ctx.moveTo(rx + rw - cornerLen, ry);
       ctx.lineTo(rx + rw, ry);
       ctx.lineTo(rx + rw, ry + cornerLen);
 
-      // Esquina inferior izquierda
       ctx.moveTo(rx, ry + rh - cornerLen);
       ctx.lineTo(rx, ry + rh);
       ctx.lineTo(rx + cornerLen, ry + rh);
 
-      // Esquina inferior derecha
       ctx.moveTo(rx + rw - cornerLen, ry + rh);
       ctx.lineTo(rx + rw, ry + rh);
       ctx.lineTo(rx + rw, ry + rh - cornerLen);
       ctx.stroke();
 
-      // 4. Etiqueta y porcentaje de confianza
-      const friendly = this.classLabels[pred.class] || { name: 'Botella' };
+      // 4. Etiqueta superior
       const scorePct = Math.round(pred.score * 100);
-      const labelText = `${friendly.name.split(' ')[0]} ${scorePct}%`;
+      const labelText = `Botella ${scorePct}%`;
 
       ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
       const textWidth = ctx.measureText(labelText).width;

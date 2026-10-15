@@ -49,7 +49,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">StockVision</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">v3.2 UltraFast</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">v3.3 MobileNet v2</span>
           </div>
           <p class="text-xs text-slate-400 hidden sm:block">Control de Inventario y Clasificación por Visión Artificial</p>
         </div>
@@ -218,10 +218,10 @@
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
               <label class="text-xs font-semibold text-slate-300">Umbral de Certeza:</label>
-              <span id="confidenceVal" class="text-xs font-mono font-bold text-sky-400">30%</span>
+              <span id="confidenceVal" class="text-xs font-mono font-bold text-sky-400">25%</span>
             </div>
-            <input id="confidenceSlider" type="range" min="0.15" max="0.75" step="0.05" value="0.30" class="w-full accent-sky-500 cursor-pointer">
-            <p class="text-[11px] text-slate-400">Sensibilidad óptima recomendada para botellas acostadas o transparentes (30%).</p>
+            <input id="confidenceSlider" type="range" min="0.10" max="0.70" step="0.05" value="0.25" class="w-full accent-sky-500 cursor-pointer">
+            <p class="text-[11px] text-slate-400">Sensibilidad óptima calibrada para botellas transparentes acostadas o de pie (25%).</p>
           </div>
 
           <!-- Lógica Anti-Duplicados -->
@@ -342,10 +342,10 @@
     </div>
   </div>
 
-  <!-- Scripts de la Aplicación (con cache buster v3.2) -->
-  <script src="js/inventory.js?v=3.2"></script>
-  <script src="js/vision.js?v=3.2"></script>
-  <script src="js/liveness.js?v=3.2"></script>
-  <script src="js/app.js?v=3.2"></script>
+  <!-- Scripts de la Aplicación (con cache buster v3.3) -->
+  <script src="js/inventory.js?v=3.3"></script>
+  <script src="js/vision.js?v=3.3"></script>
+  <script src="js/liveness.js?v=3.3"></script>
+  <script src="js/app.js?v=3.3"></script>
 </body>
 </html>
