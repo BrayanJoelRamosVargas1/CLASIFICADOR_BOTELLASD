@@ -80,6 +80,12 @@ body {
   gap: 1rem;
 }
 
+.header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .logo-badge {
   display: flex;
   align-items: center;
@@ -515,6 +521,56 @@ body {
 }
 
 /* HUD Overlays */
+.hud-flash-overlay {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 25;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hud-flash-overlay:hover,
+.hud-flash-overlay:active {
+  transform: scale(1.1);
+}
+
+.hud-flash-overlay.flash-active,
+.btn-flash.flash-active {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: #ffffff !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.7) !important;
+}
+
+/* Softbox de Iluminación de Pantalla (Fallback para cuando no hay flash de hardware) */
+.screen-torch-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  border: 10px solid rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 0 140px 50px rgba(255, 255, 255, 0.85);
+  animation: torchPulse 2s infinite alternate ease-in-out;
+}
+
+@keyframes torchPulse {
+  0% { opacity: 0.85; }
+  100% { opacity: 1; }
+}
+
 .hud-chip-top {
   position: absolute;
   top: 14px;
@@ -997,31 +1053,283 @@ body {
   text-decoration: underline;
 }
 
-/* Responsive */
+/* Responsive Móvil y Tablet de Alta Gama */
 @media (max-width: 960px) {
   .hero-glass {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  .eco-kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .scanner-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
   .controls-deck {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 640px) {
-  .eco-kpi-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  /* Header Móvil Nativo */
+  .header-glass {
+    padding: 0.5rem 0.75rem;
   }
-  .nav-btn span {
+
+  .header-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .header-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.25rem;
+    border-radius: 12px;
+  }
+
+  .logo-text h1 {
+    font-size: 1.15rem;
+  }
+
+  .counter-capsule {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+  }
+
+  .counter-num {
+    font-size: 1rem;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+    margin: 0 -0.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .nav-links::-webkit-scrollbar {
     display: none;
   }
+
+  .nav-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-radius: 999px;
+  }
+
+  .nav-btn span {
+    display: inline !important;
+  }
+
+  /* Layout Principal */
+  .main-layout {
+    padding: 0 0.75rem;
+    margin: 0.75rem auto 2rem;
+    gap: 1rem;
+  }
+
+  /* Hero Adaptable */
+  .hero-glass {
+    grid-template-columns: 1fr;
+    padding: 1.25rem 1rem;
+    border-radius: 20px;
+    gap: 1rem;
+  }
+
+  .hero-title {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  .hero-desc {
+    font-size: 0.85rem;
+  }
+
+  .hero-features {
+    gap: 0.35rem;
+  }
+
+  .feature-pill {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .hero-visual {
+    display: none; /* Eliminar imagen decorativa para priorizar escáner */
+  }
+
+  /* Grid KPIs */
+  .eco-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .kpi-card {
+    padding: 0.85rem 0.65rem;
+    border-radius: 16px;
+    gap: 0.65rem;
+  }
+
+  .kpi-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+    border-radius: 10px;
+  }
+
+  .kpi-num {
+    font-size: 1.35rem;
+  }
+
+  .kpi-sub {
+    font-size: 0.7rem;
+  }
+
+  /* Visor y Cámara */
+  .vision-panel {
+    padding: 1rem 0.85rem;
+    border-radius: 20px;
+    gap: 0.85rem;
+  }
+
   .stage-viewport {
-    height: 360px;
+    height: clamp(280px, 45vh, 380px);
+    border-radius: 16px;
+  }
+
+  .controls-deck {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .ctrl-btn {
+    padding: 0.65rem 0.5rem;
+    font-size: 0.82rem;
+    min-height: 48px;
+    border-radius: 12px;
+  }
+
+  .btn-record {
+    grid-column: 1 / -1;
+    font-size: 0.95rem !important;
+    min-height: 52px;
+  }
+
+  .aux-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .sensitivity-toggle {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 0.75rem;
+  }
+
+  .toggle-option {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .aux-btn-group {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .aux-btn-group .btn-action-sm {
+    flex: 1;
+    justify-content: center;
+    min-height: 42px;
+    font-size: 0.85rem;
+  }
+
+  /* Diagnóstico Lateral */
+  .sidebar-panel {
+    gap: 1rem;
+  }
+
+  .diag-card {
+    padding: 1.15rem 1rem;
+    border-radius: 18px;
+  }
+
+  /* Inventario */
+  .inventory-section {
+    padding: 1.25rem 0.85rem;
+    border-radius: 20px;
+  }
+
+  .inventory-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .inv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  #invSearchInput {
+    width: 100%;
+    min-height: 42px;
+    font-size: 0.85rem;
+  }
+
+  .inv-actions .btn-action-sm {
+    flex: 1;
+    min-height: 40px;
+    justify-content: center;
+    font-size: 0.82rem;
+  }
+
+  .inventory-table-container {
+    border-radius: 12px;
+  }
+
+  .inv-table {
+    min-width: 440px;
+  }
+
+  .inv-row td {
+    padding: 0.65rem 0.5rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .logo-text h1 span.badge-pill {
+    display: none;
+  }
+
+  .stage-viewport {
+    height: 300px;
+  }
+
+  .toggle-group {
+    gap: 0.15rem;
+  }
+
+  .toggle-option {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.68rem;
   }
 }

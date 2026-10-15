@@ -24,7 +24,7 @@
   <!-- Boxicons CSS -->
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
 
-  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 7.0 -->
+  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 8.0 -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -34,7 +34,7 @@
   </script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=7.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=8.0">
 </head>
 <body>
 
@@ -42,14 +42,22 @@
   <header class="header-glass">
     <div class="header-container">
       
-      <a href="#" class="logo-badge" aria-label="EcoLens AI, Inicio">
-        <div class="logo-icon">
-          <i class="bx bx-scan"></i>
+      <div class="header-top-row">
+        <a href="#" class="logo-badge" aria-label="EcoLens AI, Inicio">
+          <div class="logo-icon">
+            <i class="bx bx-scan"></i>
+          </div>
+          <div class="logo-text">
+            <h1>EcoLens <span class="badge-pill">v4.0 Pro</span></h1>
+          </div>
+        </a>
+
+        <div class="counter-capsule">
+          <i class="bx bx-recycle" style="color:var(--primary); font-size:1.1rem;"></i>
+          <span>Total:</span>
+          <strong id="counterHeaderNum" class="counter-num">0</strong>
         </div>
-        <div class="logo-text">
-          <h1>EcoLens <span class="badge-pill">v4.0 Pro</span></h1>
-        </div>
-      </a>
+      </div>
 
       <nav class="nav-links">
         <a href="#vision-scanner" class="nav-btn"><i class="bx bx-camera"></i> <span>Escáner</span></a>
@@ -61,12 +69,6 @@
         <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" class="nav-btn" title="Ver código en GitHub">
           <i class="bx bxl-github"></i> <span>GitHub</span>
         </a>
-        
-        <div class="counter-capsule">
-          <i class="bx bx-recycle" style="color:var(--primary); font-size:1.1rem;"></i>
-          <span>Total:</span>
-          <strong id="counterHeaderNum" class="counter-num">0</strong>
-        </div>
       </nav>
 
     </div>
@@ -191,6 +193,14 @@
             <p>Activa la cámara en vivo o arrastra una fotografía para iniciar la clasificación con IA.</p>
           </div>
 
+          <!-- Botón Rápido de Flash en Pantalla -->
+          <button id="btnFlashViewport" type="button" class="hud-flash-overlay" title="Activar/Desactivar Flash o Linterna" style="display:none;">
+            <i class="bx bx-sun"></i>
+          </button>
+          
+          <!-- Softbox Iluminador de Pantalla para Dispositivos sin Flash Físico -->
+          <div id="screenTorchOverlay" class="screen-torch-overlay" style="display:none;"></div>
+
           <!-- HUD Chips en Pantalla -->
           <div id="hudCameraChip" class="hud-chip-top" style="display:none;">
             <span class="dot" style="background:#10b981; width:6px; height:6px; border-radius:50%;"></span>
@@ -232,7 +242,7 @@
           </button>
         </div>
 
-        <!-- Controles Auxiliares: Sensibilidad y Switch Cámara -->
+        <!-- Controles Auxiliares: Sensibilidad, Flash y Switch Cámara -->
         <div class="aux-controls">
           <div class="sensitivity-toggle">
             <span>Sensibilidad:</span>
@@ -243,9 +253,14 @@
             </div>
           </div>
 
-          <button id="btnSwitchCamera" type="button" class="btn-action-sm" title="Alternar entre cámara trasera y frontal">
-            <i class="bx bx-transfer-alt"></i> Cambiar Cámara
-          </button>
+          <div class="aux-btn-group">
+            <button id="btnToggleFlash" type="button" class="btn-action-sm btn-flash" title="Activar/Desactivar linterna o flash">
+              <i class="bx bx-sun"></i> <span>Flash</span>
+            </button>
+            <button id="btnSwitchCamera" type="button" class="btn-action-sm" title="Alternar entre cámara trasera y frontal">
+              <i class="bx bx-transfer-alt"></i> <span>Girar</span>
+            </button>
+          </div>
         </div>
 
         <!-- Barra de Estado Informática -->
@@ -388,7 +403,7 @@
   <!-- Scripts: TensorFlow.js y Motor EcoLens Multi-Objeto -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="js/ecolens.js?v=7.0"></script>
+  <script src="js/ecolens.js?v=8.0"></script>
 
 </body>
 </html>

@@ -58,6 +58,9 @@
     btnUploadPhoto: document.getElementById('uploadPhotoInput'),
     btnUploadVideo: document.getElementById('uploadVideoInput'),
     btnSwitchCamera: document.getElementById('btnSwitchCamera'),
+    btnToggleFlash: document.getElementById('btnToggleFlash'),
+    btnFlashViewport: document.getElementById('btnFlashViewport'),
+    screenTorch: document.getElementById('screenTorchOverlay'),
     btnManualScan: document.getElementById('btnManualScan'),
     btnResetSession: document.getElementById('btnResetSession'),
     
@@ -112,6 +115,7 @@
   let loopTimeoutId = null;
   let audioCtx = null;
   let lastSpokenText = '';
+  let isTorchOn = false;
   
   // Tracking Multi-Objeto 1-a-1 con Suavizado
   let trackers = [];
@@ -574,7 +578,63 @@
     }
   }
 
-  // 10. Control de la Cámara Web / Móvil
+  // 10. Control de la Cámara Web / Móvil y Linterna Flash
+  async function toggleTorch() {
+    if (!stream) {
+      alert('Inicia la cámara primero para encender la linterna / flash.');
+      return;
+    }
+
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+
+      // Si el sensor y navegador soportan torch en hardware (Android / navegadores móviles compatibles)
+      if (caps && caps.torch) {
+        isTorchOn = !isTorchOn;
+        await track.applyConstraints({
+          advanced: [{ torch: isTorchOn }]
+        });
+        updateTorchUI();
+        playSound('click');
+        return;
+      }
+
+      // Fallback: Softbox de Pantalla para iluminar botellas en dispositivos sin flash accesible
+      isTorchOn = !isTorchOn;
+      if (dom.screenTorch) {
+        dom.screenTorch.style.display = isTorchOn ? 'block' : 'none';
+      }
+      updateTorchUI();
+      playSound('click');
+    } catch (err) {
+      console.warn('EcoLens: Linterna hardware no disponible, usando softbox de pantalla:', err);
+      isTorchOn = !isTorchOn;
+      if (dom.screenTorch) {
+        dom.screenTorch.style.display = isTorchOn ? 'block' : 'none';
+      }
+      updateTorchUI();
+      playSound('click');
+    }
+  }
+
+  function updateTorchUI() {
+    const iconClass = isTorchOn ? 'bxs-sun' : 'bx-sun';
+
+    if (dom.btnToggleFlash) {
+      dom.btnToggleFlash.innerHTML = `<i class="bx ${iconClass}"></i> <span>${isTorchOn ? 'Flash ON' : 'Flash'}</span>`;
+      dom.btnToggleFlash.classList.toggle('flash-active', isTorchOn);
+    }
+
+    if (dom.btnFlashViewport) {
+      dom.btnFlashViewport.innerHTML = `<i class="bx ${iconClass}"></i>`;
+      dom.btnFlashViewport.classList.toggle('flash-active', isTorchOn);
+      dom.btnFlashViewport.style.display = stream ? 'flex' : 'none';
+    }
+  }
+
   async function startCamera() {
     stopActiveSource();
     dom.statusText.textContent = 'Conectando sensor óptico...';
@@ -611,6 +671,10 @@
       dom.btnStartCamera.innerHTML = '<i class="bx bx-stop-circle"></i> Detener Cámara';
       dom.btnStartCamera.classList.add('btn-danger');
 
+      // Mostrar botón de flash en viewport y actualizar estado
+      if (dom.btnFlashViewport) dom.btnFlashViewport.style.display = 'flex';
+      updateTorchUI();
+
       const animLoop = () => {
         if (!isLoopActive) return;
         renderCanvasHUD();
@@ -632,6 +696,14 @@
     isLoopActive = false;
     if (animFrameId) cancelAnimationFrame(animFrameId);
     if (loopTimeoutId) clearTimeout(loopTimeoutId);
+
+    // Apagar flash si estaba encendido
+    if (isTorchOn) {
+      isTorchOn = false;
+      if (dom.screenTorch) dom.screenTorch.style.display = 'none';
+      updateTorchUI();
+    }
+    if (dom.btnFlashViewport) dom.btnFlashViewport.style.display = 'none';
 
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
@@ -877,6 +949,14 @@
       facingMode = facingMode === 'environment' ? 'user' : 'environment';
       if (stream) startCamera();
     });
+
+    if (dom.btnToggleFlash) {
+      dom.btnToggleFlash.addEventListener('click', toggleTorch);
+    }
+
+    if (dom.btnFlashViewport) {
+      dom.btnFlashViewport.addEventListener('click', toggleTorch);
+    }
 
     dom.btnUploadPhoto.addEventListener('change', (e) => {
       handlePhotoUpload(e.target.files[0]);
