@@ -199,11 +199,11 @@
         <!-- Teclado de Acciones Táctiles -->
         <div class="controls-deck">
           <button id="btnStartCamera" type="button" class="ctrl-btn btn-cam">
-            <i class="bx bx-camera"></i> Cámara
+            <i class="bx bx-camera"></i> Iniciar Cámara
           </button>
           
           <label for="uploadPhotoInput" class="ctrl-btn btn-photo">
-            <i class="bx bx-image-add"></i> Foto
+            <i class="bx bx-image-add"></i> Subir Foto
           </label>
           <input id="uploadPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
 
@@ -215,6 +215,10 @@
           <button id="btnResetSession" type="button" class="ctrl-btn" style="background:#f1f5f9; color:var(--text-muted); border:1px solid var(--card-border);">
             <i class="bx bx-refresh"></i> Nueva Toma
           </button>
+
+          <button id="btnManualScan" type="button" class="ctrl-btn btn-record" style="grid-column: 1 / -1; font-size:1rem; padding:0.85rem 1rem;">
+            <i class="bx bx-scan"></i> Registrar Ahora en Inventario
+          </button>
         </div>
 
         <!-- Controles Auxiliares: Sensibilidad y Switch Cámara -->
@@ -222,17 +226,14 @@
           <div class="sensitivity-toggle">
             <span>Sensibilidad:</span>
             <div class="toggle-group">
-              <button type="button" class="toggle-option" data-threshold="0.20">20% Alta</button>
-              <button type="button" class="toggle-option active" data-threshold="0.28">28% Óptima</button>
+              <button type="button" class="toggle-option active" data-threshold="0.20">20% Alta</button>
+              <button type="button" class="toggle-option" data-threshold="0.28">28% Óptima</button>
               <button type="button" class="toggle-option" data-threshold="0.50">50% Estricta</button>
             </div>
           </div>
 
           <button id="btnSwitchCamera" type="button" class="btn-action-sm" title="Alternar entre cámara trasera y frontal">
             <i class="bx bx-transfer-alt"></i> Cambiar Cámara
-          </button>
-          <button id="btnManualScan" type="button" class="ctrl-btn btn-record" style="display:none;">
-            <i class="bx bx-scan"></i> Analizar
           </button>
         </div>
 

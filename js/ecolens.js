@@ -8,15 +8,19 @@
 (() => {
   'use strict';
 
-  // Configuración y Constantes
+  // Configuración Global de Detección
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
-    DEFAULT_THRESHOLD: 0.28,
+    DEFAULT_THRESHOLD: 0.20, // 20% para capturar botellas PET transparentes
+    MIN_CANDIDATE_SCORE: 0.15,
     MIN_BOX_SIZE: 20,
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
   };
+
+  // Clases válidas del dataset COCO que corresponden a envases reciclables
+  const RECYCLABLE_CLASSES = ['bottle', 'cup', 'wine glass', 'vase'];
 
   // Referencias DOM
   const dom = {
@@ -69,7 +73,7 @@
     invTotalUnits: document.getElementById('invTotalUnits')
   };
 
-  // Estado de la Aplicación
+  // Estado del Sistema
   let detector = null;
   let customCnn = null;
   let stream = null;
@@ -79,20 +83,15 @@
   let isDetecting = false;
   let isLoopActive = false;
   let animFrameId = null;
-  let detectIntervalId = null;
+  let loopTimeoutId = null;
   let audioCtx = null;
   let lastSpokenText = '';
   
-  // Tracking de Botellas (Anti-duplicación)
+  // Tracking de Botellas Anti-Duplicación
   let trackers = [];
   let visibleBoxes = [];
   let takeCount = 0;
   let nextTrackId = 1;
-
-  // Buffer Canvas para Inferencia Óptima
-  const bufferCanvas = document.createElement('canvas');
-  bufferCanvas.width = 640;
-  bufferCanvas.height = 640;
 
   // 1. Sintetizador de Sonido Web Audio API
   function playSound(type = 'chime') {
@@ -108,55 +107,51 @@
       gain.connect(audioCtx.destination);
 
       if (type === 'chime') {
-        // Melodía cristalina bio-tech al registrar botella
         osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
         osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08); // A5
         osc.frequency.exponentialRampToValueAtTime(1174.66, audioCtx.currentTime + 0.16); // D6
-        gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.28);
         osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.25);
+        osc.stop(audioCtx.currentTime + 0.28);
       } else if (type === 'click') {
-        // Clic táctil de interfaz
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
         osc.start(audioCtx.currentTime);
         osc.stop(audioCtx.currentTime + 0.05);
       }
-    } catch (e) {
-      // Audio autoplay policy
-    }
+    } catch (e) {}
   }
 
   // 2. Carga de Modelos de Inteligencia Artificial
   async function initNeuralEngines() {
     try {
       if (!window.tf || !window.cocoSsd) {
-        throw new Error('Bibliotecas de TensorFlow.js no disponibles en CDN');
+        throw new Error('TensorFlow.js o COCO-SSD no cargaron desde CDN');
       }
 
-      dom.statusText.textContent = 'Inicializando aceleración WebGL y MobileNet v2...';
+      dom.statusText.textContent = 'Cargando MobileNet v2 y aceleración WebGL GPU...';
       
-      // Motor 1: Detector de Objetos MobileNet v2
+      // Cargar MobileNet v2 estándar
       detector = await cocoSsd.load({ base: 'mobilenet_v2' });
 
-      // Motor 2: Red Convolucional Propia (CNN Keras)
+      // Intentar cargar la red convolucional Keras propia
       try {
-        const shardCheck = await fetch('./modelo_botellas/model.json', { method: 'HEAD' });
-        if (shardCheck.ok) {
+        const check = await fetch('./modelo_botellas/model.json', { method: 'HEAD' });
+        if (check.ok) {
           customCnn = await tf.loadLayersModel('./modelo_botellas/model.json');
           console.info('EcoLens: Red CNN Keras cargada exitosamente.');
         }
       } catch (err) {
-        console.warn('EcoLens: Red CNN local no disponible, operando con MobileNet v2 primario.');
+        console.warn('EcoLens: Red CNN local opcional no disponible:', err);
       }
 
-      dom.statusText.textContent = 'Sistema listo. Activa la cámara o sube un archivo.';
+      dom.statusText.textContent = '● Detector listo. Haz clic en "Cámara" o sube una foto de tu botella.';
       dom.hardwareBadge.innerHTML = '<span class="dot"></span> WebGL GPU Activo';
-      dom.btnManualScan.disabled = false;
+      if (dom.btnManualScan) dom.btnManualScan.disabled = false;
     } catch (error) {
       console.error('Error al inicializar IA:', error);
       dom.statusText.textContent = 'Error al cargar los modelos. Revisa tu conexión a internet.';
@@ -166,7 +161,7 @@
     }
   }
 
-  // 3. Algoritmo de Tracking e Intersección (IoU)
+  // 3. Matemáticas de Geometría e Intersección (IoU)
   function computeIoU(a, b) {
     const x1 = Math.max(a.x, b.x);
     const y1 = Math.max(a.y, b.y);
@@ -177,244 +172,388 @@
     return union <= 0 ? 0 : inter / union;
   }
 
-  function boxesOverlap(a, b) {
+  function isOverlapping(a, b) {
     const dx = (a.x + a.w / 2) - (b.x + b.w / 2);
     const dy = (a.y + a.h / 2) - (b.y + b.h / 2);
-    const maxDim = Math.max(a.w, a.h, b.w, b.h) * 0.6;
-    return computeIoU(a, b) >= 0.25 || Math.hypot(dx, dy) < maxDim;
+    const maxDim = Math.max(a.w, a.h, b.w, b.h) * 0.7;
+    return computeIoU(a, b) >= 0.2 || Math.hypot(dx, dy) < maxDim;
   }
 
-  function cleanOverlappingDetections(boxes) {
+  function cleanOverlaps(boxes) {
     const sorted = [...boxes].sort((a, b) => b.score - a.score);
     const result = [];
     for (const box of sorted) {
       if (box.w < CONFIG.MIN_BOX_SIZE || box.h < CONFIG.MIN_BOX_SIZE) continue;
-      if (result.every(other => computeIoU(box, other) < 0.4)) {
+      if (result.every(other => computeIoU(box, other) < 0.45)) {
         result.push(box);
       }
     }
     return result;
   }
 
-  // 4. Actualización del Estado de Tracking
-  function updateTrackers(incomingBoxes) {
-    const matchedIndices = new Set();
-    const newItems = [];
-
-    // Emparejar con trackers existentes
-    for (const tr of trackers) {
-      let bestIdx = -1;
-      let bestIoU = 0;
-
-      incomingBoxes.forEach((box, i) => {
-        if (matchedIndices.has(i)) return;
-        const iou = computeIoU(tr, box);
-        if (iou > bestIoU || boxesOverlap(tr, box)) {
-          bestIoU = iou;
-          bestIdx = i;
-        }
-      });
-
-      if (bestIdx >= 0) {
-        matchedIndices.add(bestIdx);
-        const matched = incomingBoxes[bestIdx];
-        tr.x = matched.x;
-        tr.y = matched.y;
-        tr.w = matched.w;
-        tr.h = matched.h;
-        tr.score = matched.score;
-        tr.hits += 1;
-        tr.missed = 0;
-      } else {
-        tr.missed += 1;
-      }
+  function getFriendlyLabel(rawClass, w, h) {
+    const ratio = h / Math.max(1, w);
+    if (rawClass === 'wine glass' || (rawClass === 'bottle' && ratio > 1.8 && ratio < 2.5)) {
+      return 'Botella de Vidrio';
     }
-
-    // Agregar nuevos candidatos no emparejados
-    incomingBoxes.forEach((box, i) => {
-      if (matchedIndices.has(i)) return;
-      const isDuplicate = trackers.some(tr => tr.registered && boxesOverlap(tr, box));
-      if (!isDuplicate) {
-        trackers.push({
-          id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
-          x: box.x,
-          y: box.y,
-          w: box.w,
-          h: box.h,
-          score: box.score,
-          material: determineMaterial(box),
-          hits: 1,
-          missed: 0,
-          registered: false
-        });
-      }
-    });
-
-    // Limpiar trackers perdidos
-    trackers = trackers.filter(tr => tr.registered || tr.missed < 6);
-
-    // Identificar recién confirmados
-    for (const tr of trackers) {
-      if (!tr.registered && tr.hits >= 2 && tr.missed === 0) {
-        tr.registered = true;
-        newItems.push(tr);
-      }
+    if (rawClass === 'cup') {
+      return 'Vaso / Envase';
     }
-
-    return newItems;
+    return 'Botella PET Plástico';
   }
 
-  // 5. Inferencia de Material y Tipo de Envase
-  function determineMaterial(box) {
-    const ratio = box.h / Math.max(1, box.w);
-    if (ratio > 2.5) return 'PET Plástico';
-    if (ratio > 1.8) return 'Vidrio';
-    return 'Lata Aluminio';
-  }
-
-  // 6. Renderizado de HUD en Canvas con Estilo Cyber-Optic
-  function renderCanvasHUD(canvas, source, boxes) {
-    const srcW = source.videoWidth || source.naturalWidth || source.width || 640;
-    const srcH = source.videoHeight || source.naturalHeight || source.height || 480;
-
-    const scale = Math.min(1, 960 / Math.max(srcW, srcH));
-    const renderW = Math.max(1, Math.round(srcW * scale));
-    const renderH = Math.max(1, Math.round(srcH * scale));
-
-    if (canvas.width !== renderW) canvas.width = renderW;
-    if (canvas.height !== renderH) canvas.height = renderH;
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(source, 0, 0, renderW, renderH);
-
-    // Dibujar Cajas con Borde Neón y Esquinas Holográficas
-    for (const box of boxes) {
-      const isNew = !box.registered;
-      const strokeColor = isNew ? '#10b981' : '#f59e0b';
-      const fillColor = isNew ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)';
-      const labelText = isNew 
-        ? `${box.id || 'NUEVA'} · ${box.material || 'Botella'} ${Math.round(box.score * 100)}%`
-        : `${box.id} · En Inventario`;
-
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(box.x, box.y, box.w, box.h);
-
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(box.x, box.y, box.w, box.h);
-
-      // Etiqueta flotante superior
-      ctx.font = '700 13px "Plus Jakarta Sans", sans-serif';
-      const labelWidth = ctx.measureText(labelText).width + 16;
-      const labelY = box.y > 28 ? box.y - 28 : box.y;
-
-      ctx.fillStyle = strokeColor;
-      ctx.beginPath();
-      ctx.roundRect(box.x, labelY, labelWidth, 24, 6);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(labelText, box.x + 8, labelY + 16);
-    }
-  }
-
-  // 7. Bucle de Procesamiento Visual
+  // 4. Bucle Asíncrono de Inferencia
   async function processVisualFrame() {
     if (!detector || !activeSource || isDetecting) return;
     isDetecting = true;
 
     try {
-      // 1. Dibujar frame en buffer
-      const bCtx = bufferCanvas.getContext('2d', { willReadFrequently: true });
-      bCtx.drawImage(activeSource, 0, 0, 640, 640);
+      // Detección directa sobre el elemento source (video o imagen) con umbral sensible
+      const predictions = await detector.detect(activeSource, 20, CONFIG.MIN_CANDIDATE_SCORE);
 
-      // 2. Detección con MobileNet v2
-      const predictions = await detector.detect(bufferCanvas, 15, activeThreshold);
-      
-      // Filtrar por botellas y vasos/envases reciclables
-      const rawBoxes = predictions
-        .filter(p => ['bottle', 'cup', 'can'].includes(p.class) && p.score >= activeThreshold)
+      // Filtrar por clases de botellas/envases con el umbral activo
+      const candidates = predictions
+        .filter(p => RECYCLABLE_CLASSES.includes(p.class) && p.score >= activeThreshold)
         .map(p => ({
           x: p.bbox[0],
           y: p.bbox[1],
           w: p.bbox[2],
           h: p.bbox[3],
-          score: p.score
+          score: p.score,
+          rawClass: p.class,
+          label: getFriendlyLabel(p.class, p.bbox[2], p.bbox[3])
         }));
 
-      const cleanedBoxes = cleanOverlappingDetections(rawBoxes);
-      const newlyConfirmed = updateTrackers(cleanedBoxes);
+      const cleaned = cleanOverlaps(candidates);
+      const newlyRegistered = [];
 
-      visibleBoxes = trackers.filter(t => t.missed === 0).map(t => ({
-        id: t.id,
-        x: t.x,
-        y: t.y,
-        w: t.w,
-        h: t.h,
-        score: t.score,
-        material: t.material,
-        registered: t.registered
-      }));
+      for (const box of cleaned) {
+        // Buscar si ya coincide con una botella registrada en tracking
+        const existing = trackers.find(t => isOverlapping(t, box));
 
-      // Renderizar HUD
-      renderCanvasHUD(dom.canvas, activeSource, visibleBoxes);
-
-      // Actualizar conteos en vivo
-      dom.hudInView.textContent = visibleBoxes.length;
-      dom.hudInTake.textContent = takeCount;
-
-      // Si hay elementos recién confirmados, persistirlos
-      if (newlyConfirmed.length > 0) {
-        registerNewItems(newlyConfirmed);
+        if (existing) {
+          existing.x = box.x;
+          existing.y = box.y;
+          existing.w = box.w;
+          existing.h = box.h;
+          existing.score = box.score;
+          existing.missed = 0;
+          existing.hits++;
+        } else {
+          // Nueva botella detectada: ¡Registrar de inmediato!
+          const newTracker = {
+            id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+            x: box.x,
+            y: box.y,
+            w: box.w,
+            h: box.h,
+            score: box.score,
+            label: box.label,
+            hits: 1,
+            missed: 0,
+            registered: true
+          };
+          trackers.push(newTracker);
+          newlyRegistered.push(newTracker);
+        }
       }
+
+      // Marcar ausencias
+      for (const t of trackers) {
+        if (!cleaned.some(c => isOverlapping(t, c))) {
+          t.missed++;
+        }
+      }
+
+      // Limpiar trackers que salieron del encuadre hace más de 12 frames
+      trackers = trackers.filter(t => t.missed < 12);
+
+      // Actualizar cajas visibles
+      visibleBoxes = trackers.filter(t => t.missed === 0);
+      dom.hudInView.textContent = visibleBoxes.length;
+
+      // Si hay botellas nuevas, guardarlas y actualizar estado
+      if (newlyRegistered.length > 0) {
+        onNewBottlesRegistered(newlyRegistered);
+      } else if (visibleBoxes.length > 0) {
+        dom.statusText.textContent = `● ${visibleBoxes.length} envase(s) identificado(s) en cuadro.`;
+      } else {
+        dom.statusText.textContent = `Buscando envases... (Sensibilidad: ${Math.round(activeThreshold * 100)}%)`;
+      }
+
     } catch (err) {
-      console.warn('Frame drop:', err);
+      console.warn('Error en frame de inferencia:', err);
     } finally {
       isDetecting = false;
     }
   }
 
-  // 8. Registro de Botellas en Inventario
-  function registerNewItems(items) {
+  // 5. Acción al Confirmar Nuevas Botellas
+  function onNewBottlesRegistered(items) {
     playSound('chime');
     takeCount += items.length;
     dom.hudInTake.textContent = takeCount;
 
-    const records = items.map(item => ({
+    const newRecords = items.map(item => ({
       id: item.id,
       timestamp: new Date().toISOString(),
-      label: item.material || 'Botella PET',
+      label: item.label,
       confidence: Math.round(item.score * 100),
       gramsPlastic: CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
       co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
     }));
 
     const currentInv = loadInventory();
-    const updatedInv = [...records, ...currentInv];
+    const updatedInv = [...newRecords, ...currentInv];
     saveInventory(updatedInv);
     renderInventoryTable(updatedInv);
     updateImpactMetrics(updatedInv);
 
-    // Actualizar Tarjeta de Diagnóstico
-    const avgScore = items.reduce((acc, i) => acc + i.score, 0) / items.length;
-    updateDiagnosisCard(items[0].material, avgScore, updatedInv.length);
-  }
-
-  // 9. Actualización de Tarjeta Lateral de Diagnóstico
-  function updateDiagnosisCard(label, confidence, totalCount) {
-    dom.resultLabel.textContent = `${label} Identificada`;
-    dom.resultSub.textContent = `Registrada con éxito · Total en inventario: ${totalCount}`;
+    const first = items[0];
+    dom.resultIcon.innerHTML = `<i class="bx ${first.label.includes('Vidrio') ? 'bx-wine' : 'bx-recycle'}"></i>`;
+    dom.resultLabel.textContent = `¡${first.label} Registrada!`;
+    dom.resultSub.textContent = `ID ${first.id} guardada en inventario · Total: ${updatedInv.length}`;
     
-    const pct = Math.round(confidence * 100);
+    const pct = Math.round(first.score * 100);
     dom.meterPct.textContent = `${pct}%`;
     dom.meterFill.style.width = `${pct}%`;
     dom.btnSpeak.style.display = 'inline-flex';
 
-    lastSpokenText = `Se ha clasificado un envase de ${label} con una confianza del ${pct} por ciento. Inventario actualizado a ${totalCount} unidades.`;
+    lastSpokenText = `Detectada ${first.label} con confianza del ${pct} por ciento. Guardada en el inventario ecológico.`;
   }
 
-  // 10. Persistencia e Inventario en LocalStorage
+  // 6. Renderizado de HUD en Canvas con Compensación Object-Cover
+  function renderCanvasHUD() {
+    if (!activeSource) return;
+
+    const canvas = dom.canvas;
+    const viewportW = canvas.clientWidth;
+    const viewportH = canvas.clientHeight;
+
+    if (canvas.width !== viewportW || canvas.height !== viewportH) {
+      canvas.width = viewportW;
+      canvas.height = viewportH;
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, viewportW, viewportH);
+
+    const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
+    const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
+
+    if (!srcW || !srcH) return;
+
+    // Cálculo proyectivo idéntico al object-cover del CSS
+    const scale = Math.max(viewportW / srcW, viewportH / srcH);
+    const offsetX = (viewportW - srcW * scale) / 2;
+    const offsetY = (viewportH - srcH * scale) / 2;
+
+    for (const box of visibleBoxes) {
+      const rx = box.x * scale + offsetX;
+      const ry = box.y * scale + offsetY;
+      const rw = box.w * scale;
+      const rh = box.h * scale;
+
+      const strokeColor = '#10b981'; // Neón Esmeralda
+      const fillColor = 'rgba(16, 185, 129, 0.15)';
+      const tagText = `${box.id} · ${box.label} ${Math.round(box.score * 100)}%`;
+
+      // Relleno sutil y caja delimitadora
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(rx, ry, rw, rh);
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(rx, ry, rw, rh);
+
+      // Esquinas cibernéticas reforzadas
+      const corner = Math.min(16, rw / 4, rh / 4);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      
+      // Top-Left
+      ctx.beginPath();
+      ctx.moveTo(rx, ry + corner);
+      ctx.lineTo(rx, ry);
+      ctx.lineTo(rx + corner, ry);
+      ctx.stroke();
+
+      // Top-Right
+      ctx.beginPath();
+      ctx.moveTo(rx + rw - corner, ry);
+      ctx.lineTo(rx + rw, ry);
+      ctx.lineTo(rx + rw, ry + corner);
+      ctx.stroke();
+
+      // Bottom-Left
+      ctx.beginPath();
+      ctx.moveTo(rx, ry + rh - corner);
+      ctx.lineTo(rx, ry + rh);
+      ctx.lineTo(rx + corner, ry + rh);
+      ctx.stroke();
+
+      // Bottom-Right
+      ctx.beginPath();
+      ctx.moveTo(rx + rw - corner, ry + rh);
+      ctx.lineTo(rx + rw, ry + rh);
+      ctx.lineTo(rx + rw, ry + rh - corner);
+      ctx.stroke();
+
+      // Etiqueta flotante con tipografía clara
+      ctx.font = '700 13px "Plus Jakarta Sans", sans-serif';
+      const textWidth = ctx.measureText(tagText).width;
+      const labelY = ry > 26 ? ry - 26 : ry + 4;
+
+      ctx.fillStyle = '#059669';
+      ctx.beginPath();
+      ctx.roundRect(rx, labelY, textWidth + 16, 24, 6);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(tagText, rx + 8, labelY + 16);
+    }
+  }
+
+  // 7. Bucle Asíncrono de Inferencia
+  async function runInferenceLoop() {
+    if (!isLoopActive) return;
+    await processVisualFrame();
+    if (isLoopActive) {
+      loopTimeoutId = setTimeout(runInferenceLoop, 260);
+    }
+  }
+
+  // 8. Control de la Cámara Web / Móvil
+  async function startCamera() {
+    stopActiveSource();
+    dom.statusText.textContent = 'Iniciando cámara web en alta definición...';
+
+    try {
+      const constraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      dom.video.srcObject = stream;
+      await dom.video.play();
+
+      activeSource = dom.video;
+      isLoopActive = true;
+
+      // Actualizar elementos visuales
+      dom.idleState.style.display = 'none';
+      dom.preview.style.display = 'none';
+      dom.video.style.display = 'block';
+      dom.canvas.style.display = 'block';
+      dom.laser.classList.add('laser-active');
+      dom.cameraChip.style.display = 'flex';
+      dom.btnStartCamera.innerHTML = '<i class="bx bx-stop-circle"></i> Detener Cámara';
+      dom.btnStartCamera.classList.add('btn-danger');
+
+      // Animación continua de HUD a 60 FPS
+      const animLoop = () => {
+        if (!isLoopActive) return;
+        renderCanvasHUD();
+        animFrameId = requestAnimationFrame(animLoop);
+      };
+      animFrameId = requestAnimationFrame(animLoop);
+
+      // Iniciar bucle de inferencia no bloqueante
+      runInferenceLoop();
+      dom.statusText.textContent = '● Cámara en vivo activa. Apunta a una botella para registrarla.';
+      playSound('click');
+    } catch (err) {
+      console.error('Error al acceder a la cámara:', err);
+      dom.statusText.textContent = 'No se pudo acceder a la cámara. Revisa los permisos o sube una fotografía.';
+      stopActiveSource();
+    }
+  }
+
+  function stopActiveSource() {
+    isLoopActive = false;
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    if (loopTimeoutId) clearTimeout(loopTimeoutId);
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+
+    if (dom.video.srcObject) {
+      dom.video.srcObject = null;
+    }
+
+    dom.video.style.display = 'none';
+    dom.canvas.style.display = 'none';
+    dom.preview.style.display = 'none';
+    dom.idleState.style.display = 'flex';
+    dom.laser.classList.remove('laser-active');
+    dom.cameraChip.style.display = 'none';
+
+    dom.btnStartCamera.innerHTML = '<i class="bx bx-camera"></i> Cámara';
+    dom.btnStartCamera.classList.remove('btn-danger');
+    dom.statusText.textContent = 'Cámara detenida.';
+    activeSource = null;
+  }
+
+  // 9. Carga de Fotografías y Video
+  function handlePhotoUpload(file) {
+    if (!file) return;
+    stopActiveSource();
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        activeSource = img;
+        dom.preview.src = e.target.result;
+        dom.idleState.style.display = 'none';
+        dom.video.style.display = 'none';
+        dom.preview.style.display = 'block';
+        dom.canvas.style.display = 'block';
+
+        trackers = [];
+        takeCount = 0;
+        dom.statusText.textContent = 'Analizando fotografía con MobileNet v2...';
+
+        // Ejecutar inferencia inmediata sobre la foto
+        await processVisualFrame();
+        renderCanvasHUD();
+
+        if (visibleBoxes.length === 0) {
+          dom.statusText.textContent = 'No se detectaron botellas en la imagen. Prueba con otra foto o ajusta la sensibilidad a 20%.';
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // 10. Forzar Registro Manual Inmediato
+  async function forceManualScan() {
+    if (!activeSource) {
+      alert('Activa la cámara o sube una foto primero.');
+      return;
+    }
+
+    playSound('click');
+    dom.statusText.textContent = 'Analizando encuadre actual inmediatamente...';
+    await processVisualFrame();
+    renderCanvasHUD();
+
+    if (visibleBoxes.length > 0) {
+      alert(`¡Éxito! Se han detectado ${visibleBoxes.length} envase(s) en el encuadre y se registraron en tu inventario.`);
+    } else {
+      alert('El detector no encontró una botella clara en este momento. Acerca más el envase a la cámara o asegúrate de que haya buena iluminación.');
+    }
+  }
+
+  // 11. Persistencia e Inventario
   function loadInventory() {
     try {
       const data = localStorage.getItem(CONFIG.STORAGE_KEY);
@@ -443,7 +582,7 @@
 
     dom.invEmpty.style.display = 'none';
 
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       const tr = document.createElement('tr');
       tr.className = 'inv-row';
 
@@ -451,7 +590,7 @@
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
 
-      const tagClass = item.label.includes('Vidrio') ? 'glass' : item.label.includes('Lata') ? 'can' : 'pet';
+      const tagClass = item.label.includes('Vidrio') ? 'glass' : item.label.includes('Vaso') ? 'can' : 'pet';
 
       tr.innerHTML = `
         <td style="font-weight:700; font-family:var(--font-mono); color:var(--primary);">${item.id}</td>
@@ -480,7 +619,7 @@
       dom.invTableBody.appendChild(tr);
     });
 
-    // Eventos de eliminación
+    // Delegación para eliminar registros individuales
     dom.invTableBody.querySelectorAll('.btn-danger').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const idToDelete = e.currentTarget.dataset.id;
@@ -493,7 +632,7 @@
     });
   }
 
-  // 11. Métricas de Impacto Ecológico
+  // 12. Actualización de Métricas de Impacto
   function updateImpactMetrics(items = loadInventory()) {
     const count = items.length;
     const gramsPlastic = Math.round(count * CONFIG.GRAMS_PLASTIC_PER_BOTTLE);
@@ -506,110 +645,7 @@
     dom.kpiTotalWater.textContent = `${litersWater}L`;
   }
 
-  // 12. Control de Cámara
-  async function startCamera() {
-    stopActiveSource();
-    dom.statusText.textContent = 'Solicitando acceso a cámara de alta resolución...';
-
-    try {
-      const constraints = {
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
-
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      dom.video.srcObject = stream;
-      await dom.video.play();
-
-      activeSource = dom.video;
-      isLoopActive = true;
-
-      // Actualizar vista
-      dom.idleState.style.display = 'none';
-      dom.preview.style.display = 'none';
-      dom.video.style.display = 'block';
-      dom.canvas.style.display = 'block';
-      dom.laser.classList.add('laser-active');
-      dom.cameraChip.style.display = 'flex';
-      dom.btnStartCamera.innerHTML = '<i class="bx bx-stop-circle"></i> Detener';
-      dom.btnStartCamera.classList.add('btn-danger');
-
-      // Iniciar bucle de renderizado y detección periódica (cada 350ms para 60fps suaves)
-      const loopRender = () => {
-        if (!isLoopActive) return;
-        renderCanvasHUD(dom.canvas, activeSource, visibleBoxes);
-        animFrameId = requestAnimationFrame(loopRender);
-      };
-      animFrameId = requestAnimationFrame(loopRender);
-
-      detectIntervalId = setInterval(processVisualFrame, 320);
-      dom.statusText.textContent = 'Cámara en vivo activa. Apunta a las botellas para clasificarlas.';
-      playSound('click');
-    } catch (err) {
-      console.error('Error al acceder a la cámara:', err);
-      dom.statusText.textContent = 'No se pudo abrir la cámara. Revisa los permisos o sube una imagen.';
-      stopActiveSource();
-    }
-  }
-
-  function stopActiveSource() {
-    isLoopActive = false;
-    if (animFrameId) cancelAnimationFrame(animFrameId);
-    if (detectIntervalId) clearInterval(detectIntervalId);
-
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-
-    if (dom.video.srcObject) {
-      dom.video.srcObject = null;
-    }
-
-    dom.video.style.display = 'none';
-    dom.canvas.style.display = 'none';
-    dom.preview.style.display = 'none';
-    dom.idleState.style.display = 'flex';
-    dom.laser.classList.remove('laser-active');
-    dom.cameraChip.style.display = 'none';
-
-    dom.btnStartCamera.innerHTML = '<i class="bx bx-camera"></i> Cámara';
-    dom.btnStartCamera.classList.remove('btn-danger');
-    dom.statusText.textContent = 'Cámara detenida.';
-    activeSource = null;
-  }
-
-  // 13. Carga y Análisis de Fotografías
-  function handlePhotoUpload(file) {
-    if (!file) return;
-    stopActiveSource();
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        activeSource = img;
-        dom.preview.src = e.target.result;
-        dom.idleState.style.display = 'none';
-        dom.video.style.display = 'none';
-        dom.preview.style.display = 'block';
-        dom.canvas.style.display = 'block';
-
-        trackers = [];
-        takeCount = 0;
-        dom.statusText.textContent = 'Fotografía cargada. Analizando envases...';
-        processVisualFrame();
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  // 14. Exportación de Datos
+  // 13. Exportación de Datos
   function exportCSV() {
     const items = loadInventory();
     if (!items.length) {
@@ -645,7 +681,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // 15. Vinculación de Eventos
+  // 14. Eventos del Sistema
   function setupEvents() {
     dom.btnStartCamera.addEventListener('click', () => {
       if (stream) stopActiveSource();
@@ -661,14 +697,19 @@
       handlePhotoUpload(e.target.files[0]);
     });
 
+    if (dom.btnManualScan) {
+      dom.btnManualScan.addEventListener('click', forceManualScan);
+    }
+
     dom.btnResetSession.addEventListener('click', () => {
       trackers = [];
       visibleBoxes = [];
       takeCount = 0;
       dom.hudInTake.textContent = '0';
       dom.hudInView.textContent = '0';
-      dom.statusText.textContent = 'Sesión reiniciada. Los envases en vista se contarán de nuevo.';
+      dom.statusText.textContent = 'Nueva toma iniciada. Las botellas en vista se contarán de nuevo.';
       playSound('click');
+      renderCanvasHUD();
     });
 
     // Control de Sensibilidad
@@ -697,7 +738,7 @@
     dom.btnExportCsv.addEventListener('click', exportCSV);
     dom.btnExportJson.addEventListener('click', exportJSON);
     dom.btnClearInv.addEventListener('click', () => {
-      if (confirm('¿Estás seguro de que deseas vaciar todo el inventario?')) {
+      if (confirm('¿Estás seguro de que deseas vaciar todo el inventario de envases?')) {
         saveInventory([]);
         renderInventoryTable([]);
         updateImpactMetrics([]);
@@ -705,7 +746,7 @@
       }
     });
 
-    // Búsqueda en Inventario
+    // Búsqueda en Vivo
     dom.invSearch.addEventListener('input', (e) => {
       const q = e.target.value.toLowerCase();
       const all = loadInventory();
@@ -716,7 +757,7 @@
     });
   }
 
-  // Inicialización al Cargar DOM
+  // Inicialización Automática
   document.addEventListener('DOMContentLoaded', () => {
     initNeuralEngines();
     setupEvents();
