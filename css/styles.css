@@ -1,0 +1,169 @@
+/* StockVision AI - Estilos Profesionales */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --primary: #0284c7;
+  --primary-glow: rgba(2, 132, 199, 0.35);
+  --accent: #10b981;
+  --accent-glow: rgba(16, 185, 129, 0.35);
+  --bg-dark: #090d16;
+  --card-dark: rgba(15, 23, 42, 0.75);
+  --card-border: rgba(56, 189, 248, 0.15);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: var(--bg-dark);
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+code, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Glassmorphism Cards */
+.glass-panel {
+  background: var(--card-dark);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.glass-panel-interactive {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-interactive:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 15px 35px -5px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Scanner HUD Frame */
+.scanner-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #000;
+  box-shadow: 0 0 40px -10px rgba(2, 132, 199, 0.25);
+}
+
+.scanner-laser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #38bdf8, #10b981, transparent);
+  box-shadow: 0 0 15px 2px rgba(56, 189, 248, 0.8);
+  animation: scan 2.5s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes scan {
+  0% {
+    top: 5%;
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 95%;
+    opacity: 0.3;
+  }
+}
+
+/* Reticle Corners */
+.reticle-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #38bdf8;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.reticle-tl {
+  top: 16px;
+  left: 16px;
+  border-top: 3px solid #38bdf8;
+  border-left: 3px solid #38bdf8;
+  border-top-left-radius: 6px;
+}
+
+.reticle-tr {
+  top: 16px;
+  right: 16px;
+  border-top: 3px solid #38bdf8;
+  border-right: 3px solid #38bdf8;
+  border-top-right-radius: 6px;
+}
+
+.reticle-bl {
+  bottom: 16px;
+  left: 16px;
+  border-bottom: 3px solid #38bdf8;
+  border-left: 3px solid #38bdf8;
+  border-bottom-left-radius: 6px;
+}
+
+.reticle-br {
+  bottom: 16px;
+  right: 16px;
+  border-bottom: 3px solid #38bdf8;
+  border-right: 3px solid #38bdf8;
+  border-bottom-right-radius: 6px;
+}
+
+/* Pulsing Badge */
+.pulse-indicator {
+  position: relative;
+}
+
+.pulse-indicator::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 9999px;
+  background: inherit;
+  opacity: 0.6;
+  animation: pulse-ring 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.5);
+}

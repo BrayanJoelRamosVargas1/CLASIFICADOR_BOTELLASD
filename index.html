@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>StockVision AI — Clasificador Inteligente de Productos e Inventario</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- TensorFlow.js & COCO-SSD Models -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- Header Superior -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo y Título -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">StockVision</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/30">AI v2.4</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Control de Inventario y Clasificación por Visión Artificial</p>
+        </div>
+      </div>
+
+      <!-- Estado del Modelo e Info Académica -->
+      <div class="flex items-center gap-3">
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+          <span id="modelStatusBadge" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="modelStatusText" class="text-xs font-mono text-slate-300">Cargando Red Neuronal...</span>
+        </div>
+
+        <button id="openLivenessBtn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-500/30 text-sky-300 text-xs font-medium transition shadow-sm" title="Análisis 2D vs 3D">
+          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+          <span class="hidden sm:inline">Inspección 2D vs 3D</span>
+          <span class="sm:hidden">Liveness</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col gap-6">
+
+    <!-- KPI Cards (Métricas Rápidas) -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-xs font-medium uppercase tracking-wider">Unidades en Stock</span>
+          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        </div>
+        <div id="kpiTotalUnits" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">0</div>
+        <div class="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+          <span>● Conteo activo</span>
+        </div>
+      </div>
+
+      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-xs font-medium uppercase tracking-wider">Confianza Promedio</span>
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div id="kpiConfidence" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">--%</div>
+        <div class="text-xs text-slate-400 mt-1">Calibrado &gt; 55%</div>
+      </div>
+
+      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-xs font-medium uppercase tracking-wider">Productos Registrados</span>
+          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        </div>
+        <div id="kpiUniqueItems" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">0 SKU</div>
+        <div class="text-xs text-slate-400 mt-1">Distintos en lote</div>
+      </div>
+
+      <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+        <div class="flex items-center justify-between text-slate-400 mb-1">
+          <span class="text-xs font-medium uppercase tracking-wider">Último Escaneo</span>
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div id="kpiLastTime" class="text-lg sm:text-2xl font-bold text-white font-mono truncate">Sin registros</div>
+        <div class="text-xs text-slate-400 mt-1">Sincronización local</div>
+      </div>
+    </section>
+
+    <!-- Zona Central: Visor de Cámara y Controles de Escaneo -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Visor de Visión por Computadora (8 cols) -->
+      <div class="lg:col-span-8 flex flex-col gap-3">
+        <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3 border border-slate-800/90">
+          
+          <!-- Barra de Herramientas del Escáner -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Cámara IA:</span>
+              <button id="cameraSelectBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1.5" title="Cambiar cámara">
+                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Alternar Lente</span>
+              </button>
+              
+              <label class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition cursor-pointer flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span>Subir Foto</span>
+                <input id="fileInput" type="file" accept="image/*" class="hidden">
+              </label>
+
+              <button id="resetCameraBtn" class="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-xs font-medium text-slate-400 hover:text-white transition" title="Restaurar Video en Vivo">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
+            </div>
+
+            <!-- Modo Automático / Manual -->
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input id="autoModeToggle" type="checkbox" checked class="sr-only peer">
+                <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 relative"></div>
+                <span class="text-xs font-medium text-slate-300">Auto-Conteo</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Viewport del Escáner (Video + Canvas Overlay HUD) -->
+          <div class="scanner-viewport w-full aspect-[4/3] sm:aspect-[16/9] flex items-center justify-center relative">
+            <div class="scanner-laser"></div>
+            
+            <!-- Retícula HUD -->
+            <div class="reticle-corner reticle-tl"></div>
+            <div class="reticle-corner reticle-tr"></div>
+            <div class="reticle-corner reticle-bl"></div>
+            <div class="reticle-corner reticle-br"></div>
+
+            <!-- Video Feed -->
+            <video id="cameraFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            
+            <!-- Imagen Estática (si sube archivo) -->
+            <img id="staticImage" class="w-full h-full object-contain hidden" alt="Foto cargada">
+
+            <!-- Canvas Bounding Boxes Overlay -->
+            <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+          </div>
+
+          <!-- Barra de Acción Inmediata -->
+          <div class="flex items-center justify-between gap-4 pt-1">
+            <button id="manualScanBtn" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 font-semibold text-sm text-white shadow-lg shadow-sky-600/30 active:scale-[0.99] transition flex items-center justify-center gap-2">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Registrar Detección Actual (+1)</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Panel de Ajustes y Calibración (4 cols) -->
+      <div class="lg:col-span-4 flex flex-col gap-4">
+        <div class="glass-panel rounded-2xl p-4 border border-slate-800/90 flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <h3 class="text-sm font-bold text-white tracking-wide">Configuración del Detector</h3>
+            <span class="text-xs text-sky-400 font-mono">Parámetros</span>
+          </div>
+
+          <!-- Filtro de Producto / Clase -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-300">Filtro de Producto:</label>
+            <select id="categoryFilter" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+              <option value="bottle" selected>🎯 Solo Botellas (Plástica / Vidrio)</option>
+              <option value="all_products">📦 Todos los Productos (Botellas, Vasos, Latas, Libros)</option>
+              <option value="pets_demo">🐾 Demo Docente (Botellas, Perros y Gatos)</option>
+              <option value="all">🌐 Todas las clases COCO-SSD (80 clases)</option>
+            </select>
+            <p class="text-[11px] text-slate-400">Por defecto enfocado en botellas como la solicitada por el docente.</p>
+          </div>
+
+          <!-- Umbral de Confianza Slider -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-slate-300">Umbral de Certeza:</label>
+              <span id="confidenceVal" class="text-xs font-mono font-bold text-sky-400">55%</span>
+            </div>
+            <input id="confidenceSlider" type="range" min="0.30" max="0.90" step="0.05" value="0.55" class="w-full accent-sky-500 cursor-pointer">
+            <p class="text-[11px] text-slate-400">Filtra detecciones con probabilidad inferior a este porcentaje.</p>
+          </div>
+
+          <!-- Lógica Anti-Duplicados -->
+          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+            <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Debounce Espacial (IoU &gt; 0.35)</span>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+              Evita registrar repetidamente la misma botella mientras permanece quieta en el campo visual.
+            </p>
+          </div>
+
+          <!-- Respaldo Académico -->
+          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col gap-1">
+            <div class="text-xs font-semibold text-slate-300">Materia / Referencia:</div>
+            <p class="text-[11px] text-slate-400">
+              Docente: <b>Jesús Bautista</b><br>
+              Entrega: Clasificador de productos con cámara de celular y conteo de inventario.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Sección de Inventario / Tabla de Registros -->
+    <section class="glass-panel rounded-2xl p-4 sm:p-6 border border-slate-800/90 flex flex-col gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <span>Inventario de Productos Escaneados</span>
+            <span class="text-xs font-normal text-slate-400 font-mono">(Registro en tiempo real)</span>
+          </h2>
+          <p class="text-xs text-slate-400">Base de datos local en memoria persistente del navegador.</p>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="exportCsvBtn" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Exportar CSV (Excel)</span>
+          </button>
+
+          <button id="exportJsonBtn" class="px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <span>Exportar JSON</span>
+          </button>
+
+          <button id="clearInventoryBtn" class="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 text-xs font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>Vaciar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabla Responsive -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <th class="py-3 px-4">Producto & SKU</th>
+              <th class="py-3 px-4">Categoría</th>
+              <th class="py-3 px-4">Cantidad</th>
+              <th class="py-3 px-4">Confianza</th>
+              <th class="py-3 px-4">Timestamp</th>
+              <th class="py-3 px-4 text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTableBody">
+            <!-- Filas inyectadas por JS -->
+          </tbody>
+        </table>
+
+        <!-- Estado vacío -->
+        <div id="emptyInventoryState" class="py-12 flex flex-col items-center justify-center text-center gap-2">
+          <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+          </div>
+          <div class="text-sm font-medium text-slate-300">Aún no hay productos en inventario</div>
+          <p class="text-xs text-slate-500 max-w-sm">Apunta con la cámara a una botella (ej. Vital) o pulsa "Registrar Detección Actual" para iniciar el conteo.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Defensa Técnica: 2D vs 3D (Liveness & Anti-Spoofing) -->
+  <div id="livenessModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+    <div class="glass-panel w-full max-w-2xl rounded-2xl border border-sky-500/40 p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-xs font-bold text-sky-400 uppercase tracking-widest font-mono">Pregunta Técnica de Defensa</span>
+          <h2 id="livenessTitle" class="text-lg font-bold text-white mt-1">¿Por qué un clasificador 2D no distingue una botella real de una foto?</h2>
+          <div id="livenessConcept" class="text-xs text-emerald-400 font-mono mt-0.5">Invarianza del Plano Proyectivo en Visión 2D</div>
+        </div>
+        <button id="closeLivenessBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 leading-relaxed" id="livenessSummary">
+        <!-- Inyectado por JS -->
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Soluciones en la Industria para Diferenciar 3D Real vs Foto:</h4>
+        <div id="livenessSolutions" class="flex flex-col gap-2.5">
+          <!-- Inyectado por JS -->
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 flex justify-end">
+        <button onclick="document.getElementById('livenessModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts de la Aplicación -->
+  <script src="js/inventory.js"></script>
+  <script src="js/vision.js"></script>
+  <script src="js/liveness.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

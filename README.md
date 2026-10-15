@@ -1,0 +1,80 @@
+# StockVision AI — Clasificador Inteligente de Productos y Control de Inventario
+
+Sistema de Visión por Computadora y Soporte a la Toma de Decisiones diseñado para la detección, clasificación y auditoría de inventario en tiempo real mediante cámaras de dispositivos móviles y navegadores web.
+
+| Parámetro | Detalle |
+| :--- | :--- |
+| **Materia** | Sistemas de Soporte a la Toma de Decisiones |
+| **Docente** | Ing. Jesús Bautista |
+| **Entrega** | Jueves |
+| **Arquitectura** | Edge AI (TensorFlow.js + MobileNet / CNN Convolucional) + Dashboard Reactivo |
+| **Entorno de Notebook** | Jupyter Notebook (`notebook/Clasificador_Productos_Inventario.ipynb`) |
+| **Dataset de referencia** | [Bottle Detection Dataset (Kaggle)](https://www.kaggle.com/datasets/diptosen/bottle-detection-dataset/data) |
+
+---
+
+## 🎯 1. Problema y Solución Desarrollada
+
+El objetivo planteado por el docente consiste en crear un sistema capaz de leer productos con la cámara del celular (específicamente botellas de plástico, como el ejemplo de la botella de agua *Vital*), clasificarlos bajo la analogía canónica de **"Perros vs Gatos"** (clasificación supervisada binaria) y mantener un **conteo continuo y auditable de inventario**.
+
+### ¿Qué aporta StockVision AI frente a proyectos convencionales?
+
+1. **Diseño Empresarial e Industrial:** Interfaz moderna tipo Dashboard (SaaS), alejándose de interfaces infantiles y aportando valor profesional.
+2. **Algoritmo de Debounce Espacial (Anti-Duplicados con IoU):** En una cámara a 30 FPS, un objeto quieto se registraría 30 veces por segundo. StockVision implementa cálculo de *Intersection over Union* (IoU > 0.35) para asegurar que una misma botella solo incremente el stock una vez mientras permanezca a la vista.
+3. **Módulo de Liveness & Inspección Técnica (2D vs 3D):** Justificación científica integrada en la interfaz que explica por qué un clasificador 2D detecta tanto una botella real como su foto en pantalla, y cómo la visión por computadora industrial resuelve este reto mediante sensores de profundidad, paralaje óptico y análisis espectral.
+4. **Exportación Empresarial:** Generación instantánea de reportes en CSV (compatible con Microsoft Excel con BOM UTF-8) y JSON estructurado.
+
+---
+
+## 🚀 2. Inicio Rápido (Cómo Ejecutar la Aplicación)
+
+### Opción A: Servidor Local Rápido (PC o Celular)
+
+La aplicación web corre directamente con cualquier servidor HTTP local:
+
+```powershell
+# En PowerShell desde la carpeta del proyecto:
+cd C:\Users\ElCremosasWee\stockvision-ia\app
+python -m http.server 8080
+```
+
+1. Abre tu navegador en: [http://localhost:8080](http://localhost:8080)
+2. Para usarlo **desde tu celular**:
+   - Conecta tu celular a la misma red Wi-Fi de tu computadora.
+   - Abre en el navegador del celular la IP de tu PC: `http://TU_IP_LOCAL:8080` (ejemplo: `http://192.168.1.15:8080`).
+
+### Opción B: Despliegue Gratis en GitHub Pages (Ideal para mostrar al profesor en el aula)
+
+1. Sube esta carpeta a un nuevo repositorio de GitHub.
+2. En GitHub: `Settings` -> `Pages` -> selecciona la rama `main` y la carpeta `/app` (o `/root`).
+3. Te dará un enlace HTTPS público (ej. `https://tu-usuario.github.io/stockvision-ia/`) que abrirá la cámara en cualquier smartphone sin instalar nada.
+
+---
+
+## 🧪 3. Cuaderno de Entrenamiento (Jupyter Notebook)
+
+Para presentar la parte de Machine Learning solicitada por el docente:
+
+1. Abre tu terminal e inicia Jupyter:
+   ```powershell
+   cd C:\Users\ElCremosasWee\stockvision-ia\notebook
+   jupyter notebook
+   ```
+2. Abre el archivo **`Clasificador_Productos_Inventario.ipynb`**.
+3. El cuaderno incluye:
+   - Carga y Data Augmentation sobre el dataset de Kaggle.
+   - Definición de la CNN profunda con capas `Conv2D`, `BatchNormalization`, `Dropout` y `Dense(1, sigmoid)`.
+   - Curvas de exactitud (`Accuracy`) y pérdida (`Binary Crossentropy`).
+   - Algoritmo de decisión de inventario con matrices de solapamiento IoU.
+
+---
+
+## 📚 4. Guía de Defensa Técnica ante el Docente
+
+Cuando el docente o el tribunal pregunte sobre el proyecto, tienes estas respuestas de nivel senior preparadas:
+
+### P: ¿Por qué el modelo detecta una botella si le muestro una foto en otro celular?
+> **Respuesta Senior:** *"Los modelos convolucionales estándar (CNNs, MobileNet, YOLO) operan sobre planos proyectivos bidimensionales de píxeles RGB. Una fotografía en pantalla comparte exactamente los mismos contornos, proporciones geométricas y textura que el objeto físico. En la industria, para mitigar esto se aplican sensores de profundidad 3D (LiDAR o Time-of-Flight), paralaje de movimiento (optical flow) o detección de frecuencias de patrón Moiré generadas por pantallas LCD."* (Puedes abrir el botón **"Inspección 2D vs 3D"** en la web app para mostrar esto en vivo).
+
+### P: ¿Cómo evita la aplicación contar 100 veces la misma botella?
+> **Respuesta Senior:** *"Implementamos un rastreador espacial en memoria que calcula el IoU (Intersection over Union) entre fotogramas consecutivos. Si la detección actual se solapa más de un 35% con un objeto ya identificado y registrado, el sistema bloquea el incremento hasta que el objeto sale del encuadre por más de 1.2 segundos."*
