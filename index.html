@@ -21,11 +21,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 
-  <!-- Boxicons & Leaflet CSS -->
+  <!-- Boxicons CSS -->
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 6.0 -->
+  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 7.0 -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -35,7 +34,7 @@
   </script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=6.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=7.0">
 </head>
 <body>
 
@@ -56,7 +55,6 @@
         <a href="#vision-scanner" class="nav-btn"><i class="bx bx-camera"></i> <span>Escáner</span></a>
         <a href="#eco-impact" class="nav-btn"><i class="bx bx-leaf"></i> <span>Métricas</span></a>
         <a href="#inventory" class="nav-btn"><i class="bx bx-list-check"></i> <span>Inventario</span></a>
-        <a href="#recycling-map" class="nav-btn"><i class="bx bx-map-pin"></i> <span>Puntos Limpios</span></a>
         <a href="cuaderno/index.html" class="nav-btn btn-notebook" title="Ver Cuaderno de Entrenamiento Jupyter">
           <i class="bx bx-book-open"></i> <span>Cuaderno CNN</span>
         </a>
@@ -239,9 +237,9 @@
           <div class="sensitivity-toggle">
             <span>Sensibilidad:</span>
             <div class="toggle-group">
-              <button type="button" class="toggle-option active" data-threshold="0.14">14% Ultra</button>
-              <button type="button" class="toggle-option" data-threshold="0.22">22% Óptima</button>
-              <button type="button" class="toggle-option" data-threshold="0.38">38% Estricta</button>
+              <button type="button" class="toggle-option active" data-threshold="0.10">10% Multi-Objeto</button>
+              <button type="button" class="toggle-option" data-threshold="0.18">18% Equilibrada</button>
+              <button type="button" class="toggle-option" data-threshold="0.30">30% Estricta</button>
             </div>
           </div>
 
@@ -365,28 +363,6 @@
       </div>
     </section>
 
-    <!-- Sección de Mapa de Puntos Limpios (OpenStreetMap + Leaflet) -->
-    <section id="recycling-map" class="map-section">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-        <div>
-          <h3 style="font-size:1.25rem; font-weight:800;">Puntos de Reciclaje y Contenedores Cercanos</h3>
-          <p style="font-size:0.85rem; color:var(--text-muted);">Localiza contenedores de reciclaje urbano para depositar los envases detectados.</p>
-        </div>
-        <div style="display:flex; gap:0.5rem;">
-          <button id="buscar-basureros" type="button" class="btn-action-sm" style="background:var(--accent-cyan-light); color:var(--accent-cyan-text); border-color:var(--accent-cyan-border);">
-            <i class="bx bx-current-location"></i> Mi Ubicación
-          </button>
-          <input id="lugar-basureros" type="search" placeholder="Buscar por ciudad..." class="btn-action-sm" style="min-width:180px;">
-          <button id="buscar-lugar" type="button" class="btn-action-sm">
-            <i class="bx bx-search"></i> Buscar
-          </button>
-        </div>
-      </div>
-      
-      <p id="mapa-estado" style="font-size:0.8rem; color:var(--text-light); margin-top:0.5rem;"></p>
-      <div id="mapa" class="map-viewport"></div>
-    </section>
-
   </main>
 
   <!-- Footer Institucional -->
@@ -409,12 +385,10 @@
     </div>
   </footer>
 
-  <!-- Scripts: Leaflet, Mapa, TensorFlow.js y Motor EcoLens -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/mapa.js"></script>
+  <!-- Scripts: TensorFlow.js y Motor EcoLens Multi-Objeto -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="js/ecolens.js?v=6.0"></script>
+  <script src="js/ecolens.js?v=7.0"></script>
 
 </body>
 </html>
