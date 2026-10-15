@@ -29,14 +29,14 @@
   <!-- Google Fonts & Custom CSS -->
   <link rel="stylesheet" href="css/styles.css">
 
-  <!-- TensorFlow.js & COCO-SSD Models -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <!-- TensorFlow.js & COCO-SSD Models (Versiones estables ultrarrápidas) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
 
   <!-- Header Superior -->
-  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+  <header class="border-b border-slate-800/80 bg-slate-900/90 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Logo y Título -->
@@ -49,7 +49,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">StockVision</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">v3.1 Turbo</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">v3.2 UltraFast</span>
           </div>
           <p class="text-xs text-slate-400 hidden sm:block">Control de Inventario y Clasificación por Visión Artificial</p>
         </div>
@@ -334,10 +334,10 @@
     </div>
   </div>
 
-  <!-- Scripts de la Aplicación (con cache buster v3.1) -->
-  <script src="js/inventory.js?v=3.1"></script>
-  <script src="js/vision.js?v=3.1"></script>
-  <script src="js/liveness.js?v=3.1"></script>
-  <script src="js/app.js?v=3.1"></script>
+  <!-- Scripts de la Aplicación (con cache buster v3.2) -->
+  <script src="js/inventory.js?v=3.2"></script>
+  <script src="js/vision.js?v=3.2"></script>
+  <script src="js/liveness.js?v=3.2"></script>
+  <script src="js/app.js?v=3.2"></script>
 </body>
 </html>
