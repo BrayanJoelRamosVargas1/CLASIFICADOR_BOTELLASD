@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="gradEco" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Outer Bio-Ring -->
+  <circle cx="60" cy="60" r="52" fill="none" stroke="url(#gradEco)" stroke-width="4" stroke-dasharray="8 4" opacity="0.6"/>
+  <circle cx="60" cy="60" r="44" fill="#0f172a" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+  
+  <!-- Futuristic Lens Aperture -->
+  <circle cx="60" cy="60" r="34" fill="none" stroke="#059669" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="60" cy="60" r="24" fill="rgba(16, 185, 129, 0.15)"/>
+  
+  <!-- Eco Bottle / Leaf Silhouette in Center -->
+  <path d="M57 32 H63 V38 C68 40 73 45 73 54 V78 C73 84 68 88 62 88 H58 C52 88 47 84 47 78 V54 C47 45 52 40 57 38 Z" 
+        fill="url(#gradEco)" filter="url(#glow)"/>
+  <path d="M55 30 H65 V34 H55 Z" fill="#38bdf8"/>
+  
+  <!-- Neural Network Optic Crosshair -->
+  <line x1="60" y1="18" x2="60" y2="28" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+  <line x1="60" y1="92" x2="60" y2="102" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+  <line x1="18" y1="60" x2="28" y2="60" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+  <line x1="92" y1="60" x2="102" y2="60" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+  
+  <circle cx="60" cy="60" r="3" fill="#ffffff"/>
+</svg>

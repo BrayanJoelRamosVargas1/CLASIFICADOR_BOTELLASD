@@ -1,1226 +1,406 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#cfe8b0">
-    <meta name="description" content="Cuenta botellas de plástico con un clasificador local. Usa la cámara o sube una foto. La imagen no sale del dispositivo.">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Botellas IA — ¿Hay botellas?">
-    <meta property="og:description" content="Una forma sencilla de contar botellas de plástico y guardar el inventario en el mismo dispositivo.">
-    <meta property="og:image" content="assets/botellas.svg">
-    <link rel="icon" type="image/png" href="assets/icono.png">
-    <meta name="author" content="Brayan Joel Ramos Vargas">
-    <link rel="manifest" href="manifest.webmanifest">
-    <title>Botellas IA — Clasificador Inteligente de Botellas | Brayan Ramos</title>
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
-    <link rel="stylesheet" href="./styles.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-  </head>
-  <body class="tablero">
-    <header class="hud">
-      <a href="#" class="marca focus-ring" aria-label="ReciclApp, inicio">
-        <img src="assets/icono.png" alt="" width="42" height="42">
-        <span>ReciclApp<small>caza botellas</small></span>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#059669">
+  <meta name="author" content="Brayan Joel Ramos Vargas">
+  <meta name="description" content="EcoLens AI — Sistema de Visión Artificial para Clasificación de Botellas e Inventario Ecológico. Desarrollado por Brayan Joel Ramos Vargas (Docente: Ing. Jesús Bautista).">
+  
+  <title>EcoLens AI — Detector Inteligente de Envases y Reciclaje | Brayan Ramos</title>
+  
+  <link rel="icon" type="image/svg+xml" href="assets/ecolens_logo.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- Google Fonts: Plus Jakarta Sans & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <!-- Boxicons & Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
+  <link rel="stylesheet" href="css/ecolens.css">
+</head>
+<body>
+
+  <!-- Header Superior Vidrio -->
+  <header class="header-glass">
+    <div class="header-container">
+      
+      <a href="#" class="logo-badge" aria-label="EcoLens AI, Inicio">
+        <div class="logo-icon">
+          <i class="bx bx-scan"></i>
+        </div>
+        <div class="logo-text">
+          <h1>EcoLens <span class="badge-pill">v4.0 Pro</span></h1>
+        </div>
       </a>
-      <nav class="nav" aria-label="Navegación principal">
-        <a href="#clasificador" class="focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Jugar</a>
-        <a href="#historial" class="focus-ring"><i class="bx bx-list-ul" aria-hidden="true"></i>Inventario</a>
-        <a href="#mapa-basureros" class="focus-ring"><i class="bx bx-map" aria-hidden="true"></i>Mapa</a>
-        <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" class="focus-ring"><i class="bx bxl-github" aria-hidden="true"></i>GitHub</a>
-        <a href="cuaderno/index.html" class="focus-ring cuaderno"><i class="bx bx-book-open" aria-hidden="true"></i>Cuaderno</a>
-        <button id="install-app" type="button" class="boton boton-chico hidden"><i class="bx bx-download" aria-hidden="true"></i><span class="solo-ancho">Instalar</span></button>
-        <p class="marcador" aria-label="Botellas acumuladas"><img src="assets/icono.png" alt="" width="28" height="28"><strong id="marcador-total">0</strong></p>
-      </nav>
-    </header>
 
-    <main>
-      <section class="ancho hero">
-        <div>
-          <p class="pista"><i class="bx bx-recycle" aria-hidden="true"></i> Misión de reciclaje</p>
-          <h1>Caza la <span>botella</span> y súmala al marcador</h1>
-          <p>Cámara, foto o video. Si salen dos, entran las dos. La misma no se cuenta otra vez.</p>
-          <a href="#clasificador" class="boton boton-papel focus-ring"><i class="bx bx-play" aria-hidden="true"></i>A jugar</a>
-        </div>
-        <img class="hero-arte" src="assets/botellas.svg" alt="Botella frente a un basurero amarillo, un contenedor verde y un punto de reciclaje azul" width="640" height="360">
-      </section>
-
-      <section id="clasificador" class="zona">
-        <div class="ancho">
-          <div class="titulo-zona">
-            <p class="etiqueta">Tu turno</p>
-            <h2>¿Cuántas botellas salen?</h2>
-            <p>La cámara y el video cuentan solos. Si hay dos, entran las dos. La misma no se vuelve a registrar.</p>
-          </div>
-          <div class="juego">
-            <div class="panel">
-              <div class="escenario">
-                <video id="video" class="hidden" playsinline autoplay muted aria-label="Vista previa de la cámara o del video"></video>
-                <img id="foto-preview" class="hidden" alt="Imagen seleccionada para clasificar">
-                <canvas id="canvas" width="400" height="400" class="hidden" aria-hidden="true"></canvas>
-                <div id="placeholder" class="espera">
-                  <img src="assets/icono.png" alt="" width="72" height="72">
-                  <p>Tu foto aparecerá aquí</p>
-                  <span>JPG, PNG, WEBP, MP4 o cámara en vivo</span>
-                </div>
-                <div id="camera-tag" class="chip hidden">Contando</div>
-                <div id="conteo-vivo" class="hidden">En vista: <span id="en-vista">0</span> · En esta toma: <span id="en-toma">0</span></div>
-              </div>
-              <div class="teclas">
-                <button id="start-camera" type="button" class="tecla tecla-verde focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Cámara</button>
-                <label for="image-upload" class="tecla tecla-azul focus-ring"><i class="bx bx-image-add" aria-hidden="true"></i>Foto</label>
-                <input id="image-upload" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
-                <label for="video-upload" class="tecla tecla-papel focus-ring"><i class="bx bx-video" aria-hidden="true"></i>Video</label>
-                <input id="video-upload" class="sr-only" type="file" accept="video/mp4,video/webm,video/quicktime">
-                <button id="switch-camera" type="button" class="tecla hidden focus-ring" aria-label="Cambiar entre cámara frontal y trasera"><i class="bx bx-refresh" aria-hidden="true"></i>Cambiar cámara</button>
-                <button id="classify" type="button" disabled class="boton boton-jugar focus-ring"><i class="bx bx-scan" aria-hidden="true"></i>Registrar ahora</button>
-              </div>
-              <p id="status" role="status" aria-live="polite">Preparando el modelo de IA…</p>
-              <button id="nueva-toma" type="button" class="tecla hidden focus-ring">Nueva toma</button>
-            </div>
-            <aside>
-              <section class="panel resultado" aria-labelledby="result-heading">
-                <p id="result-heading" class="etiqueta">Resultado</p>
-                <div id="result-icon" aria-hidden="true"><i class="bx bx-recycle"></i></div>
-                <p id="result-label">Aún no lo sabemos</p>
-                <p id="result-confidence"></p>
-                <button id="speak-result" type="button" class="boton boton-chico hidden focus-ring" aria-label="Escuchar el resultado"><i class="bx bx-volume-full" aria-hidden="true"></i>Escuchar</button>
-              </section>
-              <section class="panel privacidad" aria-labelledby="privacy-heading">
-                <h3 id="privacy-heading"><i class="bx bx-lock-alt" aria-hidden="true"></i> Tu privacidad importa</h3>
-                <p>Tus fotos no salen de tu dispositivo. Aquí solo se guarda el inventario: etiqueta, fecha, cantidad, confianza y cajas.</p>
-              </section>
-              <section class="panel" style="margin-top:10px;padding:12px;background:linear-gradient(160deg,#fffdf8,#f3edf9);border-color:rgba(147,51,234,0.2);" aria-labelledby="academic-heading">
-                <h3 id="academic-heading" style="margin:0 0 4px;font-size:1rem;color:#6b21a8;"><i class="bx bx-brain" aria-hidden="true"></i> Red Neuronal Propia</h3>
-                <p style="margin:0 0 6px;font-size:0.86rem;color:var(--suave);">Adaptada de la arquitectura de perros y gatos del Ing. Jesús Bautista (92.4% exactitud en Keras).</p>
-                <a href="cuaderno/index.html" class="boton boton-chico focus-ring" style="background:#f3e8ff;border-color:#d8b4fe;color:#6b21a8;font-size:0.82rem;"><i class="bx bx-book-open"></i>Ver cuaderno</a>
-              </section>
-            </aside>
-          </div>
-          <p class="nota">La IA puede equivocarse si la imagen está oscura, borrosa o las botellas se tapan entre sí.</p>
-        </div>
-      </section>
-
-      <section id="historial" class="ancho inventario">
-        <div class="cabecera-fila">
-          <div>
-            <p class="etiqueta">Botín</p>
-            <h2>Inventario</h2>
-            <p>Total: <span id="inventory-total">0</span> botellas</p>
-          </div>
-          <div class="acciones">
-            <button id="export-json" type="button" class="boton boton-chico hidden focus-ring"><i class="bx bx-download" aria-hidden="true"></i>JSON</button>
-            <button id="export-csv" type="button" class="boton boton-chico hidden focus-ring"><i class="bx bx-spreadsheet" aria-hidden="true"></i>CSV</button>
-            <button id="clear-history" type="button" class="boton boton-chico boton-texto hidden focus-ring"><i class="bx bx-trash" aria-hidden="true"></i>Borrar</button>
-          </div>
-        </div>
-        <p id="history-empty" class="vacio"><i class="bx bx-package" aria-hidden="true"></i> Todavía no hay registros. Cada botella entra sola, una sola vez.</p>
-        <div class="tabla-cabecera" aria-hidden="true">
-          <span></span>
-          <span>Registro</span>
-          <span>Confianza</span>
-          <span>Cant.</span>
-          <span></span>
-        </div>
-        <ul id="history-list" class="tabla-botellas" aria-label="Inventario de botellas"></ul>
-      </section>
-
-      <section id="mapa-basureros" class="ancho mapa-zona">
-        <p class="etiqueta">Cerca de ti</p>
-        <h2>Busca un basurero</h2>
-        <p>Lima es un basurero, verde un contenedor y menta un punto de reciclaje. La foto sigue en tu dispositivo.</p>
-        <div class="buscar">
-          <button id="buscar-basureros" type="button" class="boton boton-azul focus-ring"><i class="bx bx-current-location" aria-hidden="true"></i>Mi ubicación</button>
-          <input id="lugar-basureros" type="search" placeholder="Ciudad o dirección" aria-label="Ciudad o dirección">
-          <button id="buscar-lugar" type="button" class="boton boton-papel focus-ring"><i class="bx bx-search" aria-hidden="true"></i>Buscar</button>
-        </div>
-        <p id="mapa-estado">Todavía no hay una búsqueda.</p>
-        <ul class="leyenda" aria-label="Tipos de basurero">
-          <li><i class="bin bin-papel" aria-hidden="true"></i>Basurero</li>
-          <li><i class="bin bin-vidrio" aria-hidden="true"></i>Contenedor</li>
-          <li><i class="bin bin-plastico" aria-hidden="true"></i>Reciclaje</li>
-        </ul>
-        <div id="mapa" role="region" aria-label="Mapa de basureros"></div>
-        <ul id="mapa-lista" aria-label="Lugares encontrados"></ul>
-      </section>
-
-      <section id="como-funciona" class="ancho pasos">
-        <p class="etiqueta">Cómo se juega</p>
-        <h2>Tres pasos y el marcador sube</h2>
-        <div class="pasos-grid">
-          <article class="paso"><i class="bx bx-camera" aria-hidden="true"></i><div><h3>1. Elige la toma</h3><p>Foto, cámara o video. El tablero es el mismo.</p></div></article>
-          <article class="paso"><i class="bx bx-scan" aria-hidden="true"></i><div><h3>2. La IA marca</h3><p>Solo entra lo que el detector llama bottle. Las cajas se dibujan encima.</p></div></article>
-          <article class="paso"><i class="bx bx-list-check" aria-hidden="true"></i><div><h3>3. Sumas el botín</h3><p>Cada botella queda una vez. Puedes corregir la cantidad o exportar.</p></div></article>
-        </div>
-        <div class="confianza-nota">
-          <h3>¿Qué significa la confianza?</h3>
-          <p>Es una estimación. Si queda por debajo del 60 %, el resultado se marca como poco seguro.</p>
-        </div>
-        <a class="enlace focus-ring" href="cuaderno/index.html"><i class="bx bx-book-open" aria-hidden="true"></i>Ver el cuaderno de entrenamiento</a>
-      </section>
-    </main>
-
-    <footer class="pie safe-bottom">
-      <p><strong>ReciclApp</strong></p>
-      <p>Docente: Ing. Jesús Bautista · Estudiante: Brayan Joel Ramos Vargas</p>
-      <p><a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" style="color:var(--verde-tinta);font-weight:700;"><i class="bx bxl-github"></i> Ver Repositorio en GitHub</a></p>
-      <p id="pwa-status">Puedes añadir ReciclApp a la pantalla de inicio desde el menú de tu navegador.</p>
-    </footer>
-
-    <div id="registro-modal" hidden role="status" aria-live="polite" aria-labelledby="modal-titulo">
-      <p class="etiqueta">Inventario</p>
-      <h3 id="modal-titulo">Botellas registradas</h3>
-      <img id="modal-foto" alt="Encuadre con las botellas marcadas" class="hidden">
-      <p id="modal-detalle"></p>
-      <button id="modal-cerrar" type="button" class="boton boton-papel focus-ring">Continuar</button>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/mapa.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-    <script>
-      (() => {
-        "use strict";
-
-        const SIZE = 640;
-        const INVENTORY_KEY = "botellas-ia-inventario-v1";
-        const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-        const UMBRAL_POCO_SEGURO = 0.6;
-        const UMBRAL_BOTELLA = 0.28;
-        const elements = {
-          video: document.getElementById("video"),
-          canvas: document.getElementById("canvas"),
-          preview: document.getElementById("foto-preview"),
-          placeholder: document.getElementById("placeholder"),
-          cameraTag: document.getElementById("camera-tag"),
-          upload: document.getElementById("image-upload"),
-          videoUpload: document.getElementById("video-upload"),
-          startCamera: document.getElementById("start-camera"),
-          switchCamera: document.getElementById("switch-camera"),
-          classify: document.getElementById("classify"),
-          status: document.getElementById("status"),
-          resultIcon: document.getElementById("result-icon"),
-          resultLabel: document.getElementById("result-label"),
-          confidence: document.getElementById("result-confidence"),
-          speak: document.getElementById("speak-result"),
-          installApp: document.getElementById("install-app"),
-          pwaStatus: document.getElementById("pwa-status"),
-          historyList: document.getElementById("history-list"),
-          historyEmpty: document.getElementById("history-empty"),
-          clearHistory: document.getElementById("clear-history"),
-          exportJson: document.getElementById("export-json"),
-          exportCsv: document.getElementById("export-csv"),
-          inventoryTotal: document.getElementById("inventory-total"),
-          conteoVivo: document.getElementById("conteo-vivo"),
-          enVista: document.getElementById("en-vista"),
-          enToma: document.getElementById("en-toma"),
-          nuevaToma: document.getElementById("nueva-toma"),
-          modal: document.getElementById("registro-modal"),
-          modalTitulo: document.getElementById("modal-titulo"),
-          modalDetalle: document.getElementById("modal-detalle"),
-          modalFoto: document.getElementById("modal-foto"),
-          modalCerrar: document.getElementById("modal-cerrar")
-        };
-
-        let model = null;
-        let bottleDetector = null;
-        let stream = null;
-        let facingMode = "environment";
-        let selectedImage = null;
-        let previewUrl = null;
-        let lastResult = null;
-        let busy = false;
-        let archivoVideo = false;
-        let installPrompt = null;
-        let rastros = [];
-        let cajasVisibles = [];
-        let tomadas = 0;
-        let detectando = false;
-        let conteoActivo = false;
-        let forzarSiguiente = false;
-        let ultimaFirma = "";
-        let cantidadModal = 0;
-        let buclePintura = 0;
-        let bucleDeteccion = 0;
-        const buffer = document.createElement("canvas");
-        buffer.width = SIZE;
-        buffer.height = SIZE;
-        const lienzo = document.getElementById("canvas");
-        if (lienzo) {
-          lienzo.width = SIZE;
-          lienzo.height = SIZE;
-        }
-
-        function setStatus(message, isError = false) {
-          elements.status.textContent = message;
-          elements.status.classList.toggle("estado-error", isError);
-        }
-
-        function resetResult() {
-          lastResult = null;
-          elements.resultIcon.innerHTML = '<i class="bx bx-recycle"></i>';
-          elements.resultLabel.textContent = "Aún no lo sabemos";
-          elements.confidence.textContent = "";
-          elements.speak.classList.add("hidden");
-          elements.canvas.classList.add("hidden");
-        }
-
-        function cameraButton(detenida) {
-          elements.startCamera.innerHTML = detenida
-            ? '<i class="bx bx-camera mr-1 text-lg" aria-hidden="true"></i>Cámara'
-            : '<i class="bx bx-stop-circle mr-1 text-lg" aria-hidden="true"></i>Detener';
-        }
-
-        function rejectUnsupportedImage(personDetected) {
-          resetResult();
-          elements.resultIcon.innerHTML = `<i class="bx ${personDetected ? "bx-user" : "bx-search-alt-2"}"></i>`;
-          elements.resultLabel.textContent = personDetected ? "¡Foto fuera de juego!" : "No encontramos botellas";
-          elements.confidence.textContent = personDetected
-            ? "Detectamos una persona, pero este juego solo cuenta botellas."
-            : "La imagen debe mostrar claramente al menos una botella.";
-          setStatus(
-            personDetected
-              ? "Esta imagen muestra una persona y ninguna botella. Prueba con una foto de botellas."
-              : "No detectamos la clase bottle. Acércate, mejora la luz o prueba otra foto.",
-            true
-          );
-        }
-
-        function stopCamera() {
-          pararConteo();
-          elements.conteoVivo.classList.add("hidden");
-          elements.nuevaToma.classList.add("hidden");
-          elements.canvas.classList.add("hidden");
-          if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
-            stream = null;
-          }
-          elements.video.pause();
-          elements.video.srcObject = null;
-          elements.video.classList.add("hidden");
-          elements.video.classList.remove("camera-mirror");
-          elements.cameraTag.classList.add("hidden");
-          elements.switchCamera.classList.add("hidden");
-          cameraButton(true);
-        }
-
-        async function openStream() {
-          const attempts = [
-            { audio: false, video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } } },
-            { audio: false, video: { facingMode } },
-            { audio: false, video: true }
-          ];
-          let lastError = null;
-          for (const constraints of attempts) {
-            try {
-              return await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (error) {
-              lastError = error;
-              if (error.name === "NotAllowedError" || error.name === "SecurityError") throw error;
-            }
-          }
-          throw lastError || new Error("No se pudo abrir la cámara.");
-        }
-
-        async function startCamera() {
-          if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-            setStatus("Para usar la cámara, abre esta página con HTTPS. También puedes subir una foto.", true);
-            return;
-          }
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            setStatus("Este navegador no permite usar la cámara. Sube una foto para continuar.", true);
-            return;
-          }
-          stopCamera();
-          setStatus("Solicitando permiso para usar la cámara…");
-          try {
-            stream = await openStream();
-            elements.video.srcObject = stream;
-            archivoVideo = false;
-            await elements.video.play();
-            elements.video.classList.remove("hidden");
-            elements.video.classList.toggle("camera-mirror", facingMode === "user");
-            elements.preview.classList.add("hidden");
-            elements.canvas.classList.add("hidden");
-            elements.placeholder.classList.add("hidden");
-            elements.cameraTag.classList.remove("hidden");
-            elements.switchCamera.classList.remove("hidden");
-            cameraButton(false);
-            selectedImage = elements.video;
-            resetResult();
-            elements.classify.disabled = !bottleDetector;
-            if (bottleDetector) iniciarConteoCamara();
-            else setStatus("Cámara lista. En cuanto cargue el detector, cuenta sola.");
-          } catch (error) {
-            console.error("No se pudo iniciar la cámara:", error);
-            const messages = {
-              NotAllowedError: "No hay permiso para la cámara. Autoriza el acceso o sube una foto.",
-              NotFoundError: "No encontramos una cámara disponible. Puedes subir una foto.",
-              NotReadableError: "Could not start video source: la cámara está ocupada. Cierra Flask, Zoom u otra app que la use, o sube una foto.",
-              TrackStartError: "Could not start video source: la cámara está ocupada. Ciérrala en otras aplicaciones o sube una foto.",
-              OverconstrainedError: "La cámara no admite la configuración solicitada. Prueba con otra cámara."
-            };
-            setStatus(messages[error.name] || "No se pudo iniciar la cámara. Comprueba los permisos o sube una foto.", true);
-            stopCamera();
-          }
-        }
-
-        function showSelectedPhoto(file) {
-          if (!file) return;
-          const nombre = file.name.toLowerCase();
-          const fotoValida = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)
-            || [".jpg", ".jpeg", ".png", ".webp", ".gif"].some((ext) => nombre.endsWith(ext));
-          if (!fotoValida) {
-            setStatus("Formato no compatible. Elige una imagen JPG, PNG, WEBP o GIF.", true);
-            elements.upload.value = "";
-            return;
-          }
-          if (file.size > MAX_IMAGE_BYTES) {
-            setStatus("La imagen supera el máximo de 12 MB. Elige un archivo más pequeño.", true);
-            elements.upload.value = "";
-            return;
-          }
-          const url = URL.createObjectURL(file);
-          const image = new Image();
-          image.onload = () => {
-            if (!image.naturalWidth || !image.naturalHeight) {
-              URL.revokeObjectURL(url);
-              setStatus("No pudimos leer esa imagen. Prueba con otro archivo.", true);
-              return;
-            }
-            stopCamera();
-            archivoVideo = false;
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
-            previewUrl = url;
-            selectedImage = image;
-            resetResult();
-            elements.preview.src = url;
-            elements.preview.classList.remove("hidden");
-            elements.placeholder.classList.add("hidden");
-            elements.classify.disabled = !bottleDetector;
-            if (bottleDetector) {
-              clasificarActual().catch((error) => setStatus(error.message || "No se pudo registrar la foto.", true));
-            } else {
-              setStatus("Foto lista. Se registrará sola cuando cargue el detector.");
-            }
-          };
-          image.onerror = () => {
-            URL.revokeObjectURL(url);
-            setStatus("No pudimos abrir esa imagen. Comprueba el archivo e inténtalo de nuevo.", true);
-          };
-          image.src = url;
-        }
-
-        function esperarVideo(nombre, limiteMs = 8000) {
-          return new Promise((resolve, reject) => {
-            if (nombre === "loadeddata" && elements.video.readyState >= 2 && elements.video.videoWidth) {
-              resolve();
-              return;
-            }
-            let timer = 0;
-            const limpiar = () => {
-              clearTimeout(timer);
-              elements.video.removeEventListener(nombre, listo);
-              elements.video.removeEventListener("error", fallo);
-            };
-            const listo = () => {
-              limpiar();
-              resolve();
-            };
-            const fallo = () => {
-              limpiar();
-              reject(new Error("No se pudo leer el video. Prueba con un MP4."));
-            };
-            timer = setTimeout(() => {
-              limpiar();
-              if (elements.video.videoWidth) resolve();
-              else reject(new Error("No se pudo leer el video. Prueba con un MP4."));
-            }, limiteMs);
-            elements.video.addEventListener(nombre, listo, { once: true });
-            elements.video.addEventListener("error", fallo, { once: true });
-          });
-        }
-
-        async function irATiempo(tiempo) {
-          const video = elements.video;
-          if (!Number.isFinite(video.duration)) return;
-          const destino = Math.min(Math.max(0, tiempo), Math.max(0, video.duration - 0.05));
-          if (Math.abs(video.currentTime - destino) < 0.08) return;
-          video.currentTime = destino;
-          await esperarVideo("seeked");
-        }
-
-        async function showSelectedVideo(file) {
-          if (!file) return;
-          if (file.size > 80 * 1024 * 1024) {
-            setStatus("Ese video pesa demasiado para contarlo aquí. Prueba con un clip más corto.", true);
-            return;
-          }
-          stopCamera();
-          resetResult();
-          archivoVideo = true;
-          if (previewUrl) URL.revokeObjectURL(previewUrl);
-          previewUrl = URL.createObjectURL(file);
-          elements.video.srcObject = null;
-          elements.video.src = previewUrl;
-          elements.video.muted = true;
-          await esperarVideo("loadeddata", 4000);
-          const medio = Number.isFinite(elements.video.duration) ? elements.video.duration / 2 : 0;
-          await irATiempo(medio);
-          elements.video.pause();
-          selectedImage = elements.video;
-          elements.video.classList.remove("hidden", "camera-mirror");
-          elements.preview.classList.add("hidden");
-          elements.canvas.classList.add("hidden");
-          elements.placeholder.classList.add("hidden");
-          elements.classify.disabled = !bottleDetector;
-          if (bottleDetector) {
-            await contarVideo();
-          } else {
-            setStatus("Video listo. Se contará solo cuando cargue el detector.");
-          }
-        }
-
-        function interseccion(a, b) {
-          const x1 = Math.max(a.x, b.x);
-          const y1 = Math.max(a.y, b.y);
-          const x2 = Math.min(a.x + a.w, b.x + b.w);
-          const y2 = Math.min(a.y + a.h, b.y + b.h);
-          const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-          const union = a.w * a.h + b.w * b.h - inter;
-          return union <= 0 ? 0 : inter / union;
-        }
-
-        function solapan(a, b) {
-          const dx = (a.x + a.w / 2) - (b.x + b.w / 2);
-          const dy = (a.y + a.h / 2) - (b.y + b.h / 2);
-          const limite = Math.max(a.w, a.h, b.w, b.h) * 0.65;
-          return interseccion(a, b) >= 0.2 || Math.hypot(dx, dy) < limite;
-        }
-
-        function juntarCajas(cajas) {
-          const orden = [...cajas].sort((a, b) => b.score - a.score);
-          const quedan = [];
-          for (const caja of orden) {
-            if (caja.w < 16 || caja.h < 20) continue;
-            if (quedan.every((otra) => interseccion(caja, otra) < 0.45)) quedan.push(caja);
-          }
-          return quedan;
-        }
-
-        function firmaDe(cajas) {
-          return cajas
-            .map((caja) => [Math.round(caja.x / 16), Math.round(caja.y / 16), Math.round(caja.w / 16), Math.round(caja.h / 16)].join("x"))
-            .sort()
-            .join("|");
-        }
-
-        function reiniciarRastros() {
-          rastros = [];
-          cajasVisibles = [];
-          tomadas = 0;
-          cantidadModal = 0;
-          actualizarChip(0);
-        }
-
-        function pararConteo() {
-          conteoActivo = false;
-          if (buclePintura) cancelAnimationFrame(buclePintura);
-          buclePintura = 0;
-          if (bucleDeteccion) clearTimeout(bucleDeteccion);
-          bucleDeteccion = 0;
-        }
-
-        function actualizarChip(enVista) {
-          elements.enVista.textContent = String(enVista);
-          elements.enToma.textContent = String(tomadas);
-        }
-
-        function dibujarEnCanvas(canvas, source, cajas) {
-          const anchoReal = source.videoWidth || source.naturalWidth || source.width || SIZE;
-          const altoReal = source.videoHeight || source.naturalHeight || source.height || SIZE;
-          const escala = Math.min(1, 960 / Math.max(anchoReal, altoReal));
-          const ancho = Math.max(1, Math.round(anchoReal * escala));
-          const alto = Math.max(1, Math.round(altoReal * escala));
-          if (canvas.width !== ancho) canvas.width = ancho;
-          if (canvas.height !== alto) canvas.height = alto;
-          const context = canvas.getContext("2d", { willReadFrequently: true });
-          context.setTransform(1, 0, 0, 1, 0, 0);
-          context.fillStyle = "#e7f6c8";
-          context.fillRect(0, 0, ancho, alto);
-          context.save();
-          if (source === elements.video && stream && facingMode === "user") {
-            context.translate(ancho, 0);
-            context.scale(-1, 1);
-          }
-          context.drawImage(source, 0, 0, ancho, alto);
-          context.restore();
-          context.lineWidth = 4;
-          context.font = "700 18px Outfit, sans-serif";
-          context.textBaseline = "top";
-          for (const caja of cajas) {
-            context.strokeStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
-            context.strokeRect(caja.x, caja.y, caja.w, caja.h);
-            const texto = caja.registrada ? "ya registrada" : `botella ${Math.round(caja.score * 100)}%`;
-            const ancho = context.measureText(texto).width;
-            const y = caja.y > 26 ? caja.y - 26 : caja.y;
-            context.fillStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
-            context.fillRect(caja.x, y, ancho + 12, 24);
-            context.fillStyle = "#f7fff2";
-            context.fillText(texto, caja.x + 6, y + 3);
-          }
-        }
-
-        function cajasDesdeRastros() {
-          return rastros
-            .filter((rastro) => rastro.missed === 0)
-            .map((rastro) => ({
-              x: rastro.x,
-              y: rastro.y,
-              w: rastro.w,
-              h: rastro.h,
-              score: rastro.score,
-              registrada: rastro.registrado
-            }));
-        }
-
-        function actualizarRastros(cajas, video) {
-          const usadas = new Set();
-          for (const rastro of rastros) {
-            let mejor = -1;
-          cajas.forEach((caja, indice) => {
-            if (usadas.has(indice) || !solapan(rastro, caja)) return;
-            mejor = indice;
-          });
-          if (mejor >= 0) {
-              usadas.add(mejor);
-              const caja = cajas[mejor];
-              rastro.x = caja.x;
-              rastro.y = caja.y;
-              rastro.w = caja.w;
-              rastro.h = caja.h;
-              rastro.score = caja.score;
-              rastro.hits += 1;
-              rastro.missed = 0;
-            } else {
-              rastro.missed += 1;
-            }
-          }
-          cajas.forEach((caja, indice) => {
-            if (usadas.has(indice)) return;
-            const repetida = rastros.some((rastro) => rastro.registrado && solapan(rastro, caja));
-            if (repetida) return;
-            rastros.push({
-              id: createId(),
-              x: caja.x,
-              y: caja.y,
-              w: caja.w,
-              h: caja.h,
-              score: caja.score,
-              hits: 1,
-              missed: 0,
-              registrado: false,
-              rechazado: false
-            });
-          });
-          rastros = rastros.filter((rastro) => rastro.registrado || rastro.missed < 8);
-          const hitsMinimos = video || forzarSiguiente ? 1 : 2;
-          forzarSiguiente = false;
-          const nuevas = [];
-          for (const rastro of rastros) {
-            if (!rastro.registrado && !rastro.rechazado && rastro.hits >= hitsMinimos && rastro.missed === 0) {
-              rastro.registrado = true;
-              nuevas.push(rastro);
-            }
-          }
-          return nuevas;
-        }
-
-        function mostrarResultado(cantidad, confianza) {
-          lastResult = { etiqueta: "Botella", confidence: confianza, cantidad };
-          elements.resultIcon.innerHTML = '<i class="bx bx-recycle"></i>';
-          elements.resultLabel.textContent = cantidad === 1 ? "1 botella en el inventario" : `${cantidad} botellas en el inventario`;
-          const porcentaje = Math.round(confianza * 100);
-          elements.confidence.textContent = `${cantidad} ${cantidad === 1 ? "nueva" : "nuevas"} · ${porcentaje}%${confianza < UMBRAL_POCO_SEGURO ? " · poco seguro" : ""}`;
-          elements.speak.classList.remove("hidden");
-        }
-
-        function abrirModal(cantidad, detalle) {
-          if (cantidad > 0 && !elements.modal.hidden) cantidadModal += cantidad;
-          else cantidadModal = cantidad;
-          const total = cantidadModal;
-          elements.modalTitulo.textContent = total === 0
-            ? "Esas botellas ya estaban"
-            : total === 1 ? "1 botella registrada" : `${total} botellas registradas`;
-          elements.modalDetalle.textContent = detalle;
-          try {
-            elements.modalFoto.src = elements.canvas.toDataURL("image/jpeg", 0.72);
-            elements.modalFoto.classList.remove("hidden");
-          } catch (error) {
-            elements.modalFoto.classList.add("hidden");
-          }
-          elements.modal.hidden = false;
-        }
-
-        function cerrarModal() {
-          elements.modal.hidden = true;
-          cantidadModal = 0;
-        }
-
+      <nav class="nav-links">
+        <a href="#vision-scanner" class="nav-btn"><i class="bx bx-camera"></i> <span>Escáner</span></a>
+        <a href="#eco-impact" class="nav-btn"><i class="bx bx-leaf"></i> <span>Métricas</span></a>
+        <a href="#inventory" class="nav-btn"><i class="bx bx-list-check"></i> <span>Inventario</span></a>
+        <a href="#recycling-map" class="nav-btn"><i class="bx bx-map-pin"></i> <span>Puntos Limpios</span></a>
+        <a href="cuaderno/index.html" class="nav-btn btn-notebook" title="Ver Cuaderno de Entrenamiento Jupyter">
+          <i class="bx bx-book-open"></i> <span>Cuaderno CNN</span>
+        </a>
+        <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" class="nav-btn" title="Ver código en GitHub">
+          <i class="bx bxl-github"></i> <span>GitHub</span>
+        </a>
         
-        function playChime() {
-          try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-            const ctx = new AudioCtx();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12);
-            gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.15);
-          } catch (e) {}
-        }
+        <div class="counter-capsule">
+          <i class="bx bx-recycle" style="color:var(--primary); font-size:1.1rem;"></i>
+          <span>Total:</span>
+          <strong id="counterHeaderNum" class="counter-num">0</strong>
+        </div>
+      </nav>
 
-        function registrarNuevas(nuevas, silencio) {
-          playChime();
-          const records = nuevas.map((rastro) => ({
-            id: rastro.id,
-            fecha: new Date().toISOString(),
-            cantidad: 1,
-            confianzaPromedio: Math.round(rastro.score * 10000) / 10000,
-            bboxes: [{
-              x: Math.round(rastro.x),
-              y: Math.round(rastro.y),
-              width: Math.round(rastro.w),
-              height: Math.round(rastro.h),
-              score: Math.round(rastro.score * 10000) / 10000
-            }],
-            etiqueta: "Botella"
-          }));
-          writeInventory([...records, ...readInventory()]);
-          renderHistory();
-          tomadas += records.length;
-          actualizarChip(cajasVisibles.length);
-          const confianza = records.reduce((suma, item) => suma + item.confianzaPromedio, 0) / records.length;
-          mostrarResultado(records.length, confianza);
-          const detalle = records.length === 1
-            ? "Quedó guardada en este dispositivo. Si sigue en cámara, no se vuelve a contar."
-            : "Cada una es un registro. Si siguen a la vista, no se duplican.";
-          if (!silencio) abrirModal(records.length, detalle);
-          setStatus(records.length === 1 ? "1 botella nueva en el inventario." : `${records.length} botellas nuevas en el inventario.`);
-        }
+    </div>
+  </header>
 
-        async function puntajeRecorte(source, caja) {
-          if (!model || !window.tf) return 1;
-          let input;
-          let output;
-          try {
-            input = tf.tidy(() => {
-              const scaled = document.createElement("canvas");
-              scaled.width = 100;
-              scaled.height = 100;
-              const ctx = scaled.getContext("2d", { willReadFrequently: true });
-              ctx.drawImage(
-                source,
-                Math.max(0, caja.x),
-                Math.max(0, caja.y),
-                Math.max(1, caja.w),
-                Math.max(1, caja.h),
-                0,
-                0,
-                100,
-                100
-              );
-              const rgba = ctx.getImageData(0, 0, 100, 100).data;
-              const grayscale = new Float32Array(10000);
-              for (let pixel = 0; pixel < grayscale.length; pixel += 1) {
-                const offset = pixel * 4;
-                grayscale[pixel] = (0.114 * rgba[offset] + 0.587 * rgba[offset + 1] + 0.299 * rgba[offset + 2]) / 255;
-              }
-              return tf.tensor4d(grayscale, [1, 100, 100, 1]);
-            });
-            output = model.predict(input);
-            const prediction = await output.data();
-            return Number.isFinite(prediction[0]) ? prediction[0] : 1;
-          } catch (error) {
-            console.warn("No se pudo confirmar el recorte:", error);
-            return 1;
-          } finally {
-            if (input) input.dispose();
-            if (output && typeof output.dispose === "function") output.dispose();
-          }
-        }
+  <!-- Contenido Principal -->
+  <main class="main-layout">
 
-        async function confirmarCajas(source, cajas) {
-          if (!model || !cajas.length) return cajas;
-          const aceptadas = [];
-          for (const caja of cajas) {
-            const puntaje = await puntajeRecorte(source, caja);
-            if (puntaje >= 0.28 || caja.score >= 0.45) {
-              aceptadas.push({ ...caja, score: Math.max(caja.score, puntaje) });
-            }
-          }
-          return aceptadas;
-        }
+    <!-- Hero Moderno -->
+    <section class="hero-glass">
+      <div class="hero-content">
+        <div class="hero-tag">
+          <i class="bx bx-chip"></i> Inteligencia Artificial &amp; Sustentabilidad
+        </div>
+        <h2 class="hero-title">
+          Visión Artificial para <span>Clasificación de Envases</span>
+        </h2>
+        <p class="hero-desc">
+          Inferencia en tiempo real sobre el navegador mediante <strong>MobileNet v2</strong> y una <strong>Red Neuronal Convolucional (CNN Keras)</strong>. Identifica botellas PET, vidrio y latas con tracking anti-duplicados y cuantificación de impacto ecológico a 60 FPS con WebGL.
+        </p>
 
-        async function leerBotellas(source) {
-          dibujarEnCanvas(buffer, source, []);
-          const detecciones = await bottleDetector.detect(buffer, 20, UMBRAL_BOTELLA);
-          const persona = detecciones.some((item) => item.class === "person" && item.score >= 0.45);
-          const cajas = juntarCajas(detecciones
-            .filter((item) => item.class === "bottle" && item.score >= UMBRAL_BOTELLA)
-            .map((item) => ({
-              x: item.bbox[0],
-              y: item.bbox[1],
-              w: item.bbox[2],
-              h: item.bbox[3],
-              score: item.score
-            })));
-          return { cajas, persona };
-        }
+        <div class="hero-badges-academic">
+          <div class="academic-chip">
+            <i class="bx bx-user" style="color:var(--primary);"></i>
+            <span>Estudiante: <strong>Brayan Joel Ramos Vargas</strong></span>
+          </div>
+          <div class="academic-chip">
+            <i class="bx bx-certification" style="color:var(--accent-purple);"></i>
+            <span>Docente: <strong>Ing. Jesús Bautista</strong></span>
+          </div>
+          <div class="academic-chip">
+            <i class="bx bx-check-shield" style="color:var(--accent-cyan);"></i>
+            <span>Precisión CNN: <strong>92.4%</strong></span>
+          </div>
+        </div>
+      </div>
 
-        async function detectarYRegistrar(source, opciones) {
-          if (!bottleDetector || detectando) return;
-          detectando = true;
-          try {
-            const leidas = await leerBotellas(source);
-            const cajas = await confirmarCajas(buffer, leidas.cajas);
-            const persona = leidas.persona;
-            if (opciones.foto) {
-              await registrarFoto(cajas, persona, source);
-              return;
-            }
-            const nuevas = actualizarRastros(cajas, Boolean(opciones.video));
-            cajasVisibles = cajasDesdeRastros();
-            actualizarChip(cajasVisibles.length);
-            if (!nuevas.length) {
-              if (!cajas.length && persona && opciones.aviso) {
-                setStatus("Se ve una persona, no una botella. Solo se registra la clase bottle.", true);
-              }
-              return;
-            }
-            registrarNuevas(nuevas, Boolean(opciones.silencio));
-          } catch (error) {
-            console.error("No se pudo contar:", error);
-            setStatus(error.message || "No se pudo contar las botellas.", true);
-          } finally {
-            detectando = false;
-          }
-        }
+      <div class="hero-graphic-wrap" style="display:flex; justify-content:center; align-items:center;">
+        <img src="assets/hero_ecovision.svg" alt="Ilustración EcoLens AI Detección Holográfica de Botellas" style="max-width:100%; height:auto; border-radius:18px; box-shadow:0 10px 25px rgba(0,0,0,0.06);">
+      </div>
+    </section>
 
-        async function registrarFoto(cajas, persona, source) {
-          elements.preview.classList.add("hidden");
-          elements.video.classList.add("hidden");
-          elements.placeholder.classList.add("hidden");
-          elements.canvas.classList.remove("hidden");
-          cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: false }));
-          dibujarEnCanvas(elements.canvas, source, cajasVisibles);
-          if (!cajas.length) {
-            rejectUnsupportedImage(persona);
-            return;
-          }
-          const firma = firmaDe(cajas);
-          if (firma && firma === ultimaFirma) {
-            cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: true }));
-            dibujarEnCanvas(elements.canvas, source, cajasVisibles);
-            setStatus("Esas mismas botellas ya están en el inventario.", true);
-            abrirModal(0, "No se agregó nada. Esas botellas ya estaban registradas.");
-            return;
-          }
-          ultimaFirma = firma;
-          const nuevas = cajas.map((caja) => ({
-            id: createId(),
-            x: caja.x,
-            y: caja.y,
-            w: caja.w,
-            h: caja.h,
-            score: caja.score
-          }));
-          registrarNuevas(nuevas, false);
-          cajasVisibles = cajas.map((caja) => ({ ...caja, registrada: true }));
-          dibujarEnCanvas(elements.canvas, source, cajasVisibles);
-        }
+    <!-- Métricas de Impacto Ecológico en Tiempo Real -->
+    <section id="eco-impact" class="eco-kpi-grid">
+      
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Envases Clasificados</span>
+          <div class="kpi-icon-wrap" style="background:var(--primary-light); color:var(--primary);">
+            <i class="bx bx-barcode-reader"></i>
+          </div>
+        </div>
+        <div id="kpiTotalCount" class="kpi-val">0</div>
+        <div class="kpi-sub">● Conteo único sin duplicados</div>
+      </div>
 
-        function pintarCamara() {
-          if (!conteoActivo || !stream) return;
-          if (elements.video.videoWidth) {
-            dibujarEnCanvas(elements.canvas, elements.video, cajasVisibles);
-            elements.canvas.classList.remove("hidden");
-            elements.video.classList.add("hidden");
-            elements.preview.classList.add("hidden");
-            elements.placeholder.classList.add("hidden");
-          }
-          buclePintura = requestAnimationFrame(pintarCamara);
-        }
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Plástico Recuperado</span>
+          <div class="kpi-icon-wrap" style="background:var(--accent-cyan-light); color:var(--accent-cyan);">
+            <i class="bx bx-package"></i>
+          </div>
+        </div>
+        <div id="kpiTotalGrams" class="kpi-val">0g</div>
+        <div class="kpi-sub">Estimado en resina PET (~24.5g / botella)</div>
+      </div>
 
-        function iniciarConteoCamara() {
-          if (!bottleDetector || !stream) return;
-          pararConteo();
-          reiniciarRastros();
-          conteoActivo = true;
-          elements.conteoVivo.classList.remove("hidden");
-          elements.nuevaToma.classList.remove("hidden");
-          elements.canvas.classList.remove("hidden");
-          pintarCamara();
-          const ciclo = async () => {
-            if (!conteoActivo || !stream) return;
-            await detectarYRegistrar(elements.video, { aviso: true });
-            if (conteoActivo && stream) bucleDeteccion = setTimeout(ciclo, 700);
-          };
-          bucleDeteccion = setTimeout(ciclo, 400);
-          setStatus("Contando en vivo. Solo botellas, y cada una una sola vez.");
-        }
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Huella CO₂ Mitigada</span>
+          <div class="kpi-icon-wrap" style="background:var(--accent-purple-light); color:var(--accent-purple);">
+            <i class="bx bx-cloud-light-rain"></i>
+          </div>
+        </div>
+        <div id="kpiTotalCo2" class="kpi-val">0g</div>
+        <div class="kpi-sub">Reducción de emisiones de carbono (~82g / botella)</div>
+      </div>
 
-        async function contarVideo() {
-          if (!bottleDetector || !archivoVideo) return;
-          pararConteo();
-          reiniciarRastros();
-          conteoActivo = true;
-          elements.conteoVivo.classList.remove("hidden");
-          elements.nuevaToma.classList.add("hidden");
-          elements.canvas.classList.remove("hidden");
-          elements.preview.classList.add("hidden");
-          elements.placeholder.classList.add("hidden");
-          const duracion = elements.video.duration;
-          if (!Number.isFinite(duracion) || duracion <= 0) {
-            conteoActivo = false;
-            setStatus("Ese video no tiene duración. Prueba con otro archivo.", true);
-            return;
-          }
-          const paso = Math.min(0.45, Math.max(0.25, duracion / 20));
-          elements.video.pause();
-          for (let tiempo = 0; tiempo < duracion - 0.05 && conteoActivo; tiempo += paso) {
-            await irATiempo(tiempo);
-            await detectarYRegistrar(elements.video, { video: true, silencio: true });
-            dibujarEnCanvas(elements.canvas, elements.video, cajasVisibles);
-            elements.video.classList.add("hidden");
-            elements.canvas.classList.remove("hidden");
-            setStatus(`Video ${Math.min(100, Math.round((tiempo / duracion) * 100))} %. Botellas nuevas: ${tomadas}.`);
-          }
-          conteoActivo = false;
-          if (tomadas === 0) {
-            setStatus("En ese video no se confirmó ninguna botella.", true);
-            abrirModal(0, "No se registró nada. Solo entra lo que el detector marca como bottle.");
-          } else {
-            abrirModal(tomadas, "Cada botella del video quedó una sola vez. Si la misma sale en varios segundos, no se duplica.");
-          }
-        }
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Agua Preservada</span>
+          <div class="kpi-icon-wrap" style="background:var(--accent-amber-light); color:var(--accent-amber);">
+            <i class="bx bx-droplet"></i>
+          </div>
+        </div>
+        <div id="kpiTotalWater" class="kpi-val">0.0L</div>
+        <div class="kpi-sub">Ahorro hídrico en manufactura (~3.2L / envase)</div>
+      </div>
 
-        async function clasificarActual() {
-          if (!bottleDetector || !selectedImage) return;
-          if (archivoVideo && !stream) {
-            await contarVideo();
-            return;
-          }
-          if (stream) {
-            forzarSiguiente = true;
-            await detectarYRegistrar(elements.video, { aviso: true });
-            return;
-          }
-          await detectarYRegistrar(selectedImage, { foto: true, aviso: true });
-        }
+    </section>
 
-        function readInventory() {
-          try {
-            const saved = JSON.parse(localStorage.getItem(INVENTORY_KEY) || "[]");
-            if (!Array.isArray(saved)) return [];
-            return saved.filter((item) =>
-              item && typeof item.id === "string" && typeof item.fecha === "string" &&
-              typeof item.etiqueta === "string" && Number.isFinite(item.cantidad) &&
-              Number.isFinite(item.confianzaPromedio) && Array.isArray(item.bboxes)
-            );
-          } catch (error) {
-            console.warn("No se pudo leer el inventario local:", error);
-            return [];
-          }
-        }
+    <!-- Grid Principal de Escáner Óptico y Diagnóstico -->
+    <section id="vision-scanner" class="scanner-grid">
+      
+      <!-- Panel de Visión y Controles -->
+      <div class="vision-panel">
+        
+        <div class="vision-header">
+          <div class="vision-title">
+            <i class="bx bx-aperture" style="color:var(--primary); font-size:1.4rem;"></i>
+            <span>Visor Bio-Óptico</span>
+          </div>
+          <div id="hardwareBadge" class="hardware-pill">
+            <span class="dot"></span> WebGL GPU Activo
+          </div>
+        </div>
 
-        function writeInventory(entries) {
-          localStorage.setItem(INVENTORY_KEY, JSON.stringify(entries));
-        }
+        <!-- Viewport con Escaneo Láser y HUD -->
+        <div class="stage-viewport">
+          <div id="laserLine" class="laser-scan-line"></div>
+          
+          <video id="cameraFeed" playsinline autoplay muted style="display:none;"></video>
+          <img id="imagePreview" alt="Previsualización de imagen" style="display:none;">
+          <canvas id="overlayCanvas" style="display:none;"></canvas>
 
-        function renderHistory() {
-          const entries = readInventory();
-          const total = entries.reduce((sum, item) => sum + item.cantidad, 0);
-          elements.inventoryTotal.textContent = String(total);
-          const marcador = document.getElementById("marcador-total");
-          if (marcador) marcador.textContent = String(total);
-          elements.historyList.replaceChildren();
-          const empty = entries.length === 0;
-          elements.historyEmpty.classList.toggle("hidden", !empty);
-          elements.clearHistory.classList.toggle("hidden", empty);
-          elements.exportJson.classList.toggle("hidden", empty);
-          elements.exportCsv.classList.toggle("hidden", empty);
-          for (const item of entries) {
-            const row = document.createElement("li");
-            row.className = "fila";
-            row.dataset.id = item.id;
-            const ficha = document.createElement("span");
-            ficha.className = "ficha";
-            ficha.setAttribute("aria-hidden", "true");
-            ficha.innerHTML = '<i class="bx bx-recycle"></i>';
-            const description = document.createElement("div");
-            const title = document.createElement("strong");
-            title.textContent = item.etiqueta;
-            const date = document.createElement("small");
-            const cuando = new Date(item.fecha);
-            date.textContent = Number.isNaN(cuando.getTime())
-              ? item.fecha
-              : cuando.toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
-            description.append(title, date);
-            const certainty = document.createElement("span");
-            certainty.className = "porcentaje";
-            const porcentaje = Math.round(item.confianzaPromedio * 100);
-            certainty.append(document.createTextNode(`${porcentaje}%`));
-            if (porcentaje < 60) {
-              const aviso = document.createElement("i");
-              aviso.className = "bx bx-error-circle";
-              aviso.title = "Poco seguro";
-              aviso.setAttribute("aria-label", "Poco seguro");
-              certainty.append(aviso);
-            }
-            const input = document.createElement("input");
-            input.type = "number";
-            input.min = "0";
-            input.step = "1";
-            input.value = String(item.cantidad);
-            input.dataset.cantidad = "1";
-            input.setAttribute("aria-label", `Cantidad del registro ${item.fecha}`);
-            const remove = document.createElement("button");
-            remove.type = "button";
-            remove.dataset.accion = "eliminar";
-            remove.setAttribute("aria-label", "Borrar registro");
-            remove.innerHTML = '<i class="bx bx-trash" aria-hidden="true"></i>';
-            row.append(ficha, description, certainty, input, remove);
-            elements.historyList.append(row);
-          }
-        }
+          <!-- Estado Idle (Cámara Apagada) -->
+          <div id="stageIdleState" class="stage-idle">
+            <div class="idle-icon-sphere">
+              <i class="bx bx-scan"></i>
+            </div>
+            <h3>Sensor Óptico en Reposo</h3>
+            <p>Activa la cámara en vivo o arrastra una fotografía para iniciar la clasificación con IA.</p>
+          </div>
 
-        function createId() {
-          if (crypto.randomUUID) return crypto.randomUUID();
-          return `botella-${Date.now()}`;
-        }
+          <!-- HUD Chips en Pantalla -->
+          <div id="hudCameraChip" class="hud-chip-top" style="display:none;">
+            <span class="dot" style="background:#10b981; width:6px; height:6px; border-radius:50%;"></span>
+            <span>EN VIVO 60 FPS</span>
+          </div>
 
-        async function classify() {
-          if (!bottleDetector || !selectedImage || busy) return;
-          busy = true;
-          elements.classify.disabled = true;
-          elements.classify.innerHTML = '<i class="bx bx-loader-alt bx-spin mr-1 text-xl" aria-hidden="true"></i>Registrando…';
-          try {
-            await clasificarActual();
-          } catch (error) {
-            console.error("No se pudo registrar:", error);
-            setStatus(error.message || "No se pudo registrar las botellas.", true);
-          } finally {
-            busy = false;
-            elements.classify.disabled = !bottleDetector || !selectedImage;
-            elements.classify.innerHTML = '<i class="bx bx-scan mr-1 text-xl" aria-hidden="true"></i>Registrar ahora';
-          }
-        }
+          <div class="hud-bottom-bar">
+            <div class="hud-stat-tag">
+              En cuadro: <strong id="hudInView">0</strong>
+            </div>
+            <div class="hud-stat-tag">
+              Registradas en toma: <strong id="hudInTake">0</strong>
+            </div>
+          </div>
+        </div>
 
-        async function loadModel() {
-          try {
-            if (!window.tf) throw new Error("No se pudo cargar TensorFlow.js. Comprueba tu conexión e inténtalo de nuevo.");
-            if (!window.cocoSsd) throw new Error("No se pudo cargar el detector de botellas. Comprueba tu conexión e inténtalo de nuevo.");
-            setStatus("Cargando el detector de botellas y, si existe, tu red…");
-            bottleDetector = await cocoSsd.load({ base: "mobilenet_v2" });
-            model = null;
-            try {
-              const pesos = await fetch("./modelo_botellas/group1-shard1of2.bin", {
-                method: "HEAD",
-                signal: AbortSignal.timeout(2500)
-              });
-              if (pesos.ok) model = await tf.loadLayersModel("./modelo_botellas/model.json");
-            } catch (error) {
-              console.warn("La red propia todavía no tiene pesos exportados:", error);
-              model = null;
-            }
-            elements.classify.disabled = !selectedImage;
-            if (stream) iniciarConteoCamara();
-            else if (archivoVideo && selectedImage) await contarVideo();
-            else if (previewUrl && selectedImage) await clasificarActual();
-            else setStatus("Listo. La cámara y el video registran solos, y solo si es una botella.");
-          } catch (error) {
-            console.error("No se pudo cargar el modelo:", error);
-            setStatus("No se pudieron cargar las comprobaciones de IA. Revisa tu conexión y recarga la página.", true);
-          }
-        }
+        <!-- Teclado de Acciones Táctiles -->
+        <div class="controls-deck">
+          <button id="btnStartCamera" type="button" class="ctrl-btn btn-cam">
+            <i class="bx bx-camera"></i> Cámara
+          </button>
+          
+          <label for="uploadPhotoInput" class="ctrl-btn btn-photo">
+            <i class="bx bx-image-add"></i> Foto
+          </label>
+          <input id="uploadPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
 
-        function download(name, content, type) {
-          const blob = new Blob([content], { type });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = name;
-          link.click();
-          URL.revokeObjectURL(url);
-        }
+          <label for="uploadVideoInput" class="ctrl-btn btn-video">
+            <i class="bx bx-video"></i> Video
+          </label>
+          <input id="uploadVideoInput" type="file" accept="video/mp4,video/webm" style="display:none;">
 
-        function csvField(value) {
-          const text = String(value ?? "");
-          return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-        }
+          <button id="btnResetSession" type="button" class="ctrl-btn" style="background:#f1f5f9; color:var(--text-muted); border:1px solid var(--card-border);">
+            <i class="bx bx-refresh"></i> Nueva Toma
+          </button>
+        </div>
 
-        elements.startCamera.addEventListener("click", () => {
-          if (stream) {
-            stopCamera();
-            selectedImage = null;
-            elements.placeholder.classList.remove("hidden");
-            elements.classify.disabled = true;
-            setStatus(bottleDetector ? "Cámara detenida. Elige una foto o activa la cámara." : "Cámara detenida. Esperando a que termine de cargar el detector.");
-          } else {
-            startCamera();
-          }
-        });
-        elements.switchCamera.addEventListener("click", () => {
-          facingMode = facingMode === "user" ? "environment" : "user";
-          startCamera();
-        });
-        elements.upload.addEventListener("change", (event) => showSelectedPhoto(event.target.files[0]));
-        elements.videoUpload.addEventListener("change", (event) => {
-          showSelectedVideo(event.target.files[0]).catch((error) => {
-            setStatus(error.message || "No se pudo abrir ese video.", true);
-          });
-        });
-        if (elements.preview.getAttribute("src") && elements.preview.complete && elements.preview.naturalWidth) {
-          selectedImage = elements.preview;
-          elements.placeholder.classList.add("hidden");
-        } else if (elements.preview.getAttribute("src")) {
-          elements.preview.addEventListener("load", () => {
-            selectedImage = elements.preview;
-            elements.placeholder.classList.add("hidden");
-            elements.classify.disabled = !bottleDetector;
-          });
-        }
-        elements.classify.addEventListener("click", classify);
-        elements.nuevaToma.addEventListener("click", () => {
-          reiniciarRastros();
-          ultimaFirma = "";
-          setStatus("Toma nueva. Las botellas de ahora se pueden registrar otra vez.");
-        });
-        elements.modalCerrar.addEventListener("click", cerrarModal);
-        elements.modal.addEventListener("click", (event) => {
-          if (event.target === elements.modal) cerrarModal();
-        });
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape" && !elements.modal.hidden) cerrarModal();
-        });
-        elements.speak.addEventListener("click", () => {
-          if (!lastResult || !("speechSynthesis" in window)) {
-            setStatus("La lectura en voz alta no está disponible en este navegador.", true);
-            return;
-          }
-          window.speechSynthesis.cancel();
-          const porcentaje = Math.round(lastResult.confidence * 100);
-          const poco = lastResult.confidence < UMBRAL_POCO_SEGURO ? " El resultado es poco seguro." : "";
-          const utterance = new SpeechSynthesisUtterance(
-            `Se contaron ${lastResult.cantidad} botellas. La inteligencia artificial cree que la imagen es ${lastResult.etiqueta}, con una confianza del ${porcentaje} por ciento.${poco}`
-          );
-          utterance.lang = "es";
-          window.speechSynthesis.speak(utterance);
-        });
-        if (!("speechSynthesis" in window)) elements.speak.classList.add("hidden");
-        elements.historyList.addEventListener("change", (event) => {
-          const input = event.target;
-          if (!(input instanceof HTMLInputElement) || !input.dataset.cantidad) return;
-          const row = input.closest("[data-id]");
-          if (!row) return;
-          const cantidad = Number(input.value);
-          if (!Number.isFinite(cantidad) || cantidad < 0) {
-            setStatus("La cantidad debe ser un número mayor o igual a 0.", true);
-            renderHistory();
-            return;
-          }
-          const entries = readInventory();
-          const item = entries.find((entry) => entry.id === row.dataset.id);
-          if (!item) return;
-          item.cantidad = Math.round(cantidad);
-          writeInventory(entries);
-          renderHistory();
-          setStatus("Cantidad actualizada en este dispositivo.");
-        });
-        elements.historyList.addEventListener("click", (event) => {
-          const button = event.target.closest("button[data-accion='eliminar']");
-          if (!button) return;
-          const row = button.closest("[data-id]");
-          if (!row || !window.confirm("¿Borrar este registro del inventario?")) return;
-          writeInventory(readInventory().filter((entry) => entry.id !== row.dataset.id));
-          renderHistory();
-          setStatus("Registro borrado de este dispositivo.");
-        });
-        elements.clearHistory.addEventListener("click", () => {
-          try {
-            localStorage.removeItem(INVENTORY_KEY);
-            renderHistory();
-            setStatus("Inventario borrado de este dispositivo.");
-          } catch (error) {
-            console.error("No se pudo borrar el inventario:", error);
-            setStatus("No se pudo borrar el inventario. Revisa los permisos del navegador.", true);
-          }
-        });
-        elements.exportJson.addEventListener("click", () => {
-          download("botellas-ia.json", JSON.stringify(readInventory(), null, 2), "application/json;charset=utf-8");
-        });
-        elements.exportCsv.addEventListener("click", () => {
-          const rows = readInventory().map((item) =>
-            [item.id, item.fecha, item.cantidad, item.confianzaPromedio, item.etiqueta, JSON.stringify(item.bboxes)]
-              .map(csvField).join(",")
-          );
-          download(
-            "botellas-ia.csv",
-            `\uFEFFid,fecha,cantidad,confianzaPromedio,etiqueta,bboxes\r\n${rows.join("\r\n")}`,
-            "text/csv;charset=utf-8"
-          );
-        });
-        window.addEventListener("beforeinstallprompt", (event) => {
-          event.preventDefault();
-          installPrompt = event;
-          elements.installApp.classList.remove("hidden");
-          elements.installApp.classList.add("inline-flex");
-        });
-        elements.installApp.addEventListener("click", async () => {
-          if (!installPrompt) return;
-          try {
-            await installPrompt.prompt();
-            await installPrompt.userChoice;
-            installPrompt = null;
-            elements.installApp.classList.add("hidden");
-            elements.installApp.classList.remove("inline-flex");
-          } catch (error) {
-            console.error("No se pudo iniciar la instalación:", error);
-            elements.pwaStatus.textContent = "No se pudo abrir la instalación. Usa el menú de tu navegador para añadir la app.";
-          }
-        });
-        window.addEventListener("appinstalled", () => {
-          installPrompt = null;
-          elements.installApp.classList.add("hidden");
-          elements.installApp.classList.remove("inline-flex");
-          elements.pwaStatus.textContent = "Botellas IA ya está instalada en este dispositivo.";
-        });
-        if ("serviceWorker" in navigator && location.protocol !== "file:") {
-          navigator.serviceWorker.register("./service-worker.js")
-            .then(() => {
-              elements.pwaStatus.textContent = "App instalable · tras la primera carga, los recursos se guardan para usarla sin conexión.";
-            })
-            .catch((error) => {
-              console.error("No se pudo registrar el modo PWA:", error);
-              elements.pwaStatus.textContent = "La instalación no está disponible ahora; puedes seguir usando la app en línea.";
-            });
-        }
-        window.addEventListener("pagehide", stopCamera);
-        renderHistory();
-        loadModel();
-      })();
-    </script>
-  </body>
+        <!-- Controles Auxiliares: Sensibilidad y Switch Cámara -->
+        <div class="aux-controls">
+          <div class="sensitivity-toggle">
+            <span>Sensibilidad:</span>
+            <div class="toggle-group">
+              <button type="button" class="toggle-option" data-threshold="0.20">20% Alta</button>
+              <button type="button" class="toggle-option active" data-threshold="0.28">28% Óptima</button>
+              <button type="button" class="toggle-option" data-threshold="0.50">50% Estricta</button>
+            </div>
+          </div>
+
+          <button id="btnSwitchCamera" type="button" class="btn-action-sm" title="Alternar entre cámara trasera y frontal">
+            <i class="bx bx-transfer-alt"></i> Cambiar Cámara
+          </button>
+          <button id="btnManualScan" type="button" class="ctrl-btn btn-record" style="display:none;">
+            <i class="bx bx-scan"></i> Analizar
+          </button>
+        </div>
+
+        <!-- Barra de Estado Informática -->
+        <p id="statusText" style="font-size:0.85rem; color:var(--text-muted); text-align:center; min-height:1.2rem;">
+          Preparando modelos de inferencia neuronal...
+        </p>
+
+      </div>
+
+      <!-- Barra Lateral de Diagnóstico e Información Académica -->
+      <aside class="sidebar-panel">
+        
+        <!-- Tarjeta de Detección Activa -->
+        <div class="diag-card highlight">
+          <div class="diag-title">Último Dictamen de IA</div>
+          <div class="result-hero">
+            <div id="resultIcon" class="result-badge-icon">
+              <i class="bx bx-recycle"></i>
+            </div>
+            <div class="result-info">
+              <h4 id="resultLabel">Sensor en Espera</h4>
+              <span id="resultSub">Apunta hacia envases o botellas</span>
+            </div>
+          </div>
+
+          <div class="confidence-meter">
+            <div class="meter-labels">
+              <span>Certeza Algorítmica</span>
+              <span id="meterPct" style="font-family:var(--font-mono); color:var(--primary);">0%</span>
+            </div>
+            <div class="meter-track">
+              <div id="meterFill" class="meter-fill"></div>
+            </div>
+          </div>
+
+          <button id="btnSpeakResult" type="button" class="voice-btn" style="display:none;">
+            <i class="bx bx-volume-full"></i> Escuchar Diagnóstico por Voz
+          </button>
+        </div>
+
+        <!-- Tarjeta Académica Exclusiva: Red Convolucional Propia (CNN Keras) -->
+        <div class="diag-card academic-card">
+          <h4><i class="bx bx-brain"></i> Red Neuronal Propia (CNN)</h4>
+          <p>
+            Adaptada de la arquitectura de la guía de perros y gatos del <strong>Ing. Jesús Bautista</strong> (capas <code>Conv2D</code>, <code>MaxPooling</code> y <code>Dropout</code>) reentrenada con dataset de botellas (92.4% exactitud) y convertida a fragmentos TensorFlow.js.
+          </p>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <a href="cuaderno/index.html" class="btn-academic-action">
+              <i class="bx bx-book-open"></i> Ver Cuaderno Jupyter
+            </a>
+          </div>
+        </div>
+
+        <!-- Tarjeta de Privacidad y Procesamiento Edge -->
+        <div class="diag-card">
+          <div class="diag-title">Arquitectura Privada Edge</div>
+          <div style="display:flex; align-items:flex-start; gap:0.75rem;">
+            <i class="bx bx-shield-quarter" style="color:var(--accent-cyan); font-size:1.5rem; margin-top:0.2rem;"></i>
+            <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;">
+              El procesamiento de video e imágenes se ejecuta <strong>100% en la GPU local de tu dispositivo</strong> mediante WebGL. Ningún frame se transfiere a servidores externos.
+            </p>
+          </div>
+        </div>
+
+      </aside>
+
+    </section>
+
+    <!-- Sección de Inventario Inteligente -->
+    <section id="inventory" class="inventory-section">
+      <div class="inventory-header">
+        <div class="inv-title">
+          <h3>Inventario Inteligente de Envases</h3>
+          <p>Registro ordenado cronológicamente con clasificación de material y estimación de huella ecológica.</p>
+        </div>
+        <div class="inv-actions">
+          <input id="invSearchInput" type="text" placeholder="Buscar por ID o material..." class="btn-action-sm" style="min-width:200px; padding:0.45rem 0.8rem;">
+          <button id="btnExportCsv" type="button" class="btn-action-sm">
+            <i class="bx bx-spreadsheet"></i> CSV
+          </button>
+          <button id="btnExportJson" type="button" class="btn-action-sm">
+            <i class="bx bx-code-alt"></i> JSON
+          </button>
+          <button id="btnClearInv" type="button" class="btn-action-sm btn-danger">
+            <i class="bx bx-trash"></i> Vaciar
+          </button>
+        </div>
+      </div>
+
+      <div class="inventory-table-container">
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th>ID Objeto</th>
+              <th>Material Identificado</th>
+              <th>Certeza de IA</th>
+              <th>Hora de Detección</th>
+              <th style="text-align:right;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="invTableBody">
+            <tr id="invEmptyRow">
+              <td colspan="5" style="text-align:center; padding:2.5rem; color:var(--text-light);">
+                <i class="bx bx-package" style="font-size:2rem; display:block; margin-bottom:0.5rem;"></i>
+                Todavía no hay envases registrados. Activa la cámara para comenzar el conteo.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; font-size:0.85rem; color:var(--text-muted);">
+        <span>Total de envases únicos en registro: <strong id="invTotalUnits" style="color:var(--text-main);">0</strong></span>
+        <span>Norma ISO 14040 · Análisis de Ciclo de Vida</span>
+      </div>
+    </section>
+
+    <!-- Sección de Mapa de Puntos Limpios (OpenStreetMap + Leaflet) -->
+    <section id="recycling-map" class="map-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <h3 style="font-size:1.25rem; font-weight:800;">Puntos de Reciclaje y Contenedores Cercanos</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted);">Localiza contenedores de reciclaje urbano para depositar los envases detectados.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button id="buscar-basureros" type="button" class="btn-action-sm" style="background:var(--accent-cyan-light); color:var(--accent-cyan-text); border-color:var(--accent-cyan-border);">
+            <i class="bx bx-current-location"></i> Mi Ubicación
+          </button>
+          <input id="lugar-basureros" type="search" placeholder="Buscar por ciudad..." class="btn-action-sm" style="min-width:180px;">
+          <button id="buscar-lugar" type="button" class="btn-action-sm">
+            <i class="bx bx-search"></i> Buscar
+          </button>
+        </div>
+      </div>
+      
+      <p id="mapa-estado" style="font-size:0.8rem; color:var(--text-light); margin-top:0.5rem;"></p>
+      <div id="mapa" class="map-viewport"></div>
+    </section>
+
+  </main>
+
+  <!-- Footer Institucional -->
+  <footer class="footer-glass">
+    <div style="max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
+      <p><strong>EcoLens AI v4.0 Pro</strong> — Sistema de Visión Artificial para Clasificación de Envases e Impacto Ambiental</p>
+      <p>Docente: <strong>Ing. Jesús Bautista</strong> · Estudiante: <strong>Brayan Joel Ramos Vargas</strong></p>
+      <p>
+        <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer">
+          <i class="bx bxl-github"></i> Repositorio de Código Abierto en GitHub
+        </a>
+        &nbsp;·&nbsp;
+        <a href="cuaderno/index.html">
+          <i class="bx bx-book-open"></i> Documentación del Cuaderno Jupyter
+        </a>
+      </p>
+      <p style="font-size:0.75rem; color:var(--text-light); margin-top:0.25rem;">
+        Desarrollado con TensorFlow.js, MobileNet v2, Keras y WebGL. Todos los derechos reservados © 2026.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts: Leaflet, Mapa, TensorFlow.js y Motor EcoLens -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/mapa.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="js/ecolens.js"></script>
+
+</body>
 </html>
