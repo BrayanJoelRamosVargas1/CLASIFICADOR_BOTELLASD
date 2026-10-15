@@ -24,7 +24,7 @@
   <!-- Boxicons CSS -->
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
 
-  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 8.0 -->
+  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 9.0 -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -34,7 +34,7 @@
   </script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=8.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=9.0">
 </head>
 <body>
 
@@ -201,6 +201,15 @@
           <!-- Softbox Iluminador de Pantalla para Dispositivos sin Flash Físico -->
           <div id="screenTorchOverlay" class="screen-torch-overlay" style="display:none;"></div>
 
+          <!-- Retícula Central de Enfoque Óptico (Zona de Escaneo) -->
+          <div id="targetReticle" class="target-reticle" style="display:none;">
+            <div class="reticle-corner tl"></div>
+            <div class="reticle-corner tr"></div>
+            <div class="reticle-corner bl"></div>
+            <div class="reticle-corner br"></div>
+            <span id="reticleGuideText" class="reticle-guide-text">Encuadra el envase aquí</span>
+          </div>
+
           <!-- HUD Chips en Pantalla -->
           <div id="hudCameraChip" class="hud-chip-top" style="display:none;">
             <span class="dot" style="background:#10b981; width:6px; height:6px; border-radius:50%;"></span>
@@ -247,9 +256,9 @@
           <div class="sensitivity-toggle">
             <span>Sensibilidad:</span>
             <div class="toggle-group">
-              <button type="button" class="toggle-option active" data-threshold="0.10">10% Multi-Objeto</button>
-              <button type="button" class="toggle-option" data-threshold="0.18">18% Equilibrada</button>
-              <button type="button" class="toggle-option" data-threshold="0.30">30% Estricta</button>
+              <button type="button" class="toggle-option active" data-threshold="0.22">22% Óptima</button>
+              <button type="button" class="toggle-option" data-threshold="0.35">35% Estricta</button>
+              <button type="button" class="toggle-option" data-threshold="0.50">50% Alta</button>
             </div>
           </div>
 
@@ -403,7 +412,7 @@
   <!-- Scripts: TensorFlow.js y Motor EcoLens Multi-Objeto -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="js/ecolens.js?v=8.0"></script>
+  <script src="js/ecolens.js?v=9.0"></script>
 
 </body>
 </html>

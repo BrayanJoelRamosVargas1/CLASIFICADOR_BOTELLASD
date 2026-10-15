@@ -2,7 +2,7 @@
  * EcoLens AI v4.0 Pro — Motor de Visión Artificial Multi-Objeto
  * Autor: Brayan Joel Ramos Vargas
  * Docente: Ing. Jesús Bautista
- * Arquitectura: Multi-Object SSD-Lite MobileNet v2 (GPU WebGL) + 1-to-1 Smooth IoU Tracking
+ * Arquitectura: Target-Zone SSD-Lite MobileNet v2 + Anti-False-Positive Filter + 1-to-1 Smooth IoU Tracking
  */
 
 (() => {
@@ -22,17 +22,18 @@
     }).catch(() => {});
   }
 
-  // 1. Configuración Global de Rendimiento y Detección Simultánea
+  // 1. Configuración de Detección Calibrada Antirruido
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
-    DEFAULT_THRESHOLD: 0.10,   // 10% ultra-sensible para detectar múltiples botellas juntas
-    MIN_INFERENCE_SCORE: 0.03, // Captura temprana de contornos secundarios
-    INFERENCE_WIDTH: 480,      // Buffer 480x360: Resolución óptima para captar botellas pequeñas juntas a 30 FPS
+    DEFAULT_THRESHOLD: 0.22,   // 22% Óptima: filtra ruido de fondo (muebles, juguetes) manteniendo botellas
+    MIN_INFERENCE_SCORE: 0.08, // Descarte temprano de artefactos espurios
+    INFERENCE_WIDTH: 480,      // Buffer 480x360: Nitidez óptima para varias botellas a 30+ FPS en WebGL
     INFERENCE_HEIGHT: 360,
-    INFERENCE_INTERVAL_MS: 85, // ~12 inferencias por segundo (tiempo real suave)
-    NMS_IOU_THRESHOLD: 0.65,   // Permite objetos distintos juntos o tocándose sin descartarlos
+    INFERENCE_INTERVAL_MS: 85, // ~12 inferencias por segundo
+    NMS_IOU_THRESHOLD: 0.60,   // Permite envases contiguos sin descartarlos
+    CONFIRMATION_HITS: 3,      // Debe detectarse por 3 frames consecutivos en la retícula antes de registrar
     MAX_MISSED_FRAMES: 8,      // Persistencia temporal (sin parpadeos)
-    MIN_BOX_SIZE: 14,
+    MIN_BOX_SIZE: 16,
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
@@ -52,6 +53,8 @@
     statusText: document.getElementById('statusText'),
     hardwareBadge: document.getElementById('hardwareBadge'),
     stageViewport: document.querySelector('.stage-viewport'),
+    targetReticle: document.getElementById('targetReticle'),
+    reticleGuideText: document.getElementById('reticleGuideText'),
     
     // Controles
     btnStartCamera: document.getElementById('btnStartCamera'),
@@ -96,7 +99,7 @@
     invTotalUnits: document.getElementById('invTotalUnits')
   };
 
-  // Buffer Offscreen de 480x360 para captar múltiples objetos con nitidez sin saturar GPU
+  // Buffer Offscreen de 480x360 para inferencia fluida en GPU
   const offscreenCanvas = document.createElement('canvas');
   offscreenCanvas.width = CONFIG.INFERENCE_WIDTH;
   offscreenCanvas.height = CONFIG.INFERENCE_HEIGHT;
@@ -164,7 +167,7 @@
     } catch (e) {}
   }
 
-  // 3. Inicialización del Motor de IA (SSD-Lite MobileNet v2 en WebGL GPU)
+  // 3. Inicialización del Motor de IA (SSD-Lite MobileNet v2 en GPU WebGL)
   async function initNeuralEngines() {
     try {
       if (!window.tf || !window.cocoSsd) {
@@ -176,9 +179,7 @@
       }
       console.info('EcoLens: Backend TensorFlow.js activo:', tf.getBackend());
 
-      dom.statusText.textContent = 'Cargando motor multi-objeto SSD-Lite en GPU...';
-      
-      // Cargar SSD-Lite MobileNet v2 optimizado para visión simultánea en vivo
+      dom.statusText.textContent = 'Iniciando detector SSD-Lite en GPU...';
       detector = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
 
       try {
@@ -188,7 +189,7 @@
         console.info('EcoLens: Modo detector estándar activo.');
       }
 
-      dom.statusText.textContent = '● Detector multi-objeto listo. Apunta a una o varias botellas juntas.';
+      dom.statusText.textContent = '● Detector calibrado. Encuadra tu botella en la retícula central.';
       dom.hardwareBadge.innerHTML = '<span class="dot"></span> WebGL GPU Activo';
       if (dom.btnManualScan) dom.btnManualScan.disabled = false;
     } catch (error) {
@@ -200,7 +201,7 @@
     }
   }
 
-  // 4. Geometría y Clasificación de Materiales Multi-Objeto
+  // 4. Geometría y Filtrado Antirruido de Envases Reales
   function computeIoU(a, b) {
     const x1 = Math.max(a.x, b.x);
     const y1 = Math.max(a.y, b.y);
@@ -209,6 +210,40 @@
     const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
     const union = a.w * a.h + b.w * b.h - inter;
     return union <= 0 ? 0 : inter / union;
+  }
+
+  // Filtro Estricto de Geometría: descarta muebles, dispensadores gigantes o artefactos planos
+  function isValidContainerGeometry(rawClass, bw, bh, srcW, srcH) {
+    const area = bw * bh;
+    const totalArea = srcW * srcH;
+    const areaRatio = area / totalArea;
+
+    // Descartar si llena más del 65% de la pantalla (ej. un mueble o pared) o menos del 1.2% (ruido)
+    if (areaRatio > 0.65 || areaRatio < 0.012) {
+      return false;
+    }
+
+    const hToW = bh / bw;
+    const wToH = bw / bh;
+
+    // Las botellas reales son alargadas (cilíndricas). Si es un bloque cuadrado o plano (como la base de un botellón grande), no es botella
+    if (rawClass === 'bottle') {
+      if (hToW < 1.15 && wToH < 1.15) {
+        return false; // Bloque cuadrado incompatible con botella
+      }
+      if (hToW > 5.5 || wToH > 5.5) {
+        return false; // Línea o cable excesivamente fino
+      }
+    }
+
+    // Vasos y latas
+    if (rawClass === 'cup') {
+      if (hToW < 0.65 || hToW > 2.5) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // Clasificador de Material y Apariencia
@@ -236,14 +271,14 @@
     }
     if (rawClass === 'bowl' || rawClass === 'vase') {
       return {
-        label: 'Envase Rígido / Recipiente',
+        label: 'Envase / Recipiente Rígido',
         tagClass: 'container',
         color: '#f59e0b', // Ámbar Contenedor
         fill: 'rgba(245, 158, 11, 0.18)',
         icon: 'bx-box'
       };
     }
-    // Detección de orientación de botellas PET
+    // Botellas PET
     if (ratioWtoH > 1.35) {
       return {
         label: 'Botella PET (Horizontal)',
@@ -253,7 +288,7 @@
         icon: 'bx-recycle'
       };
     }
-    if (ratioHtoW > 1.45) {
+    if (ratioHtoW > 1.35) {
       return {
         label: 'Botella PET (Vertical)',
         tagClass: 'pet',
@@ -286,7 +321,7 @@
     }
   }
 
-  // 6. Procesamiento Asíncrono Multi-Objeto Simultáneo
+  // 6. Procesamiento Asíncrono Multi-Objeto con Retícula y Filtrado de Personas/Juguetes
   async function processVisualFrame() {
     if (!detector || !activeSource || isDetecting) return;
 
@@ -303,17 +338,34 @@
       // 1. Dibujar en buffer offscreen de 480x360
       offscreenCtx.drawImage(activeSource, 0, 0, CONFIG.INFERENCE_WIDTH, CONFIG.INFERENCE_HEIGHT);
 
-      // 2. Detección simultánea de múltiples candidatos (hasta 20 objetos)
+      // 2. Detección en GPU
       const rawPredictions = await detector.detect(offscreenCanvas, 20, CONFIG.MIN_INFERENCE_SCORE);
 
-      // 3. Proyectar coordenadas del buffer a la resolución de la cámara
+      // 3. Proyectar coordenadas
       const scaleX = srcW / CONFIG.INFERENCE_WIDTH;
       const scaleY = srcH / CONFIG.INFERENCE_HEIGHT;
+
+      // 4. SUPRESIÓN DE PERSONAS Y FIGURAS (Evita que muñecos como Kratos o personas se confundan con botellas)
+      const personBoxes = rawPredictions
+        .filter(p => p.class === 'person' && p.score >= 0.28)
+        .map(p => ({
+          x: p.bbox[0] * scaleX,
+          y: p.bbox[1] * scaleY,
+          w: p.bbox[2] * scaleX,
+          h: p.bbox[3] * scaleY
+        }));
+
+      // 5. Definición de la Retícula Central de Enfoque Activo (65% x 72% del centro)
+      const reticleBox = {
+        x: srcW * 0.15,
+        y: srcH * 0.12,
+        w: srcW * 0.70,
+        h: srcH * 0.76
+      };
 
       const candidates = [];
       for (const p of rawPredictions) {
         if (!RECYCLABLE_CLASSES.includes(p.class)) continue;
-        if (p.score < activeThreshold) continue;
 
         const bx = p.bbox[0] * scaleX;
         const by = p.bbox[1] * scaleY;
@@ -321,6 +373,33 @@
         const bh = p.bbox[3] * scaleY;
 
         if (bw < CONFIG.MIN_BOX_SIZE || bh < CONFIG.MIN_BOX_SIZE) continue;
+
+        // Comprobar si solapa con una persona / figura
+        const candidateBox = { x: bx, y: by, w: bw, h: bh };
+        const overlapsPerson = personBoxes.some(pb => computeIoU(candidateBox, pb) > 0.25 || (
+          bx >= pb.x && (bx + bw) <= (pb.x + pb.w) &&
+          by >= pb.y && (by + bh) <= (pb.y + pb.h)
+        ));
+        if (overlapsPerson) continue; // Descartado: es parte de una persona o figura de acción
+
+        // Comprobar geometría física de envase real
+        if (!isValidContainerGeometry(p.class, bw, bh, srcW, srcH)) continue;
+
+        // Verificar si está dentro de la retícula de escaneo intencional
+        const centerObjX = bx + bw / 2;
+        const centerObjY = by + bh / 2;
+        const inReticle = (
+          centerObjX >= reticleBox.x && centerObjX <= (reticleBox.x + reticleBox.w) &&
+          centerObjY >= reticleBox.y && centerObjY <= (reticleBox.y + reticleBox.h)
+        ) || computeIoU(candidateBox, reticleBox) > 0.18;
+
+        // Si está en la retícula, requiere el umbral normal (ej. 22%)
+        // Si está en los bordes lejanos de la habitación, requiere 45% y nunca se auto-registra
+        if (inReticle) {
+          if (p.score < activeThreshold) continue;
+        } else {
+          if (p.score < activeThreshold + 0.20) continue;
+        }
 
         const meta = classifyMaterial(p.class, bw, bh);
 
@@ -332,11 +411,12 @@
           score: p.score,
           rawClass: p.class,
           meta: meta,
-          label: meta.label
+          label: meta.label,
+          inReticle: inReticle
         });
       }
 
-      // 4. Non-Maximum Suppression (NMS) permisivo para objetos contiguos (IoU < 0.65)
+      // 6. Non-Maximum Suppression (NMS)
       candidates.sort((a, b) => b.score - a.score);
       const filtered = [];
       for (const c of candidates) {
@@ -345,7 +425,7 @@
         }
       }
 
-      // 5. Tracking Multi-Objeto 1-a-1 Estricto (Sin absorción de botellas vecinas)
+      // 7. Tracking Multi-Objeto 1-a-1 con Filtro de Estabilidad Temporal (Hits >= 3)
       const matchedTrackerIds = new Set();
       const newlyRegistered = [];
 
@@ -354,7 +434,6 @@
         let bestIoU = 0;
 
         for (const t of trackers) {
-          // Si el tracker ya fue reclamado por otra botella en este frame, saltarlo
           if (matchedTrackerIds.has(t.id)) continue;
 
           const iou = computeIoU(t, box);
@@ -364,7 +443,6 @@
           }
         }
 
-        // Si coincide con una botella previa (IoU >= 0.18)
         if (bestMatch && bestIoU >= 0.18) {
           bestMatch.x = bestMatch.x * 0.35 + box.x * 0.65;
           bestMatch.y = bestMatch.y * 0.35 + box.y * 0.65;
@@ -373,11 +451,18 @@
           bestMatch.score = box.score;
           bestMatch.meta = box.meta;
           bestMatch.label = box.meta.label;
+          bestMatch.inReticle = box.inReticle;
           bestMatch.missed = 0;
           bestMatch.hits++;
           matchedTrackerIds.add(bestMatch.id);
+
+          // ¡CONFIRMACIÓN DE ESTABILIDAD!: Solo se añade al inventario tras ser confirmado por al menos 3 frames consecutivos en la retícula
+          if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered && bestMatch.inReticle) {
+            bestMatch.registered = true;
+            newlyRegistered.push(bestMatch);
+          }
         } else {
-          // Nueva botella / envase individual detectado: Asignarle ID exclusivo
+          // Iniciar seguimiento de nuevo candidato (aún no registrado hasta confirmar estabilidad)
           const newTracker = {
             id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
             x: box.x,
@@ -387,30 +472,39 @@
             score: box.score,
             meta: box.meta,
             label: box.meta.label,
+            inReticle: box.inReticle,
             hits: 1,
             missed: 0,
-            registered: true
+            registered: false
           };
           trackers.push(newTracker);
           matchedTrackerIds.add(newTracker.id);
-          newlyRegistered.push(newTracker);
         }
       }
 
-      // Incrementar frames perdidos a los trackers no avistados
       for (const t of trackers) {
         if (!matchedTrackerIds.has(t.id)) {
           t.missed++;
         }
       }
 
-      // Mantener en pantalla los objetos visibles con persistencia temporal
       trackers = trackers.filter(t => t.missed < CONFIG.MAX_MISSED_FRAMES * 2);
       visibleBoxes = trackers.filter(t => t.missed < CONFIG.MAX_MISSED_FRAMES);
 
       dom.hudInView.textContent = visibleBoxes.length;
 
-      // Acciones al registrar nuevas botellas
+      // Actualizar estado de la Retícula Visual
+      const hasActiveInReticle = visibleBoxes.some(b => b.inReticle);
+      if (dom.targetReticle) {
+        dom.targetReticle.classList.toggle('reticle-locked', hasActiveInReticle);
+        if (dom.reticleGuideText) {
+          dom.reticleGuideText.textContent = hasActiveInReticle
+            ? '✓ Envase Fijado · Mantén Estable'
+            : 'Encuadra el envase aquí';
+        }
+      }
+
+      // Notificar registro de envases confirmados
       if (newlyRegistered.length > 0) {
         onNewBottlesRegistered(newlyRegistered);
       } else if (visibleBoxes.length > 0) {
@@ -427,13 +521,12 @@
     }
   }
 
-  // 7. Registro de Nuevas Botellas e Inventario Multi-Objeto
+  // 7. Registro de Nuevas Botellas e Inventario
   function onNewBottlesRegistered(items) {
     playSound(items.length > 1 ? 'multi-chime' : 'chime');
     takeCount += items.length;
     dom.hudInTake.textContent = takeCount;
 
-    // Destello de captura exitosa
     if (dom.stageViewport) {
       dom.stageViewport.style.outline = '3px solid #10b981';
       setTimeout(() => {
@@ -457,7 +550,6 @@
     renderInventoryTable(updatedInv);
     updateImpactMetrics(updatedInv);
 
-    // Actualizar tarjeta lateral de dictamen
     if (items.length === 1) {
       const first = items[0];
       dom.resultIcon.innerHTML = `<i class="bx ${first.meta ? first.meta.icon : 'bx-recycle'}"></i>`;
@@ -467,7 +559,7 @@
       const pct = Math.round(first.score * 100);
       dom.meterPct.textContent = `${pct}%`;
       dom.meterFill.style.width = `${pct}%`;
-      lastSpokenText = `Detectada ${first.label} con confianza del ${pct} por ciento. Guardada en el inventario ecológico.`;
+      lastSpokenText = `Detectada ${first.label} con confianza del ${pct} por ciento. Guardada en el inventario.`;
     } else {
       dom.resultIcon.innerHTML = `<i class="bx bx-layer"></i>`;
       dom.resultLabel.textContent = `¡${items.length} Envases Identificados Juntos!`;
@@ -508,9 +600,9 @@
       const isFaded = box.missed > 0;
       const strokeColor = meta.color;
       const fillColor = isFaded ? 'rgba(0,0,0,0.05)' : meta.fill;
-      const tagText = `✓ ${box.id} · ${box.label} ${Math.round(box.score * 100)}%`;
+      const tagText = `${box.registered ? '✓' : '●'} ${box.id} · ${box.label} ${Math.round(box.score * 100)}%`;
 
-      // 1. Relleno traslúcido diferenciado por material
+      // 1. Relleno traslúcido
       ctx.fillStyle = fillColor;
       ctx.fillRect(rx, ry, rw, rh);
 
@@ -519,7 +611,7 @@
       ctx.lineWidth = Math.round(3.5 * baseScale);
       ctx.strokeRect(rx, ry, rw, rh);
 
-      // 3. Esquinas cibernéticas reforzadas en blanco brillante
+      // 3. Esquinas cibernéticas reforzadas
       const corner = Math.min(24 * baseScale, rw / 3, rh / 3);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = Math.round(4.5 * baseScale);
@@ -668,6 +760,7 @@
       dom.canvas.style.display = 'block';
       dom.laser.classList.add('laser-active');
       dom.cameraChip.style.display = 'flex';
+      if (dom.targetReticle) dom.targetReticle.style.display = 'flex';
       dom.btnStartCamera.innerHTML = '<i class="bx bx-stop-circle"></i> Detener Cámara';
       dom.btnStartCamera.classList.add('btn-danger');
 
@@ -683,7 +776,7 @@
       animFrameId = requestAnimationFrame(animLoop);
 
       runInferenceLoop();
-      dom.statusText.textContent = '● Cámara activa. Sostén una o varias botellas juntas.';
+      dom.statusText.textContent = '● Cámara activa. Sostén tu botella en la retícula central.';
       playSound('click');
     } catch (err) {
       console.error('Error al iniciar cámara:', err);
@@ -697,13 +790,13 @@
     if (animFrameId) cancelAnimationFrame(animFrameId);
     if (loopTimeoutId) clearTimeout(loopTimeoutId);
 
-    // Apagar flash si estaba encendido
     if (isTorchOn) {
       isTorchOn = false;
       if (dom.screenTorch) dom.screenTorch.style.display = 'none';
       updateTorchUI();
     }
     if (dom.btnFlashViewport) dom.btnFlashViewport.style.display = 'none';
+    if (dom.targetReticle) dom.targetReticle.style.display = 'none';
 
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
@@ -747,17 +840,17 @@
 
         trackers = [];
         takeCount = 0;
-        dom.statusText.textContent = 'Analizando fotografía con IA multi-objeto...';
+        dom.statusText.textContent = 'Analizando fotografía con IA...';
 
         await processVisualFrame();
-        renderCanvasHUD();
-
-        if (visibleBoxes.length === 0) {
-          activeThreshold = 0.05;
-          await processVisualFrame();
-          renderCanvasHUD();
-          activeThreshold = CONFIG.DEFAULT_THRESHOLD;
+        // En fotos, forzar registro de candidatos visibles
+        for (const t of trackers) {
+          if (!t.registered) {
+            t.registered = true;
+            onNewBottlesRegistered([t]);
+          }
         }
+        renderCanvasHUD();
 
         if (visibleBoxes.length === 0) {
           dom.statusText.textContent = 'No se distinguieron botellas en la imagen. Intenta con una foto con mejor iluminación.';
@@ -768,7 +861,7 @@
     reader.readAsDataURL(file);
   }
 
-  // 12. Forzar Registro Manual Inmediato Multi-Objeto
+  // 12. Forzar Registro Manual Inmediato (Captura Intencional de Retícula)
   async function forceManualScan() {
     if (!activeSource) {
       alert('Primero inicia la cámara o sube una fotografía.');
@@ -776,39 +869,62 @@
     }
 
     playSound('click');
-    dom.statusText.textContent = 'Escaneando todos los envases en cuadro...';
+    dom.statusText.textContent = 'Capturando envase en retícula...';
 
+    // 1. Si ya hay una botella fijada en la retícula, confirmarla de inmediato
+    const reticleBox = visibleBoxes.find(b => b.inReticle) || visibleBoxes[0];
+    if (reticleBox) {
+      if (!reticleBox.registered) {
+        reticleBox.registered = true;
+        onNewBottlesRegistered([reticleBox]);
+      }
+      renderCanvasHUD();
+      dom.statusText.textContent = `✓ ¡${reticleBox.label} registrada con éxito!`;
+      return;
+    }
+
+    // 2. Si no hay automática, ejecutar escaneo profundo en el centro
     const prevThreshold = activeThreshold;
-    activeThreshold = 0.04; // Escaneo profundo
+    activeThreshold = 0.12;
     await processVisualFrame();
     activeThreshold = prevThreshold;
 
-    // Si aún no detectó automáticamente, registrar los cuadrantes de escena
-    if (visibleBoxes.length === 0) {
-      const srcW = activeSource.videoWidth || activeSource.naturalWidth || 640;
-      const srcH = activeSource.videoHeight || activeSource.naturalHeight || 480;
-
-      const manualBox = {
-        id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
-        x: srcW * 0.2,
-        y: srcH * 0.15,
-        w: srcW * 0.6,
-        h: srcH * 0.7,
-        score: 0.95,
-        meta: classifyMaterial('bottle', srcW * 0.6, srcH * 0.7),
-        label: 'Botella PET Plástico (Captura Manual)',
-        hits: 1,
-        missed: 0,
-        registered: true
-      };
-
-      trackers.push(manualBox);
-      visibleBoxes = [manualBox];
-      onNewBottlesRegistered([manualBox]);
+    const found = visibleBoxes.find(b => b.inReticle) || visibleBoxes[0];
+    if (found) {
+      if (!found.registered) {
+        found.registered = true;
+        onNewBottlesRegistered([found]);
+      }
+      renderCanvasHUD();
+      dom.statusText.textContent = `✓ ¡${found.label} registrada con éxito!`;
+      return;
     }
 
+    // 3. Fallback: Registrar directamente el contenedor encuadrado en la retícula
+    const srcW = activeSource.videoWidth || activeSource.naturalWidth || 640;
+    const srcH = activeSource.videoHeight || activeSource.naturalHeight || 480;
+
+    const manualBox = {
+      id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+      x: srcW * 0.22,
+      y: srcH * 0.18,
+      w: srcW * 0.56,
+      h: srcH * 0.64,
+      score: 0.95,
+      inReticle: true,
+      meta: classifyMaterial('bottle', srcW * 0.56, srcH * 0.64),
+      label: 'Botella PET Plástico (Captura Manual)',
+      hits: 3,
+      missed: 0,
+      registered: true
+    };
+
+    trackers.push(manualBox);
+    visibleBoxes = [manualBox];
+    onNewBottlesRegistered([manualBox]);
+
     renderCanvasHUD();
-    dom.statusText.textContent = `✓ ¡${visibleBoxes.length} envase(s) registrado(s) con éxito!`;
+    dom.statusText.textContent = `✓ ¡Botella registrada exitosamente!`;
   }
 
   // 13. Persistencia en LocalStorage
@@ -983,7 +1099,7 @@
         dom.sensOptions.forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
         activeThreshold = parseFloat(opt.dataset.threshold);
-        dom.statusText.textContent = `Sensibilidad ajustada a ${Math.round(activeThreshold * 100)}% (Multi-Objeto)`;
+        dom.statusText.textContent = `Sensibilidad ajustada a ${Math.round(activeThreshold * 100)}% (Antirruido)`;
         playSound('click');
       });
     });

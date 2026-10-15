@@ -481,6 +481,76 @@ body {
   100% { top: 0%; }
 }
 
+/* Retícula Central de Enfoque Óptico (Estilo Google Lens / Vision AI) */
+.target-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 65%;
+  height: 72%;
+  max-width: 340px;
+  max-height: 440px;
+  pointer-events: none;
+  z-index: 11;
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reticle-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: rgba(255, 255, 255, 0.7);
+  border-style: solid;
+  transition: all 0.2s ease;
+}
+
+.reticle-corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 12px; }
+.reticle-corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 12px; }
+.reticle-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 12px; }
+.reticle-corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 12px; }
+
+.reticle-guide-text {
+  position: absolute;
+  bottom: 10px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(6px);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.target-reticle.reticle-locked {
+  border-color: rgba(16, 185, 129, 0.75);
+  border-style: solid;
+  box-shadow: 0 0 28px rgba(16, 185, 129, 0.35), inset 0 0 20px rgba(16, 185, 129, 0.12);
+}
+
+.target-reticle.reticle-locked .reticle-corner {
+  border-color: #10b981;
+  width: 26px;
+  height: 26px;
+}
+
+.target-reticle.reticle-locked .reticle-guide-text {
+  background: #059669;
+  color: #ffffff;
+  border-color: #34d399;
+}
+
 /* Placeholder cuando la cámara está apagada */
 .stage-idle {
   display: flex;
