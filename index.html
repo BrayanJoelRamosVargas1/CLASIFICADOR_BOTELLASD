@@ -7,6 +7,10 @@
   <meta name="author" content="Brayan Joel Ramos Vargas">
   <meta name="description" content="EcoLens AI — Sistema de Visión Artificial para Clasificación de Botellas e Inventario Ecológico. Desarrollado por Brayan Joel Ramos Vargas (Docente: Ing. Jesús Bautista).">
   
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <title>EcoLens AI — Detector Inteligente de Envases y Reciclaje | Brayan Ramos</title>
   
   <link rel="icon" type="image/svg+xml" href="assets/ecolens_logo.svg">
@@ -22,7 +26,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css">
+  <link rel="stylesheet" href="css/ecolens.css?v=5.1">
 </head>
 <body>
 
@@ -226,9 +230,9 @@
           <div class="sensitivity-toggle">
             <span>Sensibilidad:</span>
             <div class="toggle-group">
-              <button type="button" class="toggle-option active" data-threshold="0.20">20% Alta</button>
-              <button type="button" class="toggle-option" data-threshold="0.28">28% Óptima</button>
-              <button type="button" class="toggle-option" data-threshold="0.50">50% Estricta</button>
+              <button type="button" class="toggle-option active" data-threshold="0.14">14% Ultra</button>
+              <button type="button" class="toggle-option" data-threshold="0.22">22% Óptima</button>
+              <button type="button" class="toggle-option" data-threshold="0.38">38% Estricta</button>
             </div>
           </div>
 
@@ -401,7 +405,7 @@
   <script src="js/mapa.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="js/ecolens.js"></script>
+  <script src="js/ecolens.js?v=5.1"></script>
 
 </body>
 </html>

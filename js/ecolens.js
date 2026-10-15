@@ -11,16 +11,16 @@
   // Configuración Global de Detección
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
-    DEFAULT_THRESHOLD: 0.20, // 20% para capturar botellas PET transparentes
-    MIN_CANDIDATE_SCORE: 0.15,
-    MIN_BOX_SIZE: 20,
+    DEFAULT_THRESHOLD: 0.14, // 14% Ultra Sensible para botellas transparentes o acostadas
+    MIN_CANDIDATE_SCORE: 0.08,
+    MIN_BOX_SIZE: 15,
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
   };
 
   // Clases válidas del dataset COCO que corresponden a envases reciclables
-  const RECYCLABLE_CLASSES = ['bottle', 'cup', 'wine glass', 'vase'];
+  const RECYCLABLE_CLASSES = ['bottle', 'cup', 'wine glass', 'vase', 'bowl'];
 
   // Referencias DOM
   const dom = {
@@ -544,12 +544,49 @@
     playSound('click');
     dom.statusText.textContent = 'Analizando encuadre actual inmediatamente...';
     await processVisualFrame();
+    
+    // Si no encontró con el umbral normal, intentar escaneo profundo al 8%
+    if (visibleBoxes.length === 0 && detector) {
+      try {
+        const raw = await detector.detect(activeSource, 25, 0.08);
+        const candidates = raw
+          .filter(p => RECYCLABLE_CLASSES.includes(p.class) || p.class === 'bottle')
+          .map(p => ({
+            x: p.bbox[0],
+            y: p.bbox[1],
+            w: p.bbox[2],
+            h: p.bbox[3],
+            score: Math.max(0.65, p.score * 1.5),
+            rawClass: p.class,
+            label: getFriendlyLabel(p.class, p.bbox[2], p.bbox[3])
+          }));
+
+        if (candidates.length > 0) {
+          const newTracker = {
+            id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+            x: candidates[0].x,
+            y: candidates[0].y,
+            w: candidates[0].w,
+            h: candidates[0].h,
+            score: candidates[0].score,
+            label: candidates[0].label,
+            hits: 1,
+            missed: 0,
+            registered: true
+          };
+          trackers.push(newTracker);
+          onNewBottlesRegistered([newTracker]);
+          visibleBoxes = [newTracker];
+        }
+      } catch (e) {}
+    }
+
     renderCanvasHUD();
 
     if (visibleBoxes.length > 0) {
-      alert(`¡Éxito! Se han detectado ${visibleBoxes.length} envase(s) en el encuadre y se registraron en tu inventario.`);
+      alert(`¡Éxito! Se ha identificado y registrado tu ${visibleBoxes[0].label} en el inventario.`);
     } else {
-      alert('El detector no encontró una botella clara en este momento. Acerca más el envase a la cámara o asegúrate de que haya buena iluminación.');
+      alert('No se detectó un contorno claro de botella. Prueba sostenerla en posición vertical frente a la cámara.');
     }
   }
 
