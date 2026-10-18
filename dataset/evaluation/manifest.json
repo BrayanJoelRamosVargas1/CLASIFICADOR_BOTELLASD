@@ -1,0 +1,67 @@
+{
+  "repository": "https://github.com/rhiosutoyo/Bottle-Object-Detection-Dataset",
+  "revision": "215a51b764e8b50faf0c450daf82e7f2551de56d",
+  "usage": "evaluation only; no training performed",
+  "images": [
+    {
+      "file": "1.PNG",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/1.PNG",
+      "sha256": "54d565d9f71fc857b64353e639db9b3f4f15d129fb0d800a0b9dbf39b4845ca8"
+    },
+    {
+      "file": "6.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/6.jpeg",
+      "sha256": "7d706c0f6d98cba860afc0da29212b106088a3c110fbde6d207a21d474951e72"
+    },
+    {
+      "file": "10.jpg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/10.jpg",
+      "sha256": "fe78bb3c90efc209899afc41a0003a20f12cd524d7cd579b3f56a654558e92c8"
+    },
+    {
+      "file": "15.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/15.jpeg",
+      "sha256": "710e37fc00c4aa35df00f2ce4556dcfb015f00874b464e4c52c278aa52c88bd2"
+    },
+    {
+      "file": "16.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/16.jpeg",
+      "sha256": "809c6b25d924bc71a287125329ea724ceca37a4b5ce8ea67221e174c89f67a62"
+    },
+    {
+      "file": "17.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/17.jpeg",
+      "sha256": "3cc03b368abd93dec0473a6f18ff9820b08558c9b10a0a70190f3eb25e976abd"
+    },
+    {
+      "file": "18.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/18.jpeg",
+      "sha256": "6a23e712dd606b74837141a3f1a921c7a39a0ce89d502d1ea629a9b3624e7246"
+    },
+    {
+      "file": "19.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/19.jpeg",
+      "sha256": "4ead8aea06fac00556f2de97c4ba27e857648c82cc83aa700da51c8c275e6bed"
+    },
+    {
+      "file": "20.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/20.jpeg",
+      "sha256": "2b88cb3dd3ddc2acf690ae7272c7df227a7fd33a0b9b163f770dec7326da4107"
+    },
+    {
+      "file": "21.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/21.jpeg",
+      "sha256": "96e092c556a3e7924dc250ccf0871e5adea7f3bb87044022696c0c8e24049a58"
+    },
+    {
+      "file": "39.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/39.jpeg",
+      "sha256": "6f61bf8eed52a83ee7618da64d0f457460e5e4b2f1cb09fe9163d87669255647"
+    },
+    {
+      "file": "40.jpeg",
+      "source": "https://raw.githubusercontent.com/rhiosutoyo/Bottle-Object-Detection-Dataset/215a51b764e8b50faf0c450daf82e7f2551de56d/RAW/40.jpeg",
+      "sha256": "cd35d96ed0704e926d13b0ae50d36052d7b495d9d6e3058bc9744b5da219c6e1"
+    }
+  ]
+}

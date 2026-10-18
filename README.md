@@ -1,3 +1,30 @@
+# Estado actual de la aplicación (octubre de 2026)
+
+La entrada de la aplicación es `index.html`, que carga `js/yolo-detector.js`, `js/bottle-detection.js` y `js/ecolens.js`. Los módulos `js/app.js`, `js/vision.js` y `js/inventory.js` pertenecen a una interfaz anterior y no se ejecutan desde esa entrada.
+
+- Aplicación estática: HTML, CSS y JavaScript; no usa React ni un backend de inferencia.
+- IA activa: **YOLOv10 Nano** preentrenado en COCO, con ONNX Runtime Web 1.20.1 / WebAssembly monohilo. Pesos locales en `models/yolov10n/model.onnx`, procedencia y licencia AGPL-3.0 en esa carpeta. TensorFlow.js y COCO-SSD se conservan solamente en el benchmark y los materiales anteriores.
+- Solo se cuenta la clase `bottle`, desde un score de 0.30 y tras dos detecciones consecutivas. Ese score no equivale a una precisión medida del sistema.
+- Filtrado de cajas y NMS compartidos con el banco de evaluación. No se descartan botellas únicamente por estar acostadas o por ocupar casi toda la imagen.
+- Bucle secuencial con objetivo de 100 ms entre comienzos de análisis y pausa mínima de 16 ms. La frecuencia real depende del teléfono y del tiempo de inferencia. Si no hay una botella sobre el umbral, se hace una segunda pasada girada 90° y se convierten las coordenadas a la imagen original. No se garantizan 60 FPS de detección.
+- Persistencia del inventario en localStorage; CSV y JSON disponibles.
+- El material es una **estimación visual por color**, no una clasificación de material entrenada ni una identificación de marca.
+- Los archivos Keras propios y el cuaderno se conservan como material de entrenamiento; sus pesos no intervienen en el detector activo. El script de entrenamiento existente genera ejemplos sintéticos y no acredita entrenamiento con fotografías reales.
+- Se añadieron 12 fotografías reales, su licencia y procedencia para evaluación. No se ha reentrenado el modelo con ellas. Ver `dataset/evaluation/README.md` y el banco `tools/benchmark-bottles.cjs`.
+
+Verificación local:
+
+```powershell
+node --test tests/*.test.cjs
+python -m http.server 8080
+```
+
+Abrir `http://localhost:8080`. La cámara del teléfono necesita un contexto seguro HTTPS. El script `subir_a_github.bat` prepara un push a GitHub; publicar requiere subir los cambios a la rama que sirve GitHub Pages. Los cambios locales no actualizan por sí solos la página pública.
+
+---
+
+La documentación histórica siguiente describe el diseño inicial y puede diferir del código activo:
+
 # StockVision AI — Clasificador Inteligente de Productos y Control de Inventario
 
 Sistema de Visión por Computadora y Soporte a la Toma de Decisiones diseñado para la detección, clasificación y auditoría de inventario en tiempo real mediante cámaras de dispositivos móviles y navegadores web.

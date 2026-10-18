@@ -1,0 +1,279 @@
+{
+  "backend": "cpu",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "config": {
+    "modelBase": "mobilenet_v2",
+    "minScore": 0.1,
+    "threshold": 0.3,
+    "maxBoxes": 30,
+    "nmsIoU": 0.45
+  },
+  "runs": [
+    {
+      "base": "lite_mobilenet_v2",
+      "imagesWithDetections": 6,
+      "rows": [
+        {
+          "file": "1.PNG",
+          "elapsedMs": 5088,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 139.93464574217796,
+              "y": 138.44031128287315,
+              "w": 111.2187252342701,
+              "h": 315.41036823391914,
+              "score": 0.8315580487251282,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "6.jpeg",
+          "elapsedMs": 5127,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 172.05837285518646,
+              "y": 8.972976446151733,
+              "w": 211.01309537887573,
+              "h": 579.4091606140137,
+              "score": 0.8312880396842957,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "10.jpg",
+          "elapsedMs": 5395,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "15.jpeg",
+          "elapsedMs": 5399,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "16.jpeg",
+          "elapsedMs": 5158,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 192.04997062683105,
+              "y": 61.62630081176758,
+              "w": 136.18131637573242,
+              "h": 436.2666893005371,
+              "score": 0.9754841923713684,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "17.jpeg",
+          "elapsedMs": 4972,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "18.jpeg",
+          "elapsedMs": 5215,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 134.3383026123047,
+              "y": 109.42115783691406,
+              "w": 155.03116607666016,
+              "h": 361.35982513427734,
+              "score": 0.9740633368492126,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "19.jpeg",
+          "elapsedMs": 4974,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 163.8186550140381,
+              "y": 69.68172073364258,
+              "w": 130.34314155578613,
+              "h": 441.0909080505371,
+              "score": 0.945755124092102,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "20.jpeg",
+          "elapsedMs": 5077,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 163.5201072692871,
+              "y": 90.85693359375,
+              "w": 131.52565956115723,
+              "h": 422.2214126586914,
+              "score": 0.9595624208450317,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "21.jpeg",
+          "elapsedMs": 5010,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "39.jpeg",
+          "elapsedMs": 4932,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "40.jpeg",
+          "elapsedMs": 4955,
+          "bottles": 0,
+          "boxes": []
+        }
+      ]
+    },
+    {
+      "base": "mobilenet_v2",
+      "imagesWithDetections": 6,
+      "rows": [
+        {
+          "file": "1.PNG",
+          "elapsedMs": 9002,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 142.38301277160645,
+              "y": 146.74933850765228,
+              "w": 103.34127801656723,
+              "h": 301.57335114479065,
+              "score": 0.991757869720459,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "6.jpeg",
+          "elapsedMs": 9262,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "10.jpg",
+          "elapsedMs": 9077,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "15.jpeg",
+          "elapsedMs": 9091,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "16.jpeg",
+          "elapsedMs": 9118,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 193.18113327026367,
+              "y": 74.5469856262207,
+              "w": 131.9930076599121,
+              "h": 419.0859031677246,
+              "score": 0.990092396736145,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "17.jpeg",
+          "elapsedMs": 8927,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "18.jpeg",
+          "elapsedMs": 8824,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 131.7573595046997,
+              "y": 119.3360710144043,
+              "w": 148.47068309783936,
+              "h": 346.01266860961914,
+              "score": 0.9446645975112915,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "19.jpeg",
+          "elapsedMs": 8853,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 160.04533767700195,
+              "y": 72.47081756591797,
+              "w": 137.01939582824707,
+              "h": 438.560791015625,
+              "score": 0.9725008010864258,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "20.jpeg",
+          "elapsedMs": 9160,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 169.10143375396729,
+              "y": 92.52649307250977,
+              "w": 128.03353786468506,
+              "h": 418.5658073425293,
+              "score": 0.9872066378593445,
+              "rawClass": "bottle"
+            }
+          ]
+        },
+        {
+          "file": "21.jpeg",
+          "elapsedMs": 9077,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "39.jpeg",
+          "elapsedMs": 8902,
+          "bottles": 0,
+          "boxes": []
+        },
+        {
+          "file": "40.jpeg",
+          "elapsedMs": 9581,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 92.76685643196106,
+              "y": 192.6119863986969,
+              "w": 92.53752636909485,
+              "h": 248.5407453775406,
+              "score": 0.793819010257721,
+              "rawClass": "bottle"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "datasetRevision": "215a51b764e8b50faf0c450daf82e7f2551de56d",
+  "note": "Image detection coverage only; no ground-truth boxes or negatives, so this is not precision, recall or mAP. Headless desktop timings are not mobile camera timings."
+}

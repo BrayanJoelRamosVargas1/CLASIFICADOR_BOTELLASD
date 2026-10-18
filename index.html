@@ -87,7 +87,7 @@
           Visión Artificial para <span>Clasificación de Envases</span>
         </h2>
         <p class="hero-desc">
-          Inferencia en tiempo real sobre el navegador mediante <strong>MobileNet v2</strong> y una <strong>Red Neuronal Convolucional (CNN Keras)</strong>. Identifica botellas PET, vidrio y latas con tracking anti-duplicados y cuantificación de impacto ecológico a 60 FPS con WebGL.
+          Detecta botellas desde tu cámara o una fotografía, con seguimiento para evitar conteos repetidos. El material y el impacto ecológico se muestran como estimaciones.
         </p>
 
         <div class="hero-badges-academic">
@@ -101,7 +101,7 @@
           </div>
           <div class="academic-chip">
             <i class="bx bx-check-shield" style="color:var(--accent-cyan);"></i>
-            <span>Precisión CNN: <strong>92.4%</strong></span>
+            <span>Detección: <strong>Botellas</strong></span>
           </div>
         </div>
       </div>
@@ -172,7 +172,7 @@
             <span>Visor Bio-Óptico</span>
           </div>
           <div id="hardwareBadge" class="hardware-pill">
-            <span class="dot"></span> WebGL GPU Activo
+            <span class="dot"></span> Cargando IA
           </div>
         </div>
 
@@ -215,7 +215,7 @@
           <!-- HUD Chips en Pantalla -->
           <div id="hudCameraChip" class="hud-chip-top" style="display:none;">
             <span class="dot" style="background:#10b981; width:6px; height:6px; border-radius:50%;"></span>
-            <span>EN VIVO 60 FPS</span>
+            <span>CÁMARA EN VIVO</span>
           </div>
 
           <div class="hud-bottom-bar">
@@ -284,9 +284,9 @@
 
         <!-- Tarjeta Académica Exclusiva: Red Convolucional Propia (CNN Keras) -->
         <div class="diag-card academic-card">
-          <h4><i class="bx bx-brain"></i> Red Neuronal Propia (CNN)</h4>
+          <h4><i class="bx bx-brain"></i> Detector y Cuaderno de Aprendizaje</h4>
           <p>
-            Adaptada de la arquitectura de la guía de perros y gatos del <strong>Ing. Jesús Bautista</strong> (capas <code>Conv2D</code>, <code>MaxPooling</code> y <code>Dropout</code>) reentrenada con dataset de botellas (92.4% exactitud) y convertida a fragmentos TensorFlow.js.
+            El detector activo utiliza YOLOv10 Nano preentrenado. El cuaderno del <strong>Ing. Jesús Bautista</strong> conserva el ejercicio de clasificación con una CNN como material académico independiente.
           </p>
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <a href="cuaderno/index.html" class="btn-academic-action">
@@ -301,7 +301,7 @@
           <div style="display:flex; align-items:flex-start; gap:0.75rem;">
             <i class="bx bx-shield-quarter" style="color:var(--accent-cyan); font-size:1.5rem; margin-top:0.2rem;"></i>
             <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;">
-              El procesamiento de video e imágenes se ejecuta <strong>100% en la GPU local de tu dispositivo</strong> mediante WebGL. Ningún frame se transfiere a servidores externos.
+              El análisis de video e imágenes se ejecuta <strong>en tu dispositivo</strong>. Las imágenes de la cámara no se envían a servidores para su detección.
             </p>
           </div>
         </div>
@@ -376,15 +376,16 @@
         </a>
       </p>
       <p style="font-size:0.75rem; color:var(--text-light); margin-top:0.25rem;">
-        Desarrollado con TensorFlow.js, MobileNet v2, Keras y WebGL. Todos los derechos reservados © 2026.
+        Detector con YOLOv10 Nano, ONNX Runtime y WebAssembly. Todos los derechos reservados © 2026.
       </p>
     </div>
   </footer>
 
-  <!-- Scripts: TensorFlow.js y Motor EcoLens Multi-Objeto -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <script src="js/ecolens.js?v=12.0"></script>
+  <!-- Detector local de botellas y ONNX Runtime Web -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+  <script src="js/yolo-detector.js?v=13.0"></script>
+  <script src="js/bottle-detection.js?v=13.0"></script>
+  <script src="js/ecolens.js?v=13.0"></script>
 
 </body>
 </html>
