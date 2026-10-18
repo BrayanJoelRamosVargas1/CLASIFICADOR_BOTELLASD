@@ -29,7 +29,7 @@
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
     TARGET_INFERENCE_INTERVAL_MS: 100,
-    MIN_INFERENCE_PAUSE_MS: 16,
+    MIN_INFERENCE_PAUSE_MS: 40,
     CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado automáticamente al confirmar en frame 2
     TRACK_LOST_MS: 1000,      // Tolerar pérdidas breves sin volver a contar la misma botella
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
@@ -203,6 +203,20 @@
     return union <= 0 ? 0 : inter / union;
   }
 
+  function computeMatchScore(a, b) {
+    const iou = computeIoU(a, b);
+    if (iou > 0.25) return iou;
+    const acx = a.x + a.w * 0.5, acy = a.y + a.h * 0.5;
+    const bcx = b.x + b.w * 0.5, bcy = b.y + b.h * 0.5;
+    const dist = Math.hypot(acx - bcx, acy - bcy);
+    const refSize = Math.max(a.w, a.h, b.w, b.h, 1);
+    const sizeRatio = Math.min(a.w * a.h, b.w * b.h) / Math.max(a.w * a.h, b.w * b.h, 1);
+    if (dist < refSize * 0.70 && sizeRatio > 0.45) {
+      return Math.max(iou, 0.80 * (1 - dist / (refSize * 0.70)));
+    }
+    return iou;
+  }
+
   // Heurística visual de material: es una estimación por color, no un modelo entrenado.
   function inspectMaterial(bx, by, bw, bh, rawClass) {
     if (rawClass === 'wine glass') {
@@ -353,9 +367,9 @@
         for (const t of trackers) {
           if (matchedTrackerIds.has(t.id)) continue;
 
-          const iou = computeIoU(t, box);
-          if (iou > bestIoU) {
-            bestIoU = iou;
+          const score = computeMatchScore(t, box);
+          if (score > bestIoU) {
+            bestIoU = score;
             bestMatch = t;
           }
         }
@@ -441,6 +455,8 @@
       } else {
         dom.statusText.textContent = 'Buscando botellas...';
       }
+
+      if (isLoopActive) renderCanvasHUD();
 
     } catch (err) {
       console.warn('EcoLens: Advertencia en ciclo de inferencia:', err);
@@ -685,13 +701,7 @@
       dom.btnStartCamera.classList.add('btn-danger');
 
       updateTorchUI();
-
-      const animLoop = () => {
-        if (!isLoopActive) return;
-        renderCanvasHUD();
-        animFrameId = requestAnimationFrame(animLoop);
-      };
-      animFrameId = requestAnimationFrame(animLoop);
+      renderCanvasHUD();
 
       runInferenceLoop();
       dom.statusText.textContent = '● Cámara activa. Apunta hacia tus botellas.';

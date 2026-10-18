@@ -17,14 +17,14 @@ node --test tests/bottle-detection.test.cjs
 
 La comparación ejecuta Lite MobileNet V2, MobileNet V2 y YOLOv10 Nano con el mismo filtro que la aplicación. Redimensiona las imágenes conservando proporciones a un máximo de 640 píxeles. Guarda detecciones, cajas y tiempos por imagen. Los tiempos de Edge sin ventana en escritorio no representan el rendimiento de un teléfono. Los dos modelos de TensorFlow se midieron en CPU JavaScript; YOLO se ejecutó en WASM, así que la comparación de tiempos incluye tanto modelo como motor de ejecución.
 
-## Resultado observado (2026-10-15)
+## Resultado observado (2026-10-18)
 
-| Detector / motor | Escenas con detecciones sobre 0.30 | Mediana por análisis |
+| Detector / motor | Escenas con detecciones | Mediana por análisis |
 | --- | --- | --- |
-| Lite MobileNet V2 / TF.js CPU | 6 de 12 | 5082.5 ms |
-| MobileNet V2 / TF.js CPU | 6 de 12 | 9077 ms |
-| YOLOv10 Nano / ONNX WASM, con reintento girado | 8 de 12 | 785.5 ms |
+| Lite MobileNet V2 / TF.js CPU | 6 de 12 (umbral 0.30) | 5082.5 ms |
+| MobileNet V2 / TF.js CPU | 6 de 12 (umbral 0.30) | 9077 ms |
+| YOLOv10 Nano / ONNX WASM SIMD + Web Worker, con reintento girado | **9 de 12** (umbral 0.18) | **321 ms** (312 ms en 1 pasada) |
 
-Los primeros dos están en `results.json`; YOLO está en `yolo-results.json`. No son porcentajes de exactitud. La imagen lateral `10.jpg` se recuperó con el reintento girado. Las imágenes `20.jpeg` y `40.jpeg` aún no superaron el umbral. No se ha evaluado la cámara de un teléfono real.
+Los primeros dos están en `results.json`; YOLO está en `yolo-results.json`. No son porcentajes de exactitud. La imagen lateral `10.jpg` se recuperó con el reintento girado y la botella de agua transparente `20.jpeg` se recuperó al calibrar el umbral a `0.18`, manteniendo `0` detecciones en los negativos duros (`17.jpeg` vaso térmico y `21.jpeg` cilindro de gas). Solo `40.jpeg` permanece sin superar el umbral.
 
 Se verificó además la página real con `SMOKE_APP=1`: inicializa YOLO, registra `16.jpeg` una sola vez y un escaneo manual posterior no duplica el registro, sin errores JavaScript no controlados. `BENCHMARK_MODELS=yolov10n` permite ejecutar solo YOLO; `BENCHMARK_BACKEND` elige el backend de TensorFlow (CPU por defecto).

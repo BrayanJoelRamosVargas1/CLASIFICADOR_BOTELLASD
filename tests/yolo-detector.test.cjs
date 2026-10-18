@@ -46,3 +46,17 @@ test('releases input tensor when inference throws', async () => {
   await assert.rejects(h.detector.detect({ width: 640, height: 480 }), /failed inference/);
   assert.equal(h.disposed(), 1);
 });
+
+test('throttles rotated pass on live video frames to avoid doubling latency on every empty frame', async () => {
+  const h = setup([[], [], [], [], [], [], [[10, 20, 110, 220, 0.9, 39]]]);
+  const videoSource = { videoWidth: 640, videoHeight: 480 };
+  for (let i = 1; i <= 5; i++) {
+    const res = await h.detector.detect(videoSource);
+    assert.equal(res.length, 0);
+    assert.equal(h.calls(), i);
+  }
+  const sixth = await h.detector.detect(videoSource);
+  assert.equal(sixth.length, 1);
+  assert.equal(h.calls(), 7);
+});
+

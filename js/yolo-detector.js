@@ -4,10 +4,14 @@
   class YoloBottleDetector {
     static async load(modelUrl = './models/yolov10n/model.onnx') {
       ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
-      // Single-thread WASM + SIMD works on GitHub Pages without cross-origin isolation.
+      // Single-thread WASM + SIMD + Web Worker proxy prevents blocking the browser UI thread.
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.simd = true;
-      const session = await ort.InferenceSession.create(modelUrl, {
+      ort.env.wasm.proxy = typeof Worker !== 'undefined';
+      const resolvedUrl = typeof location !== 'undefined' && location.href
+        ? new URL(modelUrl, location.href).href
+        : modelUrl;
+      const session = await ort.InferenceSession.create(resolvedUrl, {
         executionProviders: ['wasm'],
         graphOptimizationLevel: 'all'
       });
@@ -19,14 +23,17 @@
       this.canvas.width = this.canvas.height = 640;
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
       this.pixels = new Float32Array(3 * 640 * 640);
+      this.videoFrameCount = 0;
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
-      if (direct.some(p => p.score >= window.BottleDetection.config.threshold)) return direct;
+      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.18;
+      if (direct.some(p => p.score >= threshold)) return direct;
       const width = source.videoWidth || source.naturalWidth || source.width;
       const height = source.videoHeight || source.naturalHeight || source.height;
       if (!width || !height) return direct;
-      // Retry sideways bottles only after a failed direct pass, preserving the fast success path.
+      // On live video streams, only run the rotated second pass every 6th empty frame to keep FPS high.
+      if (source.videoWidth && (++this.videoFrameCount % 6 !== 0)) return direct;
       if (!this.rotated) this.rotated = document.createElement('canvas');
       this.rotated.width = height;
       this.rotated.height = width;
@@ -54,6 +61,9 @@
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;
       const plane = 640 * 640;
+      if (!this.pixels || this.pixels.length !== 3 * plane) {
+        this.pixels = new Float32Array(3 * plane);
+      }
       const pixels = this.pixels;
       const inv255 = 1 / 255;
       for (let i = 0; i < plane; i++) {

@@ -4,7 +4,7 @@
   "config": {
     "modelBase": "yolov10n",
     "minScore": 0.1,
-    "threshold": 0.3,
+    "threshold": 0.18,
     "maxBoxes": 30,
     "nmsIoU": 0.45
   },
@@ -12,11 +12,11 @@
     {
       "base": "yolov10n",
       "backend": "wasm",
-      "imagesWithDetections": 8,
+      "imagesWithDetections": 9,
       "rows": [
         {
           "file": "1.PNG",
-          "elapsedMs": 855,
+          "elapsedMs": 455,
           "bottles": 1,
           "boxes": [
             {
@@ -43,7 +43,7 @@
         },
         {
           "file": "6.jpeg",
-          "elapsedMs": 716,
+          "elapsedMs": 325,
           "bottles": 1,
           "boxes": [
             {
@@ -70,7 +70,7 @@
         },
         {
           "file": "10.jpg",
-          "elapsedMs": 1380,
+          "elapsedMs": 644,
           "bottles": 1,
           "boxes": [
             {
@@ -97,7 +97,7 @@
         },
         {
           "file": "15.jpeg",
-          "elapsedMs": 648,
+          "elapsedMs": 306,
           "bottles": 1,
           "boxes": [
             {
@@ -124,7 +124,7 @@
         },
         {
           "file": "16.jpeg",
-          "elapsedMs": 664,
+          "elapsedMs": 312,
           "bottles": 1,
           "boxes": [
             {
@@ -151,14 +151,14 @@
         },
         {
           "file": "17.jpeg",
-          "elapsedMs": 1262,
+          "elapsedMs": 601,
           "bottles": 0,
           "boxes": [],
           "rawBottles": []
         },
         {
           "file": "18.jpeg",
-          "elapsedMs": 666,
+          "elapsedMs": 310,
           "bottles": 1,
           "boxes": [
             {
@@ -185,7 +185,7 @@
         },
         {
           "file": "19.jpeg",
-          "elapsedMs": 647,
+          "elapsedMs": 317,
           "bottles": 1,
           "boxes": [
             {
@@ -212,9 +212,18 @@
         },
         {
           "file": "20.jpeg",
-          "elapsedMs": 1324,
-          "bottles": 0,
-          "boxes": [],
+          "elapsedMs": 314,
+          "bottles": 1,
+          "boxes": [
+            {
+              "x": 157.5050811767578,
+              "y": 91.81004333496094,
+              "w": 140.9175262451172,
+              "h": 416.21339416503906,
+              "score": 0.1878407597541809,
+              "rawClass": "bottle"
+            }
+          ],
           "rawBottles": [
             {
               "class": "bottle",
@@ -230,7 +239,7 @@
         },
         {
           "file": "21.jpeg",
-          "elapsedMs": 1298,
+          "elapsedMs": 686,
           "bottles": 0,
           "boxes": [],
           "rawBottles": [
@@ -248,7 +257,7 @@
         },
         {
           "file": "39.jpeg",
-          "elapsedMs": 656,
+          "elapsedMs": 294,
           "bottles": 1,
           "boxes": [
             {
@@ -275,7 +284,7 @@
         },
         {
           "file": "40.jpeg",
-          "elapsedMs": 1272,
+          "elapsedMs": 651,
           "bottles": 0,
           "boxes": [],
           "rawBottles": []
