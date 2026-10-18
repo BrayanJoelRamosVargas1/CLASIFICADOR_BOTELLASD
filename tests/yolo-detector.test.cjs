@@ -34,12 +34,12 @@ test('decodes bottle boxes and releases ONNX input and output tensors', async ()
   assert.equal(h.calls(), 1);
   assert.equal(h.disposed(), 2);
 });
-test('failed direct pass retries rotation and maps boxes to original coordinates', async () => {
-  const h = setup([[], [[10, 20, 110, 220, 0.9, 39]]]);
+test('failed direct pass retries 90 and 180 rotation and maps boxes to original coordinates', async () => {
+  const h = setup([[], [[10, 20, 110, 220, 0.9, 39]], []]);
   const predictions = await h.detector.detect({ width: 640, height: 480 });
   assert.deepEqual(Array.from(predictions[0].bbox), [20, 370, 200, 100]);
-  assert.equal(h.calls(), 2);
-  assert.equal(h.disposed(), 4);
+  assert.equal(h.calls(), 3);
+  assert.equal(h.disposed(), 6);
 });
 test('releases input tensor when inference throws', async () => {
   const h = setup([new Error('failed inference')]);
@@ -47,28 +47,40 @@ test('releases input tensor when inference throws', async () => {
   assert.equal(h.disposed(), 1);
 });
 
-test('throttles rotated pass on live video frames to avoid doubling latency on every empty frame', async () => {
-  const h = setup([[], [], [], [], [], [], [[10, 20, 110, 220, 0.9, 39]]]);
+test('throttles auxiliary pass on live video frames to every 2nd empty frame and locks onto active mode', async () => {
+  const h = setup([[], [], [[10, 20, 110, 220, 0.9, 39]]]);
   const videoSource = { videoWidth: 640, videoHeight: 480 };
-  for (let i = 1; i <= 5; i++) {
-    const res = await h.detector.detect(videoSource);
-    assert.equal(res.length, 0);
-    assert.equal(h.calls(), i);
-  }
-  const sixth = await h.detector.detect(videoSource);
-  assert.equal(sixth.length, 1);
-  assert.equal(h.calls(), 7);
+  const first = await h.detector.detect(videoSource);
+  assert.equal(first.length, 0);
+  assert.equal(h.calls(), 1);
+  const second = await h.detector.detect(videoSource);
+  assert.equal(second.length, 1);
+  assert.equal(h.calls(), 3);
 });
 
 test('suppresses false-positive bottle when another COCO class has higher score on the same bounding box', async () => {
   // Same box [10, 20, 110, 220] has cup (class 41, score 0.72) and bottle (class 39, score 0.28)
   const h = setup([
     [[10, 20, 110, 220, 0.72, 41], [10, 20, 110, 220, 0.28, 39], [300, 100, 420, 480, 0.85, 39]],
+    [],
     []
   ]);
   const predictions = await h.detector.detect({ width: 640, height: 480 });
   assert.equal(predictions.length, 1);
   assert.equal(Math.round(predictions[0].score * 100), 85);
 });
+
+test('keeps bottle held in front of a person on webcam even when inside the person bounding box', async () => {
+  // Person (class 0, score 0.92) covers [0, 0, 640, 480]; bottle (class 39, score 0.32) is held at [250, 140, 340, 360]
+  const h = setup([
+    [[0, 0, 640, 480, 0.92, 0], [250, 140, 340, 360, 0.32, 39]],
+    [],
+    []
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 1);
+  assert.equal(Math.round(predictions[0].score * 100), 32);
+});
+
 
 

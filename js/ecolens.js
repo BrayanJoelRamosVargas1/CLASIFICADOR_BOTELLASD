@@ -8,10 +8,13 @@
 (() => {
   'use strict';
 
-  // 0. Purga Preventiva de Caché y Service Workers
+  // 0. Purga Preventiva de Caché y Service Workers Antiguos (preservando coi-serviceworker)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(r => r.unregister());
+      regs.forEach(r => {
+        const url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || '';
+        if (url && !url.includes('coi-serviceworker')) r.unregister();
+      });
     }).catch(() => {});
   }
   if ('caches' in window) {
@@ -28,10 +31,10 @@
     DAILY_STORAGE_KEY: 'ecolens_daily_sheets_v1',
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
-    TARGET_INFERENCE_INTERVAL_MS: 100,
-    MIN_INFERENCE_PAUSE_MS: 40,
-    CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado automáticamente al confirmar en frame 2
-    TRACK_LOST_MS: 1000,      // Tolerar pérdidas breves sin volver a contar la misma botella
+    TARGET_INFERENCE_INTERVAL_MS: 60,
+    MIN_INFERENCE_PAUSE_MS: 20,
+    CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado de inmediato si >= 26%
+    TRACK_LOST_MS: 2200,       // Tolerar pérdidas breves o giros de mano sin duplicar la misma botella
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
@@ -184,11 +187,12 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=18.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=19.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
-        dom.hardwareBadge.innerHTML = '<span class="dot"></span> YOLO · WASM';
+        const threads = (window.ort && window.ort.env && window.ort.env.wasm && window.ort.env.wasm.numThreads) || 1;
+        dom.hardwareBadge.innerHTML = `<span class="dot"></span> YOLO · WASM ${threads > 1 ? threads + 'T' : 'SIMD'}`;
         if (dom.btnManualScan) dom.btnManualScan.disabled = false;
         return detector;
       } catch (error) {
@@ -235,7 +239,7 @@
     return iou;
   }
 
-  // Heurística visual de material: es una estimación por color, no un modelo entrenado.
+  // Heurística visual de material sobre el núcleo central del envase (evitando el fondo de las esquinas).
   function inspectMaterial(bx, by, bw, bh, rawClass) {
     if (rawClass === 'wine glass') {
       return {
@@ -261,10 +265,15 @@
       const srcW = activeSource.videoWidth || activeSource.naturalWidth || 640;
       const srcH = activeSource.videoHeight || activeSource.naturalHeight || 480;
 
-      const sx = Math.max(0, Math.min(srcW - 2, Math.floor(bx)));
-      const sy = Math.max(0, Math.min(srcH - 2, Math.floor(by)));
-      const sw = Math.max(4, Math.min(srcW - sx, Math.floor(bw)));
-      const sh = Math.max(4, Math.min(srcH - sy, Math.floor(bh)));
+      const coreX = bx + bw * 0.22;
+      const coreY = by + bh * 0.18;
+      const coreW = bw * 0.56;
+      const coreH = bh * 0.64;
+
+      const sx = Math.max(0, Math.min(srcW - 2, Math.floor(coreX)));
+      const sy = Math.max(0, Math.min(srcH - 2, Math.floor(coreY)));
+      const sw = Math.max(4, Math.min(srcW - sx, Math.floor(coreW)));
+      const sh = Math.max(4, Math.min(srcH - sy, Math.floor(coreH)));
 
       sampleCtx.drawImage(activeSource, sx, sy, sw, sh, 0, 0, 16, 16);
       const imgData = sampleCtx.getImageData(0, 0, 16, 16);
@@ -347,9 +356,18 @@
     }
   }
 
+  let activeInferencePromise = null;
+
   // 6. Procesamiento asíncrono de botellas
-  async function processVisualFrame() {
-    if (!detector || !activeSource || isDetecting) return;
+  async function processVisualFrame(forceWait = false) {
+    if (!detector || !activeSource) return;
+    if (isDetecting) {
+      if (!forceWait || !activeInferencePromise) return;
+      try {
+        await activeInferencePromise;
+      } catch (e) {}
+      if (!detector || !activeSource) return;
+    }
 
     const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
     const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
@@ -361,130 +379,135 @@
     isDetecting = true;
     const generation = sourceGeneration;
 
-    try {
-      // 1. Inferencia Directa sobre activeSource (Sin buffer rígido que cause deformación)
-      const rawPredictions = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, CONFIG.MIN_INFERENCE_SCORE);
+    activeInferencePromise = (async () => {
+      try {
+        // 1. Inferencia Directa sobre activeSource (Sin buffer rígido que cause deformación)
+        const rawPredictions = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, CONFIG.MIN_INFERENCE_SCORE);
 
-      // Descartar resultados de una cámara o fotografía que ya fue cerrada.
-      if (generation !== sourceGeneration) return;
+        // Descartar resultados de una cámara o fotografía que ya fue cerrada.
+        if (generation !== sourceGeneration) return;
 
-      // Compartir exactamente el mismo filtrado con la evaluación de fotografías.
-      const filtered = window.BottleDetection.select(rawPredictions, srcW, srcH, activeThreshold);
+        // Compartir exactamente el mismo filtrado con la evaluación de fotografías.
+        const filtered = window.BottleDetection.select(rawPredictions, srcW, srcH, activeThreshold);
 
-      // 4. Tracking Espacial 1-a-1 Rápido (Permite cambio inmediato de botella)
-      const matchedTrackerIds = new Set();
-      const newlyRegistered = [];
-      const now = Date.now();
-      // Una inferencia lenta no equivale a perder el objeto: exigir una ausencia observada.
-      trackers = trackers.filter(t => t.missed === 0 || now - t.lastSeen < CONFIG.TRACK_LOST_MS);
+        // 4. Tracking Espacial 1-a-1 Rápido (Permite cambio inmediato de botella)
+        const matchedTrackerIds = new Set();
+        const newlyRegistered = [];
+        const now = Date.now();
+        // Una inferencia lenta no equivale a perder el objeto: exigir una ausencia observada.
+        trackers = trackers.filter(t => t.missed === 0 || now - t.lastSeen < CONFIG.TRACK_LOST_MS);
 
-      for (const box of filtered) {
-        let bestMatch = null;
-        let bestIoU = 0.25; // Requiere coincidencia espacial real
+        for (const box of filtered) {
+          let bestMatch = null;
+          let bestIoU = 0.25; // Requiere coincidencia espacial real
 
+          for (const t of trackers) {
+            if (matchedTrackerIds.has(t.id)) continue;
+
+            const score = computeMatchScore(t, box, filtered.length);
+            if (score > bestIoU) {
+              bestIoU = score;
+              bestMatch = t;
+            }
+          }
+
+          if (bestMatch) {
+            bestMatch.x = bestMatch.x * 0.30 + box.x * 0.70;
+            bestMatch.y = bestMatch.y * 0.30 + box.y * 0.70;
+            bestMatch.w = bestMatch.w * 0.30 + box.w * 0.70;
+            bestMatch.h = bestMatch.h * 0.30 + box.h * 0.70;
+            bestMatch.score = Math.max(bestMatch.score, box.score);
+            bestMatch.lastSeen = now;
+            bestMatch.missed = 0;
+            bestMatch.hits++;
+            matchedTrackerIds.add(bestMatch.id);
+
+            // Confirmación y Auto-Registro en Frame 2 (o inmediato si supera 0.26)
+            if ((bestMatch.hits >= CONFIG.CONFIRMATION_HITS || bestMatch.score >= 0.26) && !bestMatch.registered) {
+              bestMatch.registered = true;
+              newlyRegistered.push(bestMatch);
+            }
+          } else {
+            // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
+            const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
+            const instantConfirm = isLoopActive && box.score >= 0.26;
+            const newTracker = {
+              id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+              x: box.x,
+              y: box.y,
+              w: box.w,
+              h: box.h,
+              score: box.score,
+              rawClass: box.rawClass,
+              meta: meta,
+              label: meta.label,
+              hits: instantConfirm ? CONFIG.CONFIRMATION_HITS : 1,
+              lastSeen: now,
+              missed: 0,
+              registered: instantConfirm
+            };
+            trackers.push(newTracker);
+            matchedTrackerIds.add(newTracker.id);
+            if (instantConfirm) {
+              newlyRegistered.push(newTracker);
+            }
+          }
+        }
+
+        // Incrementar missed a trackers no detectados en este frame
         for (const t of trackers) {
-          if (matchedTrackerIds.has(t.id)) continue;
-
-          const score = computeMatchScore(t, box, filtered.length);
-          if (score > bestIoU) {
-            bestIoU = score;
-            bestMatch = t;
+          if (!matchedTrackerIds.has(t.id)) {
+            t.missed++;
+            if (!t.registered && t.missed >= 2) t.hits = 0;
           }
         }
 
-        if (bestMatch) {
-          bestMatch.x = bestMatch.x * 0.30 + box.x * 0.70;
-          bestMatch.y = bestMatch.y * 0.30 + box.y * 0.70;
-          bestMatch.w = bestMatch.w * 0.30 + box.w * 0.70;
-          bestMatch.h = bestMatch.h * 0.30 + box.h * 0.70;
-          bestMatch.score = Math.max(bestMatch.score, box.score);
-          bestMatch.lastSeen = now;
-          bestMatch.missed = 0;
-          bestMatch.hits++;
-          matchedTrackerIds.add(bestMatch.id);
+        // Mantener identidad durante pérdidas breves; dibujar solo detecciones actuales.
+        visibleBoxes = trackers.filter(t => t.missed === 0);
 
-          // Confirmación y Auto-Registro en Frame 2 (o inmediato si supera 0.40)
-          if ((bestMatch.hits >= CONFIG.CONFIRMATION_HITS || bestMatch.score >= 0.40) && !bestMatch.registered) {
-            bestMatch.registered = true;
-            newlyRegistered.push(bestMatch);
+        dom.hudInView.textContent = visibleBoxes.length;
+        if (
+          (visibleBoxes.length > 0 || (isLoopActive && takeCount > 0)) &&
+          dom.dailyCurrentInput &&
+          dom.dailyCurrentInput.value !== undefined &&
+          document.activeElement !== dom.dailyCurrentInput
+        ) {
+          dom.dailyCurrentInput.value = String(visibleBoxes.length);
+          updateDailyPreview();
+        }
+
+        // Actualizar estado de la Retícula
+        const hasActive = visibleBoxes.length > 0;
+        if (dom.targetReticle) {
+          dom.targetReticle.classList.toggle('reticle-locked', hasActive);
+          if (dom.reticleGuideText) {
+            dom.reticleGuideText.textContent = hasActive
+              ? `✓ ${visibleBoxes.length} Botella(s) en Vista`
+              : 'Encuadra tus botellas aquí';
           }
+        }
+
+        // Notificar registro de botellas confirmadas
+        if (newlyRegistered.length > 0) {
+          onNewBottlesRegistered(newlyRegistered);
+        } else if (visibleBoxes.length > 0) {
+          const labelsList = visibleBoxes.map(b => b.label.split(' ')[0] + ' ' + b.label.split(' ')[1]).join(', ');
+          dom.statusText.textContent = `● ${visibleBoxes.length} botella(s): ${labelsList} (${Math.round(visibleBoxes[0].score * 100)}%)`;
         } else {
-          // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
-          const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
-          const instantConfirm = isLoopActive && box.score >= 0.40;
-          const newTracker = {
-            id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
-            x: box.x,
-            y: box.y,
-            w: box.w,
-            h: box.h,
-            score: box.score,
-            rawClass: box.rawClass,
-            meta: meta,
-            label: meta.label,
-            hits: instantConfirm ? CONFIG.CONFIRMATION_HITS : 1,
-            lastSeen: now,
-            missed: 0,
-            registered: instantConfirm
-          };
-          trackers.push(newTracker);
-          matchedTrackerIds.add(newTracker.id);
-          if (instantConfirm) {
-            newlyRegistered.push(newTracker);
-          }
+          dom.statusText.textContent = 'Buscando botellas...';
         }
+
+        if (isLoopActive) renderCanvasHUD();
+
+      } catch (err) {
+        console.warn('EcoLens: Advertencia en ciclo de inferencia:', err);
+      } finally {
+        isDetecting = false;
+        activeInferencePromise = null;
       }
+    })();
 
-      // Incrementar missed a trackers no detectados en este frame
-      for (const t of trackers) {
-        if (!matchedTrackerIds.has(t.id)) {
-          t.missed++;
-          if (!t.registered && t.missed >= 2) t.hits = 0;
-        }
-      }
-
-      // Mantener identidad durante pérdidas breves; dibujar solo detecciones actuales.
-      visibleBoxes = trackers.filter(t => t.missed === 0);
-
-      dom.hudInView.textContent = visibleBoxes.length;
-      if (
-        (visibleBoxes.length > 0 || (isLoopActive && takeCount > 0)) &&
-        dom.dailyCurrentInput &&
-        dom.dailyCurrentInput.value !== undefined &&
-        document.activeElement !== dom.dailyCurrentInput
-      ) {
-        dom.dailyCurrentInput.value = String(visibleBoxes.length);
-        updateDailyPreview();
-      }
-
-      // Actualizar estado de la Retícula
-      const hasActive = visibleBoxes.length > 0;
-      if (dom.targetReticle) {
-        dom.targetReticle.classList.toggle('reticle-locked', hasActive);
-        if (dom.reticleGuideText) {
-          dom.reticleGuideText.textContent = hasActive
-            ? `✓ ${visibleBoxes.length} Botella(s) en Vista`
-            : 'Encuadra tus botellas aquí';
-        }
-      }
-
-      // Notificar registro de botellas confirmadas
-      if (newlyRegistered.length > 0) {
-        onNewBottlesRegistered(newlyRegistered);
-      } else if (visibleBoxes.length > 0) {
-        const labelsList = visibleBoxes.map(b => b.label.split(' ')[0] + ' ' + b.label.split(' ')[1]).join(', ');
-        dom.statusText.textContent = `● ${visibleBoxes.length} botella(s): ${labelsList} (${Math.round(visibleBoxes[0].score * 100)}%)`;
-      } else {
-        dom.statusText.textContent = 'Buscando botellas...';
-      }
-
-      if (isLoopActive) renderCanvasHUD();
-
-    } catch (err) {
-      console.warn('EcoLens: Advertencia en ciclo de inferencia:', err);
-    } finally {
-      isDetecting = false;
-    }
+    return activeInferencePromise;
   }
 
   // 7. Registro de Nuevas Botellas e Inventario
@@ -788,11 +811,15 @@
   function handlePhotoUpload(file) {
     if (!file) return;
     stopActiveSource();
+    const myGeneration = sourceGeneration;
+    dom.statusText.textContent = '⏳ Analizando fotografía con IA...';
 
     const reader = new FileReader();
     reader.onload = (e) => {
+      if (myGeneration !== sourceGeneration) return;
       const img = new Image();
       img.onload = async () => {
+        if (myGeneration !== sourceGeneration) return;
         activeSource = img;
         dom.preview.src = e.target.result;
         dom.idleState.style.display = 'none';
@@ -804,12 +831,15 @@
 
         trackers = [];
         takeCount = 0;
-        dom.statusText.textContent = 'Analizando fotografía con IA...';
+        dom.statusText.textContent = '⏳ Analizando fotografía con IA...';
 
         if (!detector) {
           await initNeuralEngines();
+          if (myGeneration !== sourceGeneration) return;
         }
-        await processVisualFrame();
+        await processVisualFrame(true);
+        if (myGeneration !== sourceGeneration || activeSource !== img) return;
+
         if (dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
           dom.dailyCurrentInput.value = String(visibleBoxes.length);
           updateDailyPreview();
@@ -824,8 +854,14 @@
         }
         renderCanvasHUD();
 
-        if (visibleBoxes.length === 0) {
+        if (visibleBoxes.length > 0) {
+          dom.statusText.textContent = `✓ ¡${visibleBoxes.length} botella(s) detectada(s) en la fotografía! (${Math.round(visibleBoxes[0].score * 100)}%)`;
+        } else {
           dom.statusText.textContent = 'No se distinguieron botellas en la imagen (Quedan: 0).';
+          if (dom.resultLabel) dom.resultLabel.textContent = 'Sin botellas en la imagen';
+          if (dom.resultSub) dom.resultSub.textContent = 'Objeto descartado o sin envases válidos en escena';
+          if (dom.meterPct) dom.meterPct.textContent = '0%';
+          if (dom.meterFill) dom.meterFill.style.width = '0%';
         }
       };
       img.src = e.target.result;
@@ -857,7 +893,7 @@
 
     // Escanear con el mismo umbral y bloqueo que el modo automático.
     try {
-      await processVisualFrame();
+      await processVisualFrame(true);
 
       const newlyFound = visibleBoxes.filter(b => !b.registered && b.missed === 0);
       if (newlyFound.length > 0) {

@@ -9,10 +9,11 @@
       ort.env.wasm.wasmPaths = scriptDir
         ? new URL('./ort/', scriptDir).href
         : './js/ort/';
-      // Single-thread WASM + SIMD + Web Worker proxy prevents blocking the browser UI thread.
-      ort.env.wasm.numThreads = 1;
+      const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated;
+      const hwThreads = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
+      ort.env.wasm.numThreads = isolated ? Math.min(4, Math.max(2, hwThreads)) : 1;
       ort.env.wasm.simd = true;
-      ort.env.wasm.proxy = typeof Worker !== 'undefined';
+      ort.env.wasm.proxy = !isolated && typeof Worker !== 'undefined';
       const resolvedUrl = (typeof location !== 'undefined' && location.href)
         ? new URL(modelUrl, location.href).href
         : modelUrl;
@@ -20,7 +21,15 @@
         executionProviders: ['wasm'],
         graphOptimizationLevel: 'all'
       });
-      return new YoloBottleDetector(session);
+      const detector = new YoloBottleDetector(session);
+      // Warm-up pass (pattern from nomi30701/yolo-object-detection-onnxruntime-web) so frame 1 never stalls.
+      try {
+        const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+        const warmOut = await session.run({ [session.inputNames[0]]: warmInput });
+        warmInput.dispose();
+        for (const t of Object.values(warmOut)) t.dispose();
+      } catch (e) {}
+      return detector;
     }
     constructor(session) {
       this.session = session;
@@ -29,35 +38,89 @@
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
       this.pixels = new Float32Array(3 * 640 * 640);
       this.videoFrameCount = 0;
-      this.lastRotatedHit = false;
+      this.lastAuxMode = null;
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
       const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.21;
-      if (direct.some(p => p.score >= threshold)) {
-        this.lastRotatedHit = false;
+      const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
+      const isVideo = Boolean(source.videoWidth);
+      if (isVideo && bestDirect >= threshold) {
+        this.lastAuxMode = null;
+        return direct;
+      }
+      if (!isVideo && bestDirect >= 0.65) {
         return direct;
       }
       const width = source.videoWidth || source.naturalWidth || source.width;
       const height = source.videoHeight || source.naturalHeight || source.height;
       if (!width || !height) return direct;
-      // On live video streams, throttle the rotated pass to every 6th empty frame unless the previous frame found a horizontal bottle.
-      if (source.videoWidth && !this.lastRotatedHit && (++this.videoFrameCount % 6 !== 0)) return direct;
-      if (!this.rotated) this.rotated = document.createElement('canvas');
-      this.rotated.width = height;
-      this.rotated.height = width;
-      const ctx = this.rotated.getContext('2d');
+
+      if (isVideo) {
+        // On live camera, if locked onto an auxiliary mode, repeat it immediately; otherwise cycle every 2nd frame.
+        const modes = ['crop', 'rot90', 'rot180'];
+        let mode = this.lastAuxMode;
+        if (!mode) {
+          if (++this.videoFrameCount % 2 !== 0) return direct;
+          mode = modes[(this.videoFrameCount >> 1) % modes.length];
+        }
+        const aux = await this.runAuxPass(mode, source, width, height, maxBoxes, minScore);
+        this.lastAuxMode = aux.some(p => p.score >= threshold) ? mode : null;
+        return direct.concat(aux);
+      }
+
+      // Static image multi-orientation & SAHI crop synthesis (0° + 90° + 180° + center zoom fallback)
+      const rot90 = await this.runAuxPass('rot90', source, width, height, maxBoxes, minScore);
+      const rot180 = await this.runAuxPass('rot180', source, width, height, maxBoxes, minScore);
+      const combined = direct.concat(rot90, rot180);
+      if (combined.some(p => p.score >= threshold)) return combined;
+      const crop = await this.runAuxPass('crop', source, width, height, maxBoxes, minScore);
+      return combined.concat(crop);
+    }
+    async runAuxPass(mode, source, width, height, maxBoxes, minScore) {
+      if (!this.auxCanvas) this.auxCanvas = document.createElement('canvas');
+      const ctx = this.auxCanvas.getContext('2d');
       if (ctx.setTransform) ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.translate(height, 0);
-      ctx.rotate(Math.PI / 2);
-      ctx.drawImage(source, 0, 0, width, height);
-      const rotated = await this.detectOnce(this.rotated, maxBoxes, minScore);
-      this.lastRotatedHit = rotated.some(p => p.score >= threshold);
-      return direct.concat(rotated.map(p => ({ ...p,
-        bbox: YoloBottleDetector.unrotateBox(p.bbox, height) })));
+      if (mode === 'rot90') {
+        this.auxCanvas.width = height;
+        this.auxCanvas.height = width;
+        ctx.translate(height, 0);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(source, 0, 0, width, height);
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
+        return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox(p.bbox, height) }));
+      }
+      if (mode === 'rot180') {
+        this.auxCanvas.width = width;
+        this.auxCanvas.height = height;
+        ctx.translate(width, height);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(source, 0, 0, width, height);
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
+        return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox180(p.bbox, width, height) }));
+      }
+      if (mode === 'crop') {
+        // SAHI (Slicing Aided Hyper Inference) center-reticle zoom crop for small/distant webcam bottles
+        const cropW = Math.round(width * 0.62);
+        const cropH = Math.round(height * 0.76);
+        const cropX = Math.round((width - cropW) * 0.5);
+        const cropY = Math.round((height - cropH) * 0.5);
+        this.auxCanvas.width = cropW;
+        this.auxCanvas.height = cropH;
+        ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.24));
+        return preds.map(p => ({
+          ...p,
+          bbox: [cropX + p.bbox[0], cropY + p.bbox[1], p.bbox[2], p.bbox[3]]
+        }));
+      }
+      return [];
     }
     static unrotateBox([x, y, w, h], originalHeight) {
       return [y, originalHeight - x - w, h, w];
+    }
+    static unrotateBox180([x, y, w, h], originalWidth, originalHeight) {
+      return [originalWidth - x - w, originalHeight - y - h, w, h];
     }
     static boxIoU([ax, ay, aw, ah], [bx, by, bw, bh]) {
       const interW = Math.max(0, Math.min(ax + aw, bx + bw) - Math.max(ax, bx));
@@ -78,12 +141,16 @@
       const iou = inter / (bArea + oArea - inter);
       const containment = inter / Math.min(bArea, oArea);
       if (other.classId !== 0) {
-        if (iou >= 0.35 && other.score >= bottle.score * 0.85) return true;
+        if (other.classId === 75) {
+          return iou >= 0.45 && other.score > bottle.score * 1.15;
+        }
+        if (iou >= 0.35 && other.score >= bottle.score * 0.90) return true;
         if (containment >= 0.65 && other.score > bottle.score) return true;
         return false;
       }
-      const insidePerson = inter / bArea;
-      return insidePerson >= 0.80 && other.score > 0.55 && bottle.score < 0.42;
+      // Person (classId 0): never suppress a bottle merely because it is held in front of a person's body!
+      // Only suppress if the bottle bounding box IS the person bounding box itself (iou >= 0.55).
+      return iou >= 0.55 && other.score > 0.60 && bottle.score < 0.35;
     }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
