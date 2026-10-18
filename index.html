@@ -6,23 +6,17 @@
   <meta name="theme-color" content="#059669">
   <meta name="author" content="Brayan Joel Ramos Vargas">
   <meta name="description" content="EcoLens AI — Sistema de Visión Artificial para Clasificación de Botellas e Inventario Ecológico. Desarrollado por Brayan Joel Ramos Vargas (Docente: Ing. Jesús Bautista).">
-  
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
 
   <title>EcoLens AI — Detector Inteligente de Envases y Reciclaje | Brayan Ramos</title>
   
   <link rel="icon" type="image/svg+xml" href="assets/ecolens_logo.svg">
   <link rel="manifest" href="manifest.webmanifest">
 
-  <!-- Google Fonts: Plus Jakarta Sans & Space Grotesk -->
+  <!-- Google Fonts & Boxicons (carga asíncrona no bloqueante) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-
-  <!-- Boxicons CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" media="print" onload="this.media='all'">
 
   <!-- Script de purga de caché previo para asegurar carga limpia de la versión 9.0 -->
   <script>
@@ -473,11 +467,11 @@
     </div>
   </footer>
 
-  <!-- Detector local de botellas y ONNX Runtime Web -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
-  <script src="js/yolo-detector.js?v=17.0"></script>
-  <script src="js/bottle-detection.js?v=17.0"></script>
-  <script src="js/ecolens.js?v=17.0"></script>
+  <!-- Detector local de botellas y ONNX Runtime Web servido localmente -->
+  <script src="js/ort/ort.min.js"></script>
+  <script src="js/yolo-detector.js?v=18.0"></script>
+  <script src="js/bottle-detection.js?v=18.0"></script>
+  <script src="js/ecolens.js?v=18.0"></script>
 
 </body>
 </html>

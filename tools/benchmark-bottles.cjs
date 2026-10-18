@@ -14,7 +14,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, 'dataset/evaluation/
     fs.readFile(filename, (err, data) => {
       if (err) { res.writeHead(404).end(); return; }
       const ext = path.extname(filename).toLowerCase();
-      res.setHeader('Content-Type', ({ '.js': 'text/javascript', '.html': 'text/html', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' })[ext] || 'application/octet-stream');
+      res.setHeader('Content-Type', ({ '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' })[ext] || 'application/octet-stream');
       res.end(data);
     });
   });

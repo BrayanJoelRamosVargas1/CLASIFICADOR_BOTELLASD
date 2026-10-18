@@ -172,24 +172,36 @@
     } catch (e) {}
   }
 
-  // 3. Inicialización del modelo YOLOv10 Nano, servido desde el propio sitio.
+  let initPromise = null;
+
+  // 3. Inicialización del modelo YOLOv10, servido desde el propio sitio.
   async function initNeuralEngines() {
-    try {
-      if (!window.ort || !window.YoloBottleDetector) {
-        throw new Error('ONNX Runtime no cargó');
+    if (detector) return detector;
+    if (initPromise) return initPromise;
+    initPromise = (async () => {
+      try {
+        if (!window.ort || !window.YoloBottleDetector) {
+          throw new Error('ONNX Runtime no cargó');
+        }
+        dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=18.0');
+        dom.statusText.textContent = isLoopActive
+          ? '● Cámara activa. Apunta hacia tus botellas.'
+          : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
+        dom.hardwareBadge.innerHTML = '<span class="dot"></span> YOLO · WASM';
+        if (dom.btnManualScan) dom.btnManualScan.disabled = false;
+        return detector;
+      } catch (error) {
+        console.error('Error al inicializar IA:', error);
+        dom.statusText.textContent = 'No se pudo cargar el detector. Recarga la página y revisa tu conexión.';
+        dom.hardwareBadge.style.background = '#fef2f2';
+        dom.hardwareBadge.style.color = '#dc2626';
+        dom.hardwareBadge.textContent = 'Detector no disponible';
+        initPromise = null;
+        return null;
       }
-      dom.statusText.textContent = 'Cargando detector de botellas...';
-      detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=17.0');
-      dom.statusText.textContent = '● Detector listo. Inicia la cámara para clasificar.';
-      dom.hardwareBadge.innerHTML = '<span class="dot"></span> YOLO · WASM';
-      if (dom.btnManualScan) dom.btnManualScan.disabled = false;
-    } catch (error) {
-      console.error('Error al inicializar IA:', error);
-      dom.statusText.textContent = 'No se pudo cargar el detector. Recarga la página y revisa tu conexión.';
-      dom.hardwareBadge.style.background = '#fef2f2';
-      dom.hardwareBadge.style.color = '#dc2626';
-      dom.hardwareBadge.textContent = 'Detector no disponible';
-    }
+    })();
+    return initPromise;
   }
 
   // 4. Geometría y Clasificación Espectral de Material
@@ -712,10 +724,18 @@
 
       updateTorchUI();
       renderCanvasHUD();
+      playSound('click');
+
+      if (!detector) {
+        dom.statusText.textContent = '⏳ Cámara encendida. Terminando de cargar IA para empezar a detectar...';
+        await initNeuralEngines();
+        if (!isLoopActive) return;
+      }
 
       runInferenceLoop();
-      dom.statusText.textContent = '● Cámara activa. Apunta hacia tus botellas.';
-      playSound('click');
+      if (detector) {
+        dom.statusText.textContent = '● Cámara activa. Apunta hacia tus botellas.';
+      }
     } catch (err) {
       console.error('Error al iniciar cámara:', err);
       dom.statusText.textContent = 'No se pudo activar la cámara. Revisa los permisos en tu navegador.';
@@ -1316,12 +1336,12 @@
 
   // Inicialización Automática
   document.addEventListener('DOMContentLoaded', () => {
-    initNeuralEngines();
     setupEvents();
     updateDailyPreview();
     renderDailyTable();
     renderInventoryTable();
     updateImpactMetrics();
+    initNeuralEngines();
   });
 
 })();

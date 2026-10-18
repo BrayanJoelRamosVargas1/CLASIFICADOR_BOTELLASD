@@ -1,14 +1,19 @@
 /* YOLOv10n ONNX adapter. Original weights and preprocessing are documented in models/yolov10n. */
 (() => {
   'use strict';
+  const scriptDir = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src)
+    ? new URL('./', document.currentScript.src).href
+    : (typeof location !== 'undefined' && location.href ? new URL('./js/', location.href).href : '');
   class YoloBottleDetector {
     static async load(modelUrl = './models/yolov10n/model.onnx') {
-      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+      ort.env.wasm.wasmPaths = scriptDir
+        ? new URL('./ort/', scriptDir).href
+        : './js/ort/';
       // Single-thread WASM + SIMD + Web Worker proxy prevents blocking the browser UI thread.
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.simd = true;
       ort.env.wasm.proxy = typeof Worker !== 'undefined';
-      const resolvedUrl = typeof location !== 'undefined' && location.href
+      const resolvedUrl = (typeof location !== 'undefined' && location.href)
         ? new URL(modelUrl, location.href).href
         : modelUrl;
       const session = await ort.InferenceSession.create(resolvedUrl, {
