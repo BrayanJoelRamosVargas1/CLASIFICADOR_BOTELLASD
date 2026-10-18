@@ -411,7 +411,12 @@
       visibleBoxes = trackers.filter(t => t.missed === 0);
 
       dom.hudInView.textContent = visibleBoxes.length;
-      if (visibleBoxes.length > 0 && dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
+      if (
+        (visibleBoxes.length > 0 || (isLoopActive && takeCount > 0)) &&
+        dom.dailyCurrentInput &&
+        dom.dailyCurrentInput.value !== undefined &&
+        document.activeElement !== dom.dailyCurrentInput
+      ) {
         dom.dailyCurrentInput.value = String(visibleBoxes.length);
         updateDailyPreview();
       }

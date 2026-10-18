@@ -285,20 +285,21 @@
     @media print {
       @page {
         size: letter portrait;
-        margin: 8mm 10mm;
+        margin: 6mm 8mm;
       }
       body {
         background: #ffffff;
-        font-size: 9pt;
+        font-size: 8pt;
+        line-height: 1.22;
       }
       .no-print {
         display: none !important;
       }
       .container {
+        display: block;
         max-width: 100%;
         margin: 0;
         padding: 0;
-        gap: 0;
       }
       .print-sheet {
         border: none;
@@ -307,13 +308,67 @@
         margin: 0;
         page-break-after: always;
         break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       .print-sheet:last-child {
-        page-break-after: auto;
-        break-after: auto;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      #hoja-ejecutiva {
+        font-size: 6.8pt;
+        line-height: 1.16;
+      }
+      #hoja-ejecutiva .sheet-header {
+        padding-bottom: 0.25rem;
+        margin-bottom: 0.3rem;
+      }
+      #hoja-ejecutiva .sheet-header h1 {
+        font-size: 9.8pt;
+      }
+      #hoja-ejecutiva .sheet-header p,
+      #hoja-ejecutiva .sheet-meta {
+        font-size: 6.5pt;
+      }
+      #hoja-ejecutiva .section-tag {
+        font-size: 6.6pt;
+        padding: 0.08rem 0.35rem;
+        margin: 0.2rem 0 0.14rem;
+      }
+      #hoja-ejecutiva table {
+        font-size: 6.4pt;
+        margin-bottom: 0.22rem;
+      }
+      #hoja-ejecutiva th,
+      #hoja-ejecutiva td {
+        padding: 0.14rem 0.26rem;
+      }
+      #hoja-ejecutiva .callout {
+        padding: 0.18rem 0.3rem;
+        font-size: 6.3pt;
+      }
+      #hoja-ejecutiva .grid-3 {
+        gap: 0.35rem;
+        margin: 0.18rem 0 0.22rem;
+      }
+      #hoja-ejecutiva .chart-card {
+        padding: 0.2rem 0.35rem;
+      }
+      #hoja-ejecutiva .chart-card h4 {
+        font-size: 6.5pt;
+        margin-bottom: 0.14rem;
+      }
+      #hoja-ejecutiva .bar-row {
+        font-size: 6pt;
+        margin-bottom: 0.1rem;
+        grid-template-columns: 62px 1fr 56px;
+      }
+      #hoja-ejecutiva .bar-track {
+        height: 6px;
       }
       .grid-2 {
         grid-template-columns: 1.05fr 0.95fr !important;
+        gap: 0.4rem !important;
       }
       .grid-3, .callout-grid {
         grid-template-columns: repeat(3, 1fr) !important;
