@@ -33,7 +33,27 @@
     return selected;
   }
 
-  const api = Object.freeze({ config, iou, select });
+  function computeDailyCut(initialStock, currentStock, productName = 'Botellas de Agua') {
+    const initial = Math.max(0, Math.floor(Number(initialStock) || 0));
+    const remaining = Math.max(0, Math.floor(Number(currentStock) || 0));
+    const sold = Math.max(0, initial - remaining);
+    const restocked = Math.max(0, remaining - initial);
+    const cleanProduct = String(productName || 'Botellas de Agua').replace(/[<>"]/g, '').trim() || 'Botellas de Agua';
+    let status = 'Sin Cambios';
+    if (remaining === 0 && initial > 0) status = 'Agotado';
+    else if (sold > 0) status = 'Con Ventas';
+    else if (restocked > 0) status = 'Reposición';
+    return {
+      product: cleanProduct,
+      initialStock: initial,
+      remainingStock: remaining,
+      soldUnits: sold,
+      restockedUnits: restocked,
+      status
+    };
+  }
+
+  const api = Object.freeze({ config, iou, select, computeDailyCut });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.BottleDetection = api;
 })();

@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caso Empresarial MANACO — Informe Gerencial (1 Hoja) + 2 Hojas de Rúbrica | Ing. Jesús Bautista</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --border: #cbd5e1;
+      --brand: #059669;
+      --brand-dark: #065f46;
+      --accent: #0284c7;
+      --amber: #d97706;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.38;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .toolbar-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn:hover { background: rgba(255,255,255,0.2); }
+    .btn-primary {
+      background: #10b981;
+      border-color: #10b981;
+      color: #052e16;
+    }
+    .btn-primary:hover { background: #34d399; }
+
+    .container {
+      max-width: 1120px;
+      margin: 1.25rem auto 3rem;
+      padding: 0 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Guía de Defensa de 5 Minutos (Solo en pantalla, no se imprime para respetar las 3 hojas exactas) */
+    .pitch-box {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1.15rem 1.35rem;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+      border-left: 5px solid #10b981;
+    }
+    .pitch-box h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.05rem;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .pitch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 0.65rem;
+      margin-top: 0.6rem;
+    }
+    .pitch-step {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 0.65rem 0.75rem;
+      font-size: 0.78rem;
+    }
+    .pitch-step strong {
+      color: #6ee7b7;
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+
+    /* Hojas Imprimibles */
+    .print-sheet {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+    }
+
+    .sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 0.55rem;
+      margin-bottom: 0.7rem;
+      gap: 1rem;
+    }
+    .sheet-header h1 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.22rem;
+      letter-spacing: -0.02em;
+    }
+    .sheet-header p {
+      margin: 0.15rem 0 0;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .sheet-meta {
+      text-align: right;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+    .sheet-meta strong { color: var(--ink); }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--brand-dark);
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 0.18rem 0.55rem;
+      border-radius: 6px;
+      margin: 0.45rem 0 0.35rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+      margin-bottom: 0.5rem;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 0.32rem 0.45rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 800;
+      color: #1e293b;
+    }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 0.75rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin: 0.4rem 0 0.55rem;
+    }
+
+    .chart-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+      background: #fcfdff;
+    }
+    .chart-card h4 {
+      margin: 0 0 0.3rem;
+      font-size: 0.72rem;
+      color: #0f172a;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 78px 1fr 62px;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.68rem;
+      margin-bottom: 0.24rem;
+    }
+    .bar-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+    }
+
+    .callout-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      margin-bottom: 0.45rem;
+    }
+    .callout {
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      padding: 0.38rem 0.5rem;
+      background: #f8fafc;
+    }
+    .callout strong {
+      display: block;
+      color: #0f172a;
+      margin-bottom: 0.12rem;
+    }
+
+    .editable-hint {
+      font-size: 0.75rem;
+      color: #0284c7;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      margin-bottom: 0.65rem;
+      display: inline-block;
+    }
+    [contenteditable="true"] {
+      outline: none;
+      background: rgba(2, 132, 199, 0.03);
+    }
+    [contenteditable="true"]:focus {
+      background: #fef9c3;
+      box-shadow: inset 0 0 0 1px #eab308;
+    }
+
+    .rubric-table th, .rubric-table td {
+      padding: 0.55rem 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 820px) {
+      .grid-2, .grid-3, .callout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      @page {
+        size: letter portrait;
+        margin: 8mm 10mm;
+      }
+      body {
+        background: #ffffff;
+        font-size: 9pt;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        gap: 0;
+      }
+      .print-sheet {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+      }
+      .print-sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .grid-2 {
+        grid-template-columns: 1.05fr 0.95fr !important;
+      }
+      .grid-3, .callout-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Herramientas (No se imprime) -->
+  <div class="toolbar no-print">
+    <div class="toolbar-left">
+      <a href="../index.html" class="btn">
+        <i class="bx bx-arrow-back"></i> Volver al Detector de Botellas
+      </a>
+      <div>
+        <strong style="font-size:0.9rem;">Caso Empresarial MANACO — Entrega Ejecutiva + 2 Hojas de Rúbrica</strong>
+        <span style="display:block; font-size:0.74rem; color:#94a3b8;">Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios · 6º Semestre · Ing. Jesús Bautista</span>
+      </div>
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" class="btn btn-primary" onclick="window.print()">
+        <i class="bx bx-printer"></i> Imprimir las 3 Hojas (1 Ejecutiva + 2 Rúbricas)
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- GUÍA RÁPIDA PARA LA DEFENSA DE 5 MINUTOS (No se imprime en papel) -->
+    <div class="pitch-box no-print">
+      <h2><i class="bx bx-microphone"></i> Guion Ejecutivo de 5 Minutos ("Vender la Propuesta como Gerentes" en el Sorteo)</h2>
+      <p style="margin:0; font-size:0.8rem; color:#cbd5e1;">
+        Si tu grupo sale sorteado, defiende la Hoja 1 con este esquema de 5 minutos exactos:
+      </p>
+      <div class="pitch-grid">
+        <div class="pitch-step">
+          <strong>Minuto 1 · El Problema Real</strong>
+          "Somos la consultoría de Ciencia de Datos de Manaco. Auditamos 240 registros de comercio exterior (2020–2024): las importaciones ($18.5 mil M USD / 751M pares) casi duplican a las exportaciones ($10.9 mil M USD), presionando nuestros márgenes en calzado masivo."
+        </div>
+        <div class="pitch-step">
+          <strong>Minuto 2 · Hallazgo Clave de Datos</strong>
+          "Descubrimos que medir por Valor o por Cantidad cambia la estrategia: Grecia lidera en USD ($2,109M), pero Países Bajos mete más volumen físico (85.5M pares a $20.52/par). Además, el calzado 100% cuero (SA6 640420) vale casi el doble ($45.22/par vs $23.54/par)."
+        </div>
+        <div class="pitch-step">
+          <strong>Minuto 3 · La Solución Analítica</strong>
+          "Proponemos implementar el motor predictivo Manaco BI &amp; Demand Engine: integrar datos externos con ventas, inventario y tallas por tienda para pronosticar demanda regional (MAPE &lt; 12%) y reducir quiebres y sobrestock en 25%."
+        </div>
+        <div class="pitch-step">
+          <strong>Minuto 4 · Decisión Financiera</strong>
+          "Descartamos competir por precio bajo contra importaciones asiáticas/europeas de $20/par. Recomendamos la Alternativa A: defender producción propia en Cuero Premium (640420) e industrial/deportivo diferenciado, con abastecimiento ágil por pronóstico."
+        </div>
+        <div class="pitch-step">
+          <strong>Minuto 5 · Cierre y Retorno (ROI)</strong>
+          "Con una inversión escalonada y 3 KPIs trimestrales (Margen Bruto por Par, Rotación de Inventario y Tasa de Devolución &lt; 2.5%), blindamos la rentabilidad de Manaco para los próximos 3 años."
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- HOJA 1: ONE-PAGER GERENCIAL EJECUTIVO (Estaciones 1, 2, 3 y 4)         -->
+    <!-- ===================================================================== -->
+    <section class="print-sheet" id="hoja-ejecutiva">
+      <div class="sheet-header">
+        <div>
+          <h1>CASO EMPRESARIAL MANACO — DIAGNÓSTICO Y PROPUESTA ESTRATÉGICA BASADA EN DATOS</h1>
+          <p>Consultoría en Ciencia de Datos e Inteligencia de Negocios · Análisis de Base de Comercio de Calzado (2020–2024 · n = 240 registros)</p>
+        </div>
+        <div class="sheet-meta">
+          <div><strong>Docente:</strong> Ing. Jesús Bautista</div>
+          <div><strong>Nivel:</strong> 6º Semestre (ABR)</div>
+          <div contenteditable="true"><strong>Equipo / Gerentes:</strong> Brayan Joel Ramos Vargas y Grupo</div>
+        </div>
+      </div>
+
+      <!-- ESTACIÓN 1: Comprensión del Caso y 5 Problemas Prioritarios -->
+      <div class="section-tag"><i class="bx bx-target-lock"></i> 4.1. Estación 1 — Problemas Prioritarios y Datos Requeridos</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:24px;">Nº</th>
+            <th style="width:26%;">Problema Prioritario</th>
+            <th style="width:38%;">Justificación e Impacto (Competitividad / Rentabilidad)</th>
+            <th>Datos Necesarios (Base Externa + Datos Internos de Manaco)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1</strong></td>
+            <td><strong>Presión de importaciones de costo competitivo en líneas masivas</strong></td>
+            <td>En la base analizada (2020–2024), las importaciones suman <strong>$18,506.09M USD (751.09M pares)</strong> frente a <strong>$10,917.36M USD (410.77M pares)</strong> exportados, con picos en 2024 ($7,688.26M). Erosiona participación local.</td>
+            <td><strong>Externa:</strong> Valor USD y pares por SA6 y país origen.<br><strong>Interna Manaco:</strong> Precios de venta retail en Bolivia, costos CIF de importación y elasticidad de demanda por línea.</td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td><strong>Falta de integración entre datos de mercado y silos internos</strong></td>
+            <td>Ventas, inventario, calidad y clientes operan aislados sin cruzarse con tendencias externas, provocando compras reactivas y pérdida de margen.</td>
+            <td><strong>Interna Manaco:</strong> ERP de ventas por tienda/región (La Paz, SCZ, CBBA), stock diario por SKU/talla, merma y CRM de clientes.</td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td><strong>Presión en costos de producción, almacenaje y logística</strong></td>
+            <td>En calzado superior cuero/suela caucho (<code>640399</code>), el valor implícito de importación es <strong>$23.54/par</strong> (con registros hasta $8.00/par en Rep. Checa 2021). Sin eficiencia operativa, el costo local supera al importado.</td>
+            <td><strong>Interna Manaco:</strong> Costo unitario de planta (cuero, caucho, mano de obra), días de inventario inmovilizado (DIO) y costo logístico por par.</td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td><strong>Subaprovechamiento del segmento de alto valor (<code>640420</code>)</strong></td>
+            <td>El calzado con suela y corte de cuero (<code>640420</code>) registra el mayor valor unitario: <strong>$45.22/par (Imp.) y $41.42/par (Exp.)</strong>, pero apenas representa el <strong>1.9%</strong> del valor comercial total.</td>
+            <td><strong>Externa:</strong> Diferencial de valor unitario por categoría SA6.<br><strong>Interna Manaco:</strong> Margen de contribución por línea premium/ejecutiva y tasa de recompra por segmento.</td>
+          </tr>
+          <tr>
+            <td><strong>5</strong></td>
+            <td><strong>Desfase entre demanda omnicanal/digital y abastecimiento</strong></td>
+            <td>El cambio hacia búsqueda y compra digital genera variaciones rápidas de demanda por región que el modelo tradicional de reposición no anticipa.</td>
+            <td><strong>Interna Manaco:</strong> Tráfico y conversión en canales digitales/catálogo, pedidos no atendidos (quiebres de talla) y tiempos de entrega.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ESTACIÓN 2: Diagnóstico Empresarial mediante Ciencia de Datos -->
+      <div class="section-tag"><i class="bx bx-bar-chart-alt-2"></i> 4.2. Estación 2 — Diagnóstico con Ciencia de Datos (Inspección, Tabla Depurada y 3 Gráficos)</div>
+      <div class="grid-2">
+        <div>
+          <table>
+            <thead>
+              <tr>
+                <th>Flujo</th>
+                <th>Cód. SA6 y Categoría</th>
+                <th class="num">Valor (M USD)</th>
+                <th class="num">Pares (M)</th>
+                <th class="num">USD/Par Pond.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Importación</strong></td>
+                <td><code>640399</code> Sup. cuero / suela caucho</td>
+                <td class="num">$11,709.68</td>
+                <td class="num">497.50</td>
+                <td class="num"><strong>$23.54</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Importación</strong></td>
+                <td><code>640411</code> Deportivo caucho/plástico</td>
+                <td class="num">$6,447.48</td>
+                <td class="num">245.87</td>
+                <td class="num"><strong>$26.22</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Importación</strong></td>
+                <td><code>640420</code> Suela cuero / sup. cuero</td>
+                <td class="num">$348.93</td>
+                <td class="num">7.72</td>
+                <td class="num"><strong>$45.22</strong></td>
+              </tr>
+              <tr style="background:#f0fdf4;">
+                <td><strong>Exportación</strong></td>
+                <td><code>640399</code> Sup. cuero / suela caucho</td>
+                <td class="num">$8,514.24</td>
+                <td class="num">320.75</td>
+                <td class="num"><strong>$26.54</strong></td>
+              </tr>
+              <tr style="background:#f0fdf4;">
+                <td><strong>Exportación</strong></td>
+                <td><code>640411</code> Deportivo caucho/plástico</td>
+                <td class="num">$2,173.93</td>
+                <td class="num">84.49</td>
+                <td class="num"><strong>$25.73</strong></td>
+              </tr>
+              <tr style="background:#f0fdf4;">
+                <td><strong>Exportación</strong></td>
+                <td><code>640420</code> Suela cuero / sup. cuero</td>
+                <td class="num">$229.19</td>
+                <td class="num">5.53</td>
+                <td class="num"><strong>$41.42</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="font-size:0.68rem; color:var(--muted);">
+            <strong>Depuración técnica:</strong> 240 filas válidas (120 Imp. / 120 Exp.), 30 países socios, años 2020–2024, 0 valores nulos y 0 filas agregadas "Mundo" (evitando doble conteo). <code>Valor_USD / Cantidad_pares = Valor_USD_por_par</code> verificado al 100%.
+          </div>
+        </div>
+
+        <div class="callout-grid" style="grid-template-columns:1fr; gap:0.32rem; margin:0;">
+          <div class="callout">
+            <strong>3 Hallazgos Ejecutivos (Dato vs Hipótesis)</strong>
+            1) <em>Concentración:</em> <code>640399</code> concentra el 63.3% del valor importado y 78.0% del exportado.<br>
+            2) <em>Valor vs Cantidad cambia el líder:</em> En importaciones, <strong>Grecia</strong> es #1 en Valor ($2,109.6M), pero <strong>Países Bajos</strong> es #1 en Cantidad física (85.49M pares a $20.52/par).<br>
+            3) <em>Premio por diferenciación:</em> <code>640420</code> (cuero integral) duplica el valor por par ($45.22 vs $23.54), sosteniendo la hipótesis de que Manaco debe diferenciar su línea de cuero en vez de competir solo en volumen barato.
+          </div>
+          <div class="callout">
+            <strong>2 Limitaciones + 1 Pregunta Estratégica</strong>
+            • <em>Limitación 1:</em> <code>Valor_USD_por_par</code> es valor comercial aduanero (FOB/CIF) y <strong>no equivale al precio retail al consumidor</strong> (no incluye aranceles, IVA, flete interno ni margen comercial).<br>
+            • <em>Limitación 2:</em> El dataset externo reporta flujos de España y carece de costos internos de planta de Manaco.<br>
+            • <em>Pregunta Estratégica:</em> ¿Qué proporción del portafolio de Manaco en <code>640411</code>/<code>640399</code> debe migrar a diseño diferenciado y reposición predictiva para proteger el margen bruto frente al calzado importado de ~$20/par?
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 Gráficos Obligatorios de la Estación 2 -->
+      <div class="grid-3">
+        <!-- Gráfico 1 -->
+        <div class="chart-card">
+          <h4>Gráfico 1: Importación vs Exportación (M USD)</h4>
+          <div class="bar-row">
+            <span>Imp. 640399</span>
+            <div class="bar-track"><div class="bar-fill" style="width:100%; background:#dc2626;"></div></div>
+            <span class="num">$11,710M</span>
+          </div>
+          <div class="bar-row">
+            <span>Exp. 640399</span>
+            <div class="bar-track"><div class="bar-fill" style="width:73%; background:#10b981;"></div></div>
+            <span class="num">$8,514M</span>
+          </div>
+          <div class="bar-row">
+            <span>Imp. 640411</span>
+            <div class="bar-track"><div class="bar-fill" style="width:55%; background:#f97316;"></div></div>
+            <span class="num">$6,447M</span>
+          </div>
+          <div class="bar-row">
+            <span>Exp. 640411</span>
+            <div class="bar-track"><div class="bar-fill" style="width:19%; background:#059669;"></div></div>
+            <span class="num">$2,174M</span>
+          </div>
+          <div class="bar-row">
+            <span>Imp. 640420</span>
+            <div class="bar-track"><div class="bar-fill" style="width:6%; background:#6366f1;"></div></div>
+            <span class="num">$349M</span>
+          </div>
+          <div class="bar-row">
+            <span>Exp. 640420</span>
+            <div class="bar-track"><div class="bar-fill" style="width:4%; background:#0284c7;"></div></div>
+            <span class="num">$229M</span>
+          </div>
+        </div>
+
+        <!-- Gráfico 2 -->
+        <div class="chart-card">
+          <h4>Gráfico 2: Top Socios (Valor USD vs Pares)</h4>
+          <div class="bar-row">
+            <span>Grecia (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:92%; background:#0284c7;"></div></div>
+            <span class="num">$2,110M | 80M</span>
+          </div>
+          <div class="bar-row">
+            <span>P. Bajos (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:77%; background:#0ea5e9;"></div></div>
+            <span class="num">$1,754M | <strong>85M</strong></span>
+          </div>
+          <div class="bar-row">
+            <span>Vietnam (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:66%; background:#38bdf8;"></div></div>
+            <span class="num">$1,518M | 52M</span>
+          </div>
+          <div class="bar-row">
+            <span>Indonesia (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:100%; background:#059669;"></div></div>
+            <span class="num">$2,286M | 105M</span>
+          </div>
+          <div class="bar-row">
+            <span>Vietnam (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:34%; background:#10b981;"></div></div>
+            <span class="num">$786M | 37M</span>
+          </div>
+          <div class="bar-row">
+            <span>Eslovenia (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:33%; background:#34d399;"></div></div>
+            <span class="num">$749M | 27M</span>
+          </div>
+        </div>
+
+        <!-- Gráfico 3 -->
+        <div class="chart-card">
+          <h4>Gráfico 3: Valor Aprox. por Par (USD/Par)</h4>
+          <div class="bar-row">
+            <span>640420 (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:100%; background:#7c3aed;"></div></div>
+            <span class="num"><strong>$45.22/par</strong></span>
+          </div>
+          <div class="bar-row">
+            <span>640420 (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:92%; background:#8b5cf6;"></div></div>
+            <span class="num"><strong>$41.42/par</strong></span>
+          </div>
+          <div class="bar-row">
+            <span>640399 (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:59%; background:#059669;"></div></div>
+            <span class="num">$26.54/par</span>
+          </div>
+          <div class="bar-row">
+            <span>640411 (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:58%; background:#f59e0b;"></div></div>
+            <span class="num">$26.22/par</span>
+          </div>
+          <div class="bar-row">
+            <span>640411 (Exp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:57%; background:#10b981;"></div></div>
+            <span class="num">$25.73/par</span>
+          </div>
+          <div class="bar-row">
+            <span>640399 (Imp)</span>
+            <div class="bar-track"><div class="bar-fill" style="width:52%; background:#ef4444;"></div></div>
+            <span class="num">$23.54/par</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESTACIÓN 3 Y ESTACIÓN 4 EN COLUMNAS EJECUTIVAS -->
+      <div class="grid-2">
+        <!-- Estación 3 -->
+        <div>
+          <div class="section-tag"><i class="bx bx-bulb"></i> 4.3. Estación 3 — Ficha de Propuesta Estratégica (3 Años)</div>
+          <table>
+            <tbody>
+              <tr>
+                <th style="width:28%;">Solución de Ciencia de Datos</th>
+                <td><strong>Sistema "Manaco Demand &amp; Margin Intelligence":</strong> Modelo de pronóstico de demanda por SKU/talla/región + Tablero BI que integra ventas diarias, stock en tiendas (captura asistida por visión/ERP) y precios de referencia de importación.</td>
+              </tr>
+              <tr>
+                <th>3 Objetivos SMART y KPIs (2026–2029)</th>
+                <td>
+                  <strong>1. Exactitud de Pronóstico:</strong> Reducir el error de pronóstico (<code>KPI: MAPE</code>) al <strong>&lt; 12%</strong> en las 30 tiendas principales en 12 meses.<br>
+                  <strong>2. Eficiencia de Inventario:</strong> Disminuir el sobrestock y quiebres de talla en <strong>-25%</strong> (<code>KPI: Días de Inventario DIO y Fill Rate &gt; 95%</code>) al año 2.<br>
+                  <strong>3. Mix de Mayor Valor:</strong> Elevar la cuota de líneas diferenciadas de cuero (<code>640420</code>/<code>640399</code> premium) en <strong>+4.5 puntos porcentuales</strong> de margen bruto al año 3 (<code>KPI: Margen Bruto por Par USD</code>).
+                </td>
+              </tr>
+              <tr>
+                <th>Áreas y Responsables</th>
+                <td><strong>Gerencia Comercial &amp; BI</strong> (modelo de demanda y precios), <strong>Operaciones y Logística</strong> (planificación de lotes y stock), <strong>TI</strong> (pipeline ETL de tiendas y e-commerce).</td>
+              </tr>
+              <tr>
+                <th>2 Riesgos y Mitigación</th>
+                <td>
+                  <strong>R1:</strong> Baja calidad/retraso en registros de inventario en tiendas → <em>Mitigación:</em> Auditoría digital diaria con evidencia fotográfica y validación automática.<br>
+                  <strong>R2:</strong> Baja adopción del equipo comercial → <em>Mitigación:</em> Tablero de 1 clic con alertas accionables de reposición por región.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Estación 4 -->
+        <div>
+          <div class="section-tag"><i class="bx bx-line-chart"></i> 4.4. Estación 4 — Análisis Financiero, Alternativas y Decisión</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Criterio</th>
+                <th>Alternativa A (Recomendada): Diferenciación en Cuero + Reposición Predictiva BI</th>
+                <th>Alternativa B: Competir por Precio Bajo en Deportivo Masivo (<code>640411</code>)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Beneficio Esperado</strong></td>
+                <td>Captura segmentos de <strong>$35–$45+/par</strong>, libera capital de trabajo (-25% stock inmóvil) y protege margen.</td>
+                <td>Mayor volumen a corto plazo, pero guerra de precios contra importaciones de $20–$23/par.</td>
+              </tr>
+              <tr>
+                <td><strong>Costo / Riesgo</strong></td>
+                <td>Inversión moderada en BI/datos y control de calidad de cuero. Riesgo bajo y escalable.</td>
+                <td>Alta inversión en capital de trabajo y alto riesgo de erosión del margen operativo.</td>
+              </tr>
+              <tr>
+                <td><strong>Acción Comercial y Segmento</strong></td>
+                <td colspan="2"><strong>Segmento elegido:</strong> Consumidor urbano/profesional y corporativo (25–50 años, eje troncal La Paz–SCZ–CBBA). <strong>Acción:</strong> Lanzar colección de cuero confort/ejecutivo con disponibilidad garantizada de tallas por canal digital + retiro en tienda (Click &amp; Collect).</td>
+              </tr>
+              <tr>
+                <td><strong>3 KPIs de Seguimiento</strong></td>
+                <td colspan="2">
+                  <strong>1) Margen de Contribución por Par ($USD/par)</strong> ·
+                  <strong>2) Índice de Rotación de Inventario y Quiebre de Tallas (%)</strong> ·
+                  <strong>3) Tasa de Defectos y Devoluciones (&lt; 2.0%)</strong>.<br>
+                  <em>Datos internos faltantes a solicitar:</em> Costo estándar por SKU en fábrica, tasa histórica de devoluciones por defecto y costo logístico por tramo regional.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- HOJA 2 (PENÚLTIMA HOJA): RÚBRICA DE AUTOEVALUACIÓN DE ESTUDIANTES      -->
+    <!-- ===================================================================== -->
+    <section class="print-sheet" id="hoja-autoevaluacion">
+      <div class="sheet-header">
+        <div>
+          <h1>RÚBRICA DE AUTOEVALUACIÓN POR GRUPO DE LOS ESTUDIANTES</h1>
+          <p>Caso de Estudio Empresarial: MANACO · Carrera: Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios (6º Semestre)</p>
+        </div>
+        <div class="sheet-meta">
+          <div><strong>Penúltima Hoja</strong></div>
+          <div>Autocalificación Grupal</div>
+        </div>
+      </div>
+
+      <div class="editable-hint no-print">
+        <i class="bx bx-edit"></i> Puedes hacer clic sobre cualquier celda de la tabla para editar o agregar los nombres completos de tus compañeros antes de imprimir.
+      </div>
+
+      <p style="font-size:0.82rem; margin:0.3rem 0 0.75rem;">
+        <strong>Calificarse con la siguiente escala:</strong> &nbsp;
+        <code>0</code> (No se presentó) &nbsp;·&nbsp;
+        <code>25</code> (Muy poco desarrollado) &nbsp;·&nbsp;
+        <code>50</code> (Poco desarrollado) &nbsp;·&nbsp;
+        <code>75</code> (Aceptable) &nbsp;·&nbsp;
+        <code>100</code> (Óptimo)
+      </p>
+
+      <table class="rubric-table" style="margin-bottom:1.4rem;">
+        <thead>
+          <tr>
+            <th style="width:45px; text-align:center;">Nº</th>
+            <th style="width:34%;">NOMBRE COMPLETO</th>
+            <th style="text-align:center;">Fase 1 – Comprensión del caso</th>
+            <th style="text-align:center;">Fase 2 – Diagnóstico empresarial</th>
+            <th style="text-align:center;">Fase 3 – Propuesta estratégica</th>
+            <th style="text-align:center;">Fase 4 – Análisis financiero y marketing</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center;"><strong>1</strong></td>
+            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>2</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>3</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>4</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>5</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:0.92rem; margin:0 0 0.5rem;">Indicar sus fortalezas y debilidades en este proceso</h3>
+      <table class="rubric-table">
+        <thead>
+          <tr>
+            <th style="width:45px; text-align:center;">Nº</th>
+            <th style="width:30%;">NOMBRE COMPLETO</th>
+            <th style="width:35%;">Fortalezas</th>
+            <th>Debilidades</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center;"><strong>1</strong></td>
+            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
+            <td contenteditable="true">Dominio en procesamiento de datos, automatización de indicadores y diseño de propuestas analíticas orientadas a decisiones gerenciales.</td>
+            <td contenteditable="true">Sintetizar gran volumen de hallazgos estadísticos dentro del límite estricto de 5 minutos de exposición ejecutiva.</td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>2</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>3</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>4</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>5</strong></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+            <td contenteditable="true"></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- HOJA 3 (ÚLTIMA HOJA): RÚBRICA DE EVALUACIÓN POR GRUPO DEL DOCENTE      -->
+    <!-- ===================================================================== -->
+    <section class="print-sheet" id="hoja-evaluacion-docente">
+      <div class="sheet-header">
+        <div>
+          <h1>RÚBRICA DE EVALUACIÓN POR GRUPO DEL DOCENTE</h1>
+          <p>Caso de Estudio Empresarial: MANACO · Carrera: Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios (6º Semestre)</p>
+        </div>
+        <div class="sheet-meta">
+          <div><strong>Última Hoja</strong></div>
+          <div>Evaluación del Docente</div>
+        </div>
+      </div>
+
+      <p style="font-size:0.82rem; margin:0.3rem 0 0.75rem;">
+        <strong>Calificarse con la siguiente escala:</strong> &nbsp;
+        <code>0</code> (No se presentó) &nbsp;·&nbsp;
+        <code>25</code> (Muy poco desarrollado) &nbsp;·&nbsp;
+        <code>50</code> (Poco desarrollado) &nbsp;·&nbsp;
+        <code>75</code> (Aceptable) &nbsp;·&nbsp;
+        <code>100</code> (Óptimo)
+      </p>
+
+      <table class="rubric-table" style="margin-bottom:1.4rem;">
+        <thead>
+          <tr>
+            <th style="width:45px; text-align:center;">Nº</th>
+            <th style="width:34%;">NOMBRE COMPLETO</th>
+            <th style="text-align:center;">Fase 1 – Comprensión del caso</th>
+            <th style="text-align:center;">Fase 2 – Diagnóstico empresarial</th>
+            <th style="text-align:center;">Fase 3 – Propuesta estratégica</th>
+            <th style="text-align:center;">Fase 4 – Análisis financiero y marketing</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center;"><strong>1</strong></td>
+            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
+            <td style="height:34px;"></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>2</strong></td>
+            <td contenteditable="true" style="height:34px;"></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>3</strong></td>
+            <td contenteditable="true" style="height:34px;"></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>4</strong></td>
+            <td contenteditable="true" style="height:34px;"></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>5</strong></td>
+            <td contenteditable="true" style="height:34px;"></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:0.92rem; margin:0 0 0.5rem;">Indicar las fortalezas y debilidades del estudiante en este proceso</h3>
+      <table class="rubric-table" style="margin-bottom:2rem;">
+        <thead>
+          <tr>
+            <th style="width:45px; text-align:center;">Nº</th>
+            <th style="width:30%;">NOMBRE COMPLETO</th>
+            <th style="width:35%;">Fortalezas</th>
+            <th>Debilidades</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center;"><strong>1</strong></td>
+            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
+            <td style="height:42px;"></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>2</strong></td>
+            <td contenteditable="true" style="height:42px;"></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>3</strong></td>
+            <td contenteditable="true" style="height:42px;"></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>4</strong></td>
+            <td contenteditable="true" style="height:42px;"></td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><strong>5</strong></td>
+            <td contenteditable="true" style="height:42px;"></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:2.2rem; font-size:0.9rem; display:flex; justify-content:space-between; align-items:center;">
+        <div><strong>Nombre del docente:</strong> Ing. Jesús Bautista ....................................................................................</div>
+        <div><strong>Firma / Sello:</strong> ......................................................</div>
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>

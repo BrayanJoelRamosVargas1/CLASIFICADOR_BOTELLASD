@@ -25,6 +25,7 @@
   // 1. Configuración de Detección Calibrada de Alto Rendimiento
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
+    DAILY_STORAGE_KEY: 'ecolens_daily_sheets_v1',
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
     TARGET_INFERENCE_INTERVAL_MS: 100,
@@ -78,6 +79,21 @@
     hudInView: document.getElementById('hudInView'),
     hudInTake: document.getElementById('hudInTake'),
     
+    // Control Diario de Inventario y Ventas (Planilla con Foto)
+    dailyProductInput: document.getElementById('dailyProductInput'),
+    dailyInitialInput: document.getElementById('dailyInitialInput'),
+    dailyCurrentInput: document.getElementById('dailyCurrentInput'),
+    dailySoldPreview: document.getElementById('dailySoldPreview'),
+    dailyStatusPreview: document.getElementById('dailyStatusPreview'),
+    dailyAiSyncHint: document.getElementById('dailyAiSyncHint'),
+    btnSetInitialFromAi: document.getElementById('btnSetInitialFromAi'),
+    btnSaveDailyCut: document.getElementById('btnSaveDailyCut'),
+    btnExportDailyCsv: document.getElementById('btnExportDailyCsv'),
+    btnPrintDailySheet: document.getElementById('btnPrintDailySheet'),
+    btnClearDailySheet: document.getElementById('btnClearDailySheet'),
+    dailyTableBody: document.getElementById('dailyTableBody'),
+    dailyEmptyRow: document.getElementById('dailyEmptyRow'),
+
     // Inventario
     invTableBody: document.getElementById('invTableBody'),
     invEmpty: document.getElementById('invEmptyRow'),
@@ -395,6 +411,10 @@
       visibleBoxes = trackers.filter(t => t.missed === 0);
 
       dom.hudInView.textContent = visibleBoxes.length;
+      if (visibleBoxes.length > 0 && dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
+        dom.dailyCurrentInput.value = String(visibleBoxes.length);
+        updateDailyPreview();
+      }
 
       // Actualizar estado de la Retícula
       const hasActive = visibleBoxes.length > 0;
@@ -933,6 +953,235 @@
     URL.revokeObjectURL(url);
   }
 
+  // 15.B Control Diario de Inventario y Ventas (Planilla con Foto)
+  function loadDailySheets() {
+    try {
+      const raw = localStorage.getItem(CONFIG.DAILY_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveDailySheets(list) {
+    try {
+      // Conservar hasta 40 cortes con miniatura para no exceder la cuota de localStorage
+      localStorage.setItem(CONFIG.DAILY_STORAGE_KEY, JSON.stringify(list.slice(0, 40)));
+    } catch (e) {}
+  }
+
+  function updateDailyPreview() {
+    if (!dom.dailyInitialInput || !dom.dailyCurrentInput || !dom.dailySoldPreview) return;
+    const cut = window.BottleDetection.computeDailyCut(
+      dom.dailyInitialInput.value,
+      dom.dailyCurrentInput.value,
+      dom.dailyProductInput ? dom.dailyProductInput.value : 'Botellas de Agua'
+    );
+    if (cut.restockedUnits > 0) {
+      dom.dailySoldPreview.textContent = `0 vendidas (+${cut.restockedUnits})`;
+    } else {
+      dom.dailySoldPreview.textContent = `${cut.soldUnits} vendida${cut.soldUnits === 1 ? '' : 's'}`;
+    }
+    if (dom.dailyStatusPreview) {
+      dom.dailyStatusPreview.textContent = `Quedan ${cut.remainingStock} de ${cut.initialStock} · ${cut.status}`;
+    }
+  }
+
+  function captureEvidenceSnapshot(cut) {
+    try {
+      const snap = document.createElement('canvas');
+      snap.width = 240;
+      snap.height = 160;
+      const ctx = snap.getContext('2d');
+      if (!ctx || !ctx.fillRect) return '';
+
+      if (activeSource) {
+        renderCanvasHUD();
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, snap.width, snap.height);
+        ctx.drawImage(activeSource, 0, 0, snap.width, snap.height);
+        if (dom.canvas && dom.canvas.width > 0) {
+          ctx.drawImage(dom.canvas, 0, 0, snap.width, snap.height);
+        }
+      } else {
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(0, 0, snap.width, snap.height);
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 15px sans-serif';
+        if (ctx.fillText) {
+          ctx.fillText(cut.product.slice(0, 22), 14, 36);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 20px monospace';
+          ctx.fillText(`Ini:${cut.initialStock} -> Quedan:${cut.remainingStock}`, 14, 82);
+          ctx.fillStyle = '#a7f3d0';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`Vendidas: ${cut.soldUnits} u.`, 14, 122);
+        }
+      }
+      return snap.toDataURL ? snap.toDataURL('image/jpeg', 0.72) : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function saveDailyCut() {
+    if (!dom.dailyInitialInput || !dom.dailyCurrentInput) return;
+    const cut = window.BottleDetection.computeDailyCut(
+      dom.dailyInitialInput.value,
+      dom.dailyCurrentInput.value,
+      dom.dailyProductInput ? dom.dailyProductInput.value : 'Botellas de Agua'
+    );
+    const currentList = loadDailySheets();
+    const record = {
+      id: `DIA-${String(currentList.length + 1).padStart(3, '0')}`,
+      timestamp: new Date().toISOString(),
+      product: cut.product,
+      initialStock: cut.initialStock,
+      remainingStock: cut.remainingStock,
+      soldUnits: cut.soldUnits,
+      restockedUnits: cut.restockedUnits,
+      status: cut.status,
+      photo: captureEvidenceSnapshot(cut)
+    };
+    const updated = [record, ...currentList];
+    saveDailySheets(updated);
+    renderDailyTable(updated);
+    updateDailyPreview();
+    playSound('chime');
+    if (dom.statusText) {
+      dom.statusText.textContent = `✓ Corte guardado en Planilla: Empezó con ${cut.initialStock}, quedan ${cut.remainingStock} → ${cut.soldUnits} vendida(s).`;
+    }
+  }
+
+  function renderDailyTable(list = loadDailySheets()) {
+    if (!dom.dailyTableBody || !dom.dailyTableBody.appendChild) return;
+    dom.dailyTableBody.innerHTML = '';
+    if (!list.length) {
+      if (dom.dailyEmptyRow) {
+        dom.dailyEmptyRow.style.display = '';
+        dom.dailyTableBody.appendChild(dom.dailyEmptyRow);
+      }
+      return;
+    }
+
+    list.forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.className = 'inv-row';
+      const dateObj = new Date(row.timestamp);
+      const dateStr = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timeStr = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+      const statusBg = row.status === 'Agotado'
+        ? '#fef2f2; color:#dc2626;'
+        : row.status === 'Con Ventas'
+          ? '#ecfdf5; color:#059669;'
+          : row.status === 'Reposición'
+            ? '#eff6ff; color:#2563eb;'
+            : '#f1f5f9; color:#475569;';
+
+      const soldLabel = row.restockedUnits > 0
+        ? `0 (+${row.restockedUnits} rep.)`
+        : `${row.soldUnits} vendida${row.soldUnits === 1 ? '' : 's'}`;
+
+      const photoHtml = row.photo
+        ? `<img src="${row.photo}" alt="Evidencia ${row.id}" style="width:72px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" title="Clic para abrir foto">`
+        : `<span style="font-size:0.75rem; color:var(--text-muted);">Sin foto</span>`;
+
+      tr.innerHTML = `
+        <td>${photoHtml}</td>
+        <td style="font-size:0.8rem; color:var(--text-muted);">
+          <strong style="color:var(--text-main); display:block;">${dateStr}</strong>
+          <span>${timeStr} · ${row.id}</span>
+        </td>
+        <td class="daily-prod-cell" style="font-weight:700;"></td>
+        <td style="font-family:var(--font-mono); font-weight:700;">${row.initialStock} u.</td>
+        <td style="font-family:var(--font-mono); font-weight:700; color:#0284c7;">${row.remainingStock} u.</td>
+        <td style="font-family:var(--font-mono); font-weight:800; color:#059669; font-size:0.95rem;">${soldLabel}</td>
+        <td>
+          <span style="display:inline-block; padding:0.25rem 0.6rem; border-radius:999px; font-size:0.75rem; font-weight:700; background:${statusBg}">
+            ${row.status}
+          </span>
+        </td>
+        <td style="text-align:right;">
+          <button class="btn-action-sm btn-danger btn-del-daily" data-id="${row.id}" title="Eliminar corte">
+            <i class="bx bx-trash"></i>
+          </button>
+        </td>
+      `;
+      const prodCell = tr.querySelector('.daily-prod-cell');
+      if (prodCell) prodCell.textContent = row.product;
+
+      const imgEl = tr.querySelector('img');
+      if (imgEl && row.photo) {
+        imgEl.addEventListener('click', () => {
+          const w = window.open('', '_blank');
+          if (w) {
+            w.document.write(`<!doctype html><title>${row.id} - Evidencia</title><body style="margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#fff;font-family:sans-serif;"><img src="${row.photo}" style="max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);"><p style="margin-top:1rem;"><strong>${row.id}</strong> · Inicial: ${row.initialStock} | Quedan: ${row.remainingStock} | Vendidas: ${row.soldUnits}</p></body>`);
+            w.document.close();
+          }
+        });
+      }
+
+      dom.dailyTableBody.appendChild(tr);
+    });
+
+    if (dom.dailyTableBody.querySelectorAll) {
+      dom.dailyTableBody.querySelectorAll('.btn-del-daily').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.currentTarget.dataset.id;
+          const next = loadDailySheets().filter(r => r.id !== id);
+          saveDailySheets(next);
+          renderDailyTable(next);
+          playSound('click');
+        });
+      });
+    }
+  }
+
+  function exportDailyCSV() {
+    const rows = loadDailySheets();
+    if (!rows.length) {
+      alert('Aún no hay cortes diarios en la planilla para exportar.');
+      return;
+    }
+    let csv = '\uFEFFID_Corte,Fecha_Hora,Producto,Stock_Inicial,Quedan_Leidas_IA,Vendidas_Calculadas,Reposicion,Estado\n';
+    rows.forEach(r => {
+      csv += `"${r.id}","${r.timestamp}","${r.product}",${r.initialStock},${r.remainingStock},${r.soldUnits},${r.restockedUnits || 0},"${r.status}"\n`;
+    });
+    downloadBlob(csv, `Planilla_Control_Inventario_${Date.now()}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  function printDailySheet() {
+    const rows = loadDailySheets();
+    if (!rows.length) {
+      alert('Guarda al menos un corte del día para imprimir la planilla.');
+      return;
+    }
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const trs = rows.map(r => {
+      const d = new Date(r.timestamp).toLocaleString('es-ES');
+      const img = r.photo ? `<img src="${r.photo}" style="width:90px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #ccc;">` : 'Sin foto';
+      return `<tr>
+        <td style="text-align:center;">${img}</td>
+        <td><strong>${r.id}</strong><br><small>${d}</small></td>
+        <td>${r.product}</td>
+        <td style="text-align:center;font-weight:bold;">${r.initialStock}</td>
+        <td style="text-align:center;font-weight:bold;color:#0284c7;">${r.remainingStock}</td>
+        <td style="text-align:center;font-weight:bold;color:#059669;">${r.soldUnits}</td>
+        <td style="text-align:center;">${r.status}</td>
+      </tr>`;
+    }).join('');
+    w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Planilla de Control de Inventario y Ventas</title>
+      <style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}h2{margin:0 0 4px;}p{margin:0 0 16px;color:#475569;font-size:13px;}table{width:100%;border-collapse:collapse;font-size:13px;}th,td{border:1px solid #cbd5e1;padding:8px;}th{background:#f1f5f9;text-align:left;}</style>
+      </head><body>
+      <h2>Planilla de Control Diario de Inventario y Ventas (Visión IA)</h2>
+      <p>Estudiante: Brayan Joel Ramos Vargas · Docente: Ing. Jesús Bautista · Generado: ${new Date().toLocaleString('es-ES')}</p>
+      <table><thead><tr><th>Foto Evidencia</th><th>Corte / Fecha</th><th>Producto</th><th>Stock Inicial</th><th>Quedan (IA)</th><th>Vendidas</th><th>Estado</th></tr></thead><tbody>${trs}</tbody></table>
+      <script>window.onload=()=>window.print();<\/script></body></html>`);
+    w.document.close();
+  }
+
   // 16. Configuración de Eventos
   function setupEvents() {
     dom.btnStartCamera.addEventListener('click', () => {
@@ -957,6 +1206,43 @@
 
     if (dom.btnManualScan) {
       dom.btnManualScan.addEventListener('click', forceManualScan);
+    }
+
+    // Eventos de Planilla de Control Diario
+    if (dom.dailyInitialInput && dom.dailyInitialInput.addEventListener) {
+      dom.dailyInitialInput.addEventListener('input', updateDailyPreview);
+    }
+    if (dom.dailyCurrentInput && dom.dailyCurrentInput.addEventListener) {
+      dom.dailyCurrentInput.addEventListener('input', updateDailyPreview);
+    }
+    if (dom.dailyProductInput && dom.dailyProductInput.addEventListener) {
+      dom.dailyProductInput.addEventListener('input', updateDailyPreview);
+    }
+    if (dom.btnSetInitialFromAi && dom.btnSetInitialFromAi.addEventListener) {
+      dom.btnSetInitialFromAi.addEventListener('click', () => {
+        const currentCount = visibleBoxes.length > 0 ? visibleBoxes.length : Number(dom.dailyCurrentInput.value || 0);
+        dom.dailyInitialInput.value = String(currentCount);
+        updateDailyPreview();
+        playSound('click');
+      });
+    }
+    if (dom.btnSaveDailyCut && dom.btnSaveDailyCut.addEventListener) {
+      dom.btnSaveDailyCut.addEventListener('click', saveDailyCut);
+    }
+    if (dom.btnExportDailyCsv && dom.btnExportDailyCsv.addEventListener) {
+      dom.btnExportDailyCsv.addEventListener('click', exportDailyCSV);
+    }
+    if (dom.btnPrintDailySheet && dom.btnPrintDailySheet.addEventListener) {
+      dom.btnPrintDailySheet.addEventListener('click', printDailySheet);
+    }
+    if (dom.btnClearDailySheet && dom.btnClearDailySheet.addEventListener) {
+      dom.btnClearDailySheet.addEventListener('click', () => {
+        if (confirm('¿Vaciar todos los cortes diarios guardados en la planilla?')) {
+          saveDailySheets([]);
+          renderDailyTable([]);
+          playSound('click');
+        }
+      });
     }
 
     // Síntesis de Voz
@@ -999,6 +1285,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     initNeuralEngines();
     setupEvents();
+    updateDailyPreview();
+    renderDailyTable();
     renderInventoryTable();
     updateImpactMetrics();
   });

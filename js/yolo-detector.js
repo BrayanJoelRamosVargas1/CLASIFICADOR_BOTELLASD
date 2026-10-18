@@ -4,9 +4,13 @@
   class YoloBottleDetector {
     static async load(modelUrl = './models/yolov10n/model.onnx') {
       ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
-      // Single-thread WASM also works on GitHub Pages without cross-origin isolation.
+      // Single-thread WASM + SIMD works on GitHub Pages without cross-origin isolation.
       ort.env.wasm.numThreads = 1;
-      const session = await ort.InferenceSession.create(modelUrl, { executionProviders: ['wasm'] });
+      ort.env.wasm.simd = true;
+      const session = await ort.InferenceSession.create(modelUrl, {
+        executionProviders: ['wasm'],
+        graphOptimizationLevel: 'all'
+      });
       return new YoloBottleDetector(session);
     }
     constructor(session) {
@@ -14,6 +18,7 @@
       this.canvas = document.createElement('canvas');
       this.canvas.width = this.canvas.height = 640;
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+      this.pixels = new Float32Array(3 * 640 * 640);
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
@@ -26,6 +31,7 @@
       this.rotated.width = height;
       this.rotated.height = width;
       const ctx = this.rotated.getContext('2d');
+      if (ctx.setTransform) ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.translate(height, 0);
       ctx.rotate(Math.PI / 2);
       ctx.drawImage(source, 0, 0, width, height);
@@ -48,11 +54,13 @@
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;
       const plane = 640 * 640;
-      const pixels = new Float32Array(3 * plane);
+      const pixels = this.pixels;
+      const inv255 = 1 / 255;
       for (let i = 0; i < plane; i++) {
-        pixels[i] = rgba[i * 4] / 255;
-        pixels[plane + i] = rgba[i * 4 + 1] / 255;
-        pixels[2 * plane + i] = rgba[i * 4 + 2] / 255;
+        const idx = i * 4;
+        pixels[i] = rgba[idx] * inv255;
+        pixels[plane + i] = rgba[idx + 1] * inv255;
+        pixels[2 * plane + i] = rgba[idx + 2] * inv255;
       }
       const input = new ort.Tensor('float32', pixels, [1, 3, 640, 640]);
       let outputs;

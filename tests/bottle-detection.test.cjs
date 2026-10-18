@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { select } = require('../js/bottle-detection.js');
+const { select, computeDailyCut } = require('../js/bottle-detection.js');
 const bottle = { class: 'bottle', score: 0.8, bbox: [10, 20, 50, 100] };
 
 test('cups, vases, bowls and glasses are not bottles', () => {
@@ -24,4 +24,22 @@ test('rejects low confidence, invalid and tiny boxes, clips image edges', () => 
 test('does not discard real close-up or horizontal bottles by aspect ratio', () => {
   assert.equal(select([{ ...bottle, bbox: [0, 0, 630, 470] }], 640, 480).length, 1);
   assert.equal(select([{ ...bottle, bbox: [0, 0, 200, 40] }], 640, 480).length, 1);
+});
+test('computes daily inventory cut: starting with 10 bottles and reading 8 yields 2 sold', () => {
+  const cut = computeDailyCut(10, 8, 'Botellas de Agua');
+  assert.equal(cut.initialStock, 10);
+  assert.equal(cut.remainingStock, 8);
+  assert.equal(cut.soldUnits, 2);
+  assert.equal(cut.restockedUnits, 0);
+  assert.equal(cut.status, 'Con Ventas');
+});
+test('computes restock, sold-out and sanitizes product name against XSS', () => {
+  const restock = computeDailyCut(10, 13, '<script>Agua</script>');
+  assert.equal(restock.soldUnits, 0);
+  assert.equal(restock.restockedUnits, 3);
+  assert.equal(restock.status, 'Reposición');
+  assert.equal(restock.product, 'scriptAgua/script');
+  const empty = computeDailyCut(10, 0);
+  assert.equal(empty.soldUnits, 10);
+  assert.equal(empty.status, 'Agotado');
 });

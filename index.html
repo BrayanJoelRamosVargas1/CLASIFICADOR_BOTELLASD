@@ -61,9 +61,12 @@
 
       <nav class="nav-links">
         <a href="#vision-scanner" class="nav-btn"><i class="bx bx-camera"></i> <span>Escáner</span></a>
-        <a href="#eco-impact" class="nav-btn"><i class="bx bx-leaf"></i> <span>Métricas</span></a>
+        <a href="#daily-control" class="nav-btn"><i class="bx bx-spreadsheet"></i> <span>Planilla Día</span></a>
         <a href="#inventory" class="nav-btn"><i class="bx bx-list-check"></i> <span>Inventario</span></a>
-        <a href="cuaderno/index.html" class="nav-btn btn-notebook" title="Ver Cuaderno de Entrenamiento Jupyter">
+        <a href="manaco/index.html" class="nav-btn btn-notebook" title="Caso Empresarial MANACO (1 Hoja Ejecutiva + 2 Rúbricas)">
+          <i class="bx bx-briefcase-alt-2"></i> <span>Caso Manaco</span>
+        </a>
+        <a href="cuaderno/index.html" class="nav-btn" title="Ver Cuaderno de Entrenamiento Jupyter">
           <i class="bx bx-book-open"></i> <span>Cuaderno CNN</span>
         </a>
         <a href="https://github.com/BrayanJoelRamosVargas1/CLASIFICADOR_BOTELLASD" target="_blank" rel="noopener noreferrer" class="nav-btn" title="Ver código en GitHub">
@@ -282,15 +285,18 @@
           </button>
         </div>
 
-        <!-- Tarjeta Académica Exclusiva: Red Convolucional Propia (CNN Keras) -->
+        <!-- Tarjeta Académica Exclusiva: Red Convolucional Propia (CNN Keras) + Caso Manaco -->
         <div class="diag-card academic-card">
-          <h4><i class="bx bx-brain"></i> Detector y Cuaderno de Aprendizaje</h4>
+          <h4><i class="bx bx-brain"></i> Detector y Proyectos Académicos</h4>
           <p>
-            El detector activo utiliza YOLOv10 Nano preentrenado. El cuaderno del <strong>Ing. Jesús Bautista</strong> conserva el ejercicio de clasificación con una CNN como material académico independiente.
+            El detector activo utiliza YOLOv10 Nano preentrenado. Incluye acceso al cuaderno CNN y al <strong>Caso de Estudio Empresarial MANACO</strong> del <strong>Ing. Jesús Bautista</strong>.
           </p>
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <a href="cuaderno/index.html" class="btn-academic-action">
               <i class="bx bx-book-open"></i> Ver Cuaderno Jupyter
+            </a>
+            <a href="manaco/index.html" class="btn-academic-action" style="background:#0f172a; color:#ffffff; border-color:#0f172a;">
+              <i class="bx bx-briefcase-alt-2"></i> Caso Manaco + Rúbricas
             </a>
           </div>
         </div>
@@ -308,6 +314,88 @@
 
       </aside>
 
+    </section>
+
+    <!-- Sección de Control de Inventario Diario y Cálculo de Ventas (Planilla con Foto) -->
+    <section id="daily-control" class="inventory-section" style="margin-bottom:1.75rem; border:2px solid rgba(5, 150, 105, 0.22);">
+      <div class="inventory-header" style="flex-wrap:wrap; gap:1rem;">
+        <div class="inv-title">
+          <h3><i class="bx bx-store-alt" style="color:var(--primary);"></i> Control Diario de Inventario y Ventas (Planilla con Foto)</h3>
+          <p>Fija con cuántas botellas empiezas el día (ej. <strong>10</strong>), lee con la cámara cuántas quedan (ej. <strong>8</strong>) y guarda el día calculando automáticamente lo vendido (ej. <strong>2 vendidas</strong>) junto con la foto de evidencia.</p>
+        </div>
+        <div class="inv-actions">
+          <button id="btnExportDailyCsv" type="button" class="btn-action-sm" title="Descargar Planilla en Excel CSV">
+            <i class="bx bx-spreadsheet"></i> Exportar Planilla Excel
+          </button>
+          <button id="btnPrintDailySheet" type="button" class="btn-action-sm" title="Imprimir o guardar Planilla en PDF">
+            <i class="bx bx-printer"></i> Imprimir Planilla
+          </button>
+          <button id="btnClearDailySheet" type="button" class="btn-action-sm btn-danger" title="Borrar planilla diaria">
+            <i class="bx bx-trash"></i> Vaciar
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Cálculo Diario (Empiezo con -> Quedan -> Vendidas -> Guardar Foto + Día) -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:0.85rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:1rem; margin-bottom:1.25rem; align-items:end;">
+        <div>
+          <label for="dailyProductInput" style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.3rem; text-transform:uppercase;">Producto / Lote</label>
+          <input id="dailyProductInput" type="text" value="Botellas de Agua" class="btn-action-sm" style="width:100%; padding:0.55rem 0.75rem; background:#fff;">
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+            <label for="dailyInitialInput" style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">1. Empiezo el día con</label>
+            <button id="btnSetInitialFromAi" type="button" style="font-size:0.7rem; background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; padding:0;" title="Tomar el conteo actual de la cámara como stock inicial">Usar cámara</button>
+          </div>
+          <input id="dailyInitialInput" type="number" min="0" max="9999" value="10" class="btn-action-sm" style="width:100%; padding:0.55rem 0.75rem; font-weight:800; font-family:var(--font-mono); font-size:1rem; background:#fff;">
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+            <label for="dailyCurrentInput" style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">2. Quedan (Lectura IA)</label>
+            <span id="dailyAiSyncHint" style="font-size:0.7rem; color:#059669; font-weight:600;">● Auto-IA</span>
+          </div>
+          <input id="dailyCurrentInput" type="number" min="0" max="9999" value="8" class="btn-action-sm" style="width:100%; padding:0.55rem 0.75rem; font-weight:800; font-family:var(--font-mono); font-size:1rem; background:#fff;">
+        </div>
+
+        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:0.5rem 0.8rem; display:flex; flex-direction:column; justify-content:center;">
+          <span style="font-size:0.7rem; font-weight:700; color:#047857; text-transform:uppercase;">3. Cálculo de Ventas</span>
+          <strong id="dailySoldPreview" style="font-size:1.15rem; font-family:var(--font-mono); color:#065f46;">2 vendidas</strong>
+          <span id="dailyStatusPreview" style="font-size:0.72rem; color:#059669;">Quedan 8 de 10</span>
+        </div>
+
+        <div>
+          <button id="btnSaveDailyCut" type="button" class="ctrl-btn btn-cam" style="width:100%; padding:0.65rem 1rem; font-size:0.88rem; justify-content:center;">
+            <i class="bx bx-camera-Home bx-save"></i> <span>Guardar Día + Foto</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="inventory-table-container">
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th>Foto Evidencia</th>
+              <th>Día y Hora</th>
+              <th>Producto</th>
+              <th>Stock Inicial</th>
+              <th>Quedan (Leído)</th>
+              <th>Vendidas (Cálculo)</th>
+              <th>Estado</th>
+              <th style="text-align:right;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="dailyTableBody">
+            <tr id="dailyEmptyRow">
+              <td colspan="8" style="text-align:center; padding:2rem; color:var(--text-light);">
+                <i class="bx bx-spreadsheet" style="font-size:1.8rem; display:block; margin-bottom:0.4rem;"></i>
+                Aún no hay cortes diarios guardados. Ingresa con cuántas botellas empiezas (ej. 10), apunta la cámara o sube una foto para leer cuántas quedan (ej. 8) y pulsa <strong>Guardar Día + Foto</strong>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <!-- Sección de Inventario Inteligente -->
@@ -374,6 +462,10 @@
         <a href="cuaderno/index.html">
           <i class="bx bx-book-open"></i> Documentación del Cuaderno Jupyter
         </a>
+        &nbsp;·&nbsp;
+        <a href="manaco/index.html">
+          <i class="bx bx-briefcase-alt-2"></i> Caso Empresarial MANACO
+        </a>
       </p>
       <p style="font-size:0.75rem; color:var(--text-light); margin-top:0.25rem;">
         Detector con YOLOv10 Nano, ONNX Runtime y WebAssembly. Todos los derechos reservados © 2026.
@@ -383,9 +475,9 @@
 
   <!-- Detector local de botellas y ONNX Runtime Web -->
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
-  <script src="js/yolo-detector.js?v=13.0"></script>
-  <script src="js/bottle-detection.js?v=13.0"></script>
-  <script src="js/ecolens.js?v=13.0"></script>
+  <script src="js/yolo-detector.js?v=14.0"></script>
+  <script src="js/bottle-detection.js?v=14.0"></script>
+  <script src="js/ecolens.js?v=14.0"></script>
 
 </body>
 </html>
