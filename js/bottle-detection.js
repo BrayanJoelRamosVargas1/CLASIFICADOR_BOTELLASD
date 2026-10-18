@@ -4,7 +4,7 @@
   const config = Object.freeze({
     modelBase: 'yolov10n',
     minScore: 0.10,
-    threshold: 0.18,
+    threshold: 0.21,
     maxBoxes: 30,
     nmsIoU: 0.45
   });

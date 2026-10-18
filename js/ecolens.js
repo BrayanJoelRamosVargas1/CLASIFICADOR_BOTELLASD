@@ -179,7 +179,7 @@
         throw new Error('ONNX Runtime no cargó');
       }
       dom.statusText.textContent = 'Cargando detector de botellas...';
-      detector = await window.YoloBottleDetector.load();
+      detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=16.0');
       dom.statusText.textContent = '● Detector listo. Inicia la cámara para clasificar.';
       dom.hardwareBadge.innerHTML = '<span class="dot"></span> YOLO · WASM';
       if (dom.btnManualScan) dom.btnManualScan.disabled = false;
@@ -208,11 +208,14 @@
     if (iou > 0.25) return iou;
     const acx = a.x + a.w * 0.5, acy = a.y + a.h * 0.5;
     const bcx = b.x + b.w * 0.5, bcy = b.y + b.h * 0.5;
-    const dist = Math.hypot(acx - bcx, acy - bcy);
-    const refSize = Math.max(a.w, a.h, b.w, b.h, 1);
+    const dx = Math.abs(acx - bcx);
+    const dy = Math.abs(acy - bcy);
+    const maxW = Math.max(a.w, b.w, 1);
+    const maxH = Math.max(a.h, b.h, 1);
     const sizeRatio = Math.min(a.w * a.h, b.w * b.h) / Math.max(a.w * a.h, b.w * b.h, 1);
-    if (dist < refSize * 0.70 && sizeRatio > 0.45) {
-      return Math.max(iou, 0.80 * (1 - dist / (refSize * 0.70)));
+    if (dx < maxW * 0.75 && dy < maxH * 0.55 && sizeRatio > 0.50) {
+      const normDist = Math.hypot(dx / (maxW * 0.75), dy / (maxH * 0.55));
+      if (normDist < 1) return Math.max(iou, 0.75 * (1 - normDist * 0.6));
     }
     return iou;
   }

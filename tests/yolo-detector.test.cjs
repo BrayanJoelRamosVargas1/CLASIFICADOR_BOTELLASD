@@ -60,3 +60,15 @@ test('throttles rotated pass on live video frames to avoid doubling latency on e
   assert.equal(h.calls(), 7);
 });
 
+test('suppresses false-positive bottle when another COCO class has higher score on the same bounding box', async () => {
+  // Same box [10, 20, 110, 220] has cup (class 41, score 0.72) and bottle (class 39, score 0.28)
+  const h = setup([
+    [[10, 20, 110, 220, 0.72, 41], [10, 20, 110, 220, 0.28, 39], [300, 100, 420, 480, 0.85, 39]],
+    []
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 1);
+  assert.equal(Math.round(predictions[0].score * 100), 85);
+});
+
+

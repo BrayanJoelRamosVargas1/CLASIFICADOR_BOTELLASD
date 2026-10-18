@@ -49,6 +49,13 @@
     static unrotateBox([x, y, w, h], originalHeight) {
       return [y, originalHeight - x - w, h, w];
     }
+    static boxIoU([ax, ay, aw, ah], [bx, by, bw, bh]) {
+      const interW = Math.max(0, Math.min(ax + aw, bx + bw) - Math.max(ax, bx));
+      const interH = Math.max(0, Math.min(ay + ah, by + bh) - Math.max(ay, by));
+      const inter = interW * interH;
+      const union = aw * ah + bw * bh - inter;
+      return union > 0 ? inter / union : 0;
+    }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
       const height = source.videoHeight || source.naturalHeight || source.height;
@@ -78,16 +85,24 @@
         outputs = await this.session.run({ [this.session.inputNames[0]]: input });
         const output = outputs[this.session.outputNames[0]];
         if (output.dims.length !== 3 || output.dims[2] !== 6) throw new Error('Formato YOLOv10 inesperado');
-        const predictions = [];
+        const bottles = [];
+        const otherClasses = [];
         const data = output.data;
         for (let i = 0; i < data.length; i += 6) {
           const [x1, y1, x2, y2, score, classId] = data.subarray(i, i + 6);
-          if (classId !== 39 || score < minScore) continue;
-          predictions.push({ class: 'bottle', score,
-            bbox: [x1 * width / resizedW, y1 * height / resizedH,
-              (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH] });
+          if (score < minScore) continue;
+          const bbox = [x1 * width / resizedW, y1 * height / resizedH,
+            (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH];
+          if (classId === 39) {
+            bottles.push({ class: 'bottle', score, bbox });
+          } else {
+            otherClasses.push({ classId, score, bbox });
+          }
         }
-        return predictions.sort((a, b) => b.score - a.score).slice(0, maxBoxes);
+        const dominantBottles = bottles.filter(b =>
+          !otherClasses.some(o => o.score > b.score && YoloBottleDetector.boxIoU(b.bbox, o.bbox) >= 0.70)
+        );
+        return dominantBottles.sort((a, b) => b.score - a.score).slice(0, maxBoxes);
       } finally {
         input.dispose();
         if (outputs) for (const tensor of Object.values(outputs)) tensor.dispose();
