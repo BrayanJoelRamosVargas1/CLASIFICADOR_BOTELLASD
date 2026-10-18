@@ -311,7 +311,8 @@
         page-break-inside: avoid;
         break-inside: avoid;
       }
-      .print-sheet:last-child {
+      .print-sheet:last-child,
+      #hoja-evaluacion-docente {
         page-break-after: avoid !important;
         break-after: avoid !important;
       }
@@ -390,6 +391,12 @@
       </div>
     </div>
     <div class="toolbar-actions">
+      <a href="Caso_Manaco_RESUELTO.docx" download class="btn" title="Descargar el documento Word del Ing. Jesús Bautista ya resuelto">
+        <i class="bx bxs-file-doc"></i> Descargar Word Resuelto (.docx)
+      </a>
+      <a href="Base_de_Datos_MANACO.xlsx" download class="btn" title="Descargar el archivo Excel original de 240 registros">
+        <i class="bx bx-spreadsheet"></i> Descargar Excel (.xlsx)
+      </a>
       <button type="button" class="btn btn-primary" onclick="window.print()">
         <i class="bx bx-printer"></i> Imprimir las 3 Hojas (1 Ejecutiva + 2 Rúbricas)
       </button>
@@ -1009,7 +1016,138 @@
       </div>
     </section>
 
+    <!-- EXPLORADOR INTERACTIVO DE LOS 240 REGISTROS DEL EXCEL DEL INGENIERO (Solo en pantalla, no se imprime) -->
+    <section class="print-sheet no-print" id="explorador-excel" style="border:2px solid #0284c7;">
+      <div class="sheet-header">
+        <div>
+          <h1><i class="bx bx-data" style="color:#0284c7;"></i> EXPLORADOR EN VIVO — BASE DE DATOS EXCEL DEL INGENIERO (240 REGISTROS)</h1>
+          <p>Fuente directa: <code>Bae de Datos MANACO - INTERMEDIO (1).xlsx</code> · Filtra en vivo por flujo, año, categoría SA6 o país socio</p>
+        </div>
+        <div class="sheet-meta">
+          <div id="excelCountBadge" style="font-weight:800; color:#0284c7; font-size:0.9rem;">Cargando 240 filas...</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.65rem; margin-bottom:0.85rem; background:#f8fafc; padding:0.75rem; border-radius:8px; border:1px solid #cbd5e1;">
+        <div>
+          <label style="font-size:0.72rem; font-weight:700; display:block; margin-bottom:0.2rem;">Flujo Comercial</label>
+          <select id="fFlujo" style="width:100%; padding:0.4rem; border-radius:6px; border:1px solid #cbd5e1;">
+            <option value="">Todos (Importación + Exportación)</option>
+            <option value="Importación">Importación</option>
+            <option value="Exportación">Exportación</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem; font-weight:700; display:block; margin-bottom:0.2rem;">Año</label>
+          <select id="fAnio" style="width:100%; padding:0.4rem; border-radius:6px; border:1px solid #cbd5e1;">
+            <option value="">Todos (2020–2024)</option>
+            <option value="2020">2020</option>
+            <option value="2021">2021</option>
+            <option value="2022">2022</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem; font-weight:700; display:block; margin-bottom:0.2rem;">Categoría SA6</label>
+          <select id="fSa6" style="width:100%; padding:0.4rem; border-radius:6px; border:1px solid #cbd5e1;">
+            <option value="">Todas (640399, 640411, 640420)</option>
+            <option value="640399">640399 - Sup. cuero / suela caucho</option>
+            <option value="640411">640411 - Calzado deportivo</option>
+            <option value="640420">640420 - Suela cuero / sup. cuero</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem; font-weight:700; display:block; margin-bottom:0.2rem;">Buscar Socio Comercial</label>
+          <input id="fSocio" type="text" placeholder="Ej. Grecia, Países Bajos, Vietnam..." style="width:100%; padding:0.4rem; border-radius:6px; border:1px solid #cbd5e1;">
+        </div>
+      </div>
+
+      <div id="excelKpiBar" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.65rem; margin-bottom:0.85rem;"></div>
+
+      <div style="max-height:360px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px;">
+        <table style="margin:0;">
+          <thead style="position:sticky; top:0; z-index:2;">
+            <tr>
+              <th>Año</th>
+              <th>Flujo</th>
+              <th>SA6</th>
+              <th>Categoría</th>
+              <th>Socio Comercial</th>
+              <th class="num">Valor (Miles USD)</th>
+              <th class="num">Cantidad (Pares)</th>
+              <th class="num">Valor Total (USD)</th>
+              <th class="num">USD / Par</th>
+            </tr>
+          </thead>
+          <tbody id="excelTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
   </div>
+
+  <script>
+    (() => {
+      let rows = [];
+      const tbody = document.getElementById('excelTableBody');
+      const countBadge = document.getElementById('excelCountBadge');
+      const kpiBar = document.getElementById('excelKpiBar');
+      const fFlujo = document.getElementById('fFlujo');
+      const fAnio = document.getElementById('fAnio');
+      const fSa6 = document.getElementById('fSa6');
+      const fSocio = document.getElementById('fSocio');
+
+      function render() {
+        const flujo = fFlujo.value;
+        const anio = fAnio.value;
+        const sa6 = fSa6.value;
+        const socio = fSocio.value.trim().toLowerCase();
+
+        const filtered = rows.filter(r =>
+          (!flujo || r.flujo === flujo) &&
+          (!anio || String(r.anio) === anio) &&
+          (!sa6 || r.sa6 === sa6) &&
+          (!socio || r.socio.toLowerCase().includes(socio))
+        );
+
+        let sumUsd = 0, sumPares = 0;
+        for (const r of filtered) {
+          sumUsd += r.valorUsd;
+          sumPares += r.pares;
+        }
+        const pondPar = sumPares > 0 ? (sumUsd / sumPares) : 0;
+
+        countBadge.textContent = `${filtered.length} de ${rows.length} registros activos`;
+        kpiBar.innerHTML = `
+          <div class="callout"><strong>Valor Comercial Filtrado</strong><span style="font-size:1rem;font-weight:800;color:#0f172a;">$${(sumUsd / 1e6).toLocaleString('es-ES', { maximumFractionDigits: 2 })} Millones USD</span></div>
+          <div class="callout"><strong>Volumen Físico Filtrado</strong><span style="font-size:1rem;font-weight:800;color:#0284c7;">${(sumPares / 1e6).toLocaleString('es-ES', { maximumFractionDigits: 2 })} Millones de pares</span></div>
+          <div class="callout"><strong>Valor Ponderado por Par</strong><span style="font-size:1rem;font-weight:800;color:#059669;">$${pondPar.toFixed(2)} USD / par</span></div>
+        `;
+
+        tbody.innerHTML = filtered.map(r => `
+          <tr>
+            <td><strong>${r.anio}</strong></td>
+            <td><span style="color:${r.flujo === 'Importación' ? '#dc2626' : '#059669'};font-weight:700;">${r.flujo}</span></td>
+            <td><code>${r.sa6}</code></td>
+            <td>${r.categoria}</td>
+            <td><strong>${r.socio}</strong></td>
+            <td class="num">${r.valorMilesUsd.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+            <td class="num">${r.pares.toLocaleString('es-ES')}</td>
+            <td class="num">$${r.valorUsd.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+            <td class="num"><strong>$${r.usdPorPar.toFixed(2)}</strong></td>
+          </tr>
+        `).join('');
+      }
+
+      [fFlujo, fAnio, fSa6, fSocio].forEach(el => el && el.addEventListener('input', render));
+
+      fetch('./datos_manaco_240.json')
+        .then(res => res.json())
+        .then(data => { rows = data; render(); })
+        .catch(() => { countBadge.textContent = '240 registros integrados en resumen ejecutivo'; });
+    })();
+  </script>
 
 </body>
 </html>
