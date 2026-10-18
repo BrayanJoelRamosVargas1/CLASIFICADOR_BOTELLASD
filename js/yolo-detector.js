@@ -24,16 +24,20 @@
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
       this.pixels = new Float32Array(3 * 640 * 640);
       this.videoFrameCount = 0;
+      this.lastRotatedHit = false;
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
-      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.18;
-      if (direct.some(p => p.score >= threshold)) return direct;
+      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.21;
+      if (direct.some(p => p.score >= threshold)) {
+        this.lastRotatedHit = false;
+        return direct;
+      }
       const width = source.videoWidth || source.naturalWidth || source.width;
       const height = source.videoHeight || source.naturalHeight || source.height;
       if (!width || !height) return direct;
-      // On live video streams, only run the rotated second pass every 6th empty frame to keep FPS high.
-      if (source.videoWidth && (++this.videoFrameCount % 6 !== 0)) return direct;
+      // On live video streams, throttle the rotated pass to every 6th empty frame unless the previous frame found a horizontal bottle.
+      if (source.videoWidth && !this.lastRotatedHit && (++this.videoFrameCount % 6 !== 0)) return direct;
       if (!this.rotated) this.rotated = document.createElement('canvas');
       this.rotated.width = height;
       this.rotated.height = width;
@@ -43,6 +47,7 @@
       ctx.rotate(Math.PI / 2);
       ctx.drawImage(source, 0, 0, width, height);
       const rotated = await this.detectOnce(this.rotated, maxBoxes, minScore);
+      this.lastRotatedHit = rotated.some(p => p.score >= threshold);
       return direct.concat(rotated.map(p => ({ ...p,
         bbox: YoloBottleDetector.unrotateBox(p.bbox, height) })));
     }
@@ -55,6 +60,25 @@
       const inter = interW * interH;
       const union = aw * ah + bw * bh - inter;
       return union > 0 ? inter / union : 0;
+    }
+    static isDominatedByOtherClass(bottle, other) {
+      const [bx, by, bw, bh] = bottle.bbox;
+      const [ox, oy, ow, oh] = other.bbox;
+      const interW = Math.max(0, Math.min(bx + bw, ox + ow) - Math.max(bx, ox));
+      const interH = Math.max(0, Math.min(by + bh, oy + oh) - Math.max(by, oy));
+      const inter = interW * interH;
+      if (inter <= 0) return false;
+      const bArea = Math.max(bw * bh, 1);
+      const oArea = Math.max(ow * oh, 1);
+      const iou = inter / (bArea + oArea - inter);
+      const containment = inter / Math.min(bArea, oArea);
+      if (other.classId !== 0) {
+        if (iou >= 0.35 && other.score >= bottle.score * 0.85) return true;
+        if (containment >= 0.65 && other.score > bottle.score) return true;
+        return false;
+      }
+      const insidePerson = inter / bArea;
+      return insidePerson >= 0.80 && other.score > 0.55 && bottle.score < 0.42;
     }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
@@ -100,7 +124,7 @@
           }
         }
         const dominantBottles = bottles.filter(b =>
-          !otherClasses.some(o => o.score > b.score && YoloBottleDetector.boxIoU(b.bbox, o.bbox) >= 0.70)
+          !otherClasses.some(o => YoloBottleDetector.isDominatedByOtherClass(b, o))
         );
         return dominantBottles.sort((a, b) => b.score - a.score).slice(0, maxBoxes);
       } finally {

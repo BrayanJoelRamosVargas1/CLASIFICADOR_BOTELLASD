@@ -16,7 +16,7 @@
       "rows": [
         {
           "file": "1.PNG",
-          "elapsedMs": 936,
+          "elapsedMs": 704,
           "bottles": 1,
           "boxes": [
             {
@@ -43,7 +43,7 @@
         },
         {
           "file": "6.jpeg",
-          "elapsedMs": 737,
+          "elapsedMs": 584,
           "bottles": 1,
           "boxes": [
             {
@@ -70,7 +70,7 @@
         },
         {
           "file": "10.jpg",
-          "elapsedMs": 1407,
+          "elapsedMs": 1134,
           "bottles": 1,
           "boxes": [
             {
@@ -107,7 +107,7 @@
         },
         {
           "file": "15.jpeg",
-          "elapsedMs": 672,
+          "elapsedMs": 544,
           "bottles": 1,
           "boxes": [
             {
@@ -134,7 +134,7 @@
         },
         {
           "file": "16.jpeg",
-          "elapsedMs": 675,
+          "elapsedMs": 547,
           "bottles": 1,
           "boxes": [
             {
@@ -161,14 +161,14 @@
         },
         {
           "file": "17.jpeg",
-          "elapsedMs": 1342,
+          "elapsedMs": 1068,
           "bottles": 0,
           "boxes": [],
           "rawBottles": []
         },
         {
           "file": "18.jpeg",
-          "elapsedMs": 675,
+          "elapsedMs": 545,
           "bottles": 1,
           "boxes": [
             {
@@ -195,7 +195,7 @@
         },
         {
           "file": "19.jpeg",
-          "elapsedMs": 678,
+          "elapsedMs": 542,
           "bottles": 1,
           "boxes": [
             {
@@ -232,7 +232,7 @@
         },
         {
           "file": "20.jpeg",
-          "elapsedMs": 692,
+          "elapsedMs": 546,
           "bottles": 1,
           "boxes": [
             {
@@ -259,14 +259,14 @@
         },
         {
           "file": "21.jpeg",
-          "elapsedMs": 1352,
+          "elapsedMs": 1075,
           "bottles": 0,
           "boxes": [],
           "rawBottles": []
         },
         {
           "file": "39.jpeg",
-          "elapsedMs": 638,
+          "elapsedMs": 533,
           "bottles": 1,
           "boxes": [
             {
@@ -293,7 +293,7 @@
         },
         {
           "file": "40.jpeg",
-          "elapsedMs": 612,
+          "elapsedMs": 532,
           "bottles": 1,
           "boxes": [
             {

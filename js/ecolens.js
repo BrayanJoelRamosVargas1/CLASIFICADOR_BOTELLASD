@@ -179,7 +179,7 @@
         throw new Error('ONNX Runtime no cargó');
       }
       dom.statusText.textContent = 'Cargando detector de botellas...';
-      detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=16.0');
+      detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=17.0');
       dom.statusText.textContent = '● Detector listo. Inicia la cámara para clasificar.';
       dom.hardwareBadge.innerHTML = '<span class="dot"></span> YOLO · WASM';
       if (dom.btnManualScan) dom.btnManualScan.disabled = false;
@@ -203,7 +203,7 @@
     return union <= 0 ? 0 : inter / union;
   }
 
-  function computeMatchScore(a, b) {
+  function computeMatchScore(a, b, countInFrame = 1) {
     const iou = computeIoU(a, b);
     if (iou > 0.25) return iou;
     const acx = a.x + a.w * 0.5, acy = a.y + a.h * 0.5;
@@ -213,8 +213,11 @@
     const maxW = Math.max(a.w, b.w, 1);
     const maxH = Math.max(a.h, b.h, 1);
     const sizeRatio = Math.min(a.w * a.h, b.w * b.h) / Math.max(a.w * a.h, b.w * b.h, 1);
-    if (dx < maxW * 0.75 && dy < maxH * 0.55 && sizeRatio > 0.50) {
-      const normDist = Math.hypot(dx / (maxW * 0.75), dy / (maxH * 0.55));
+    const limitX = countInFrame === 1 ? Math.max(maxW * 2.2, 220) : maxW * 0.75;
+    const limitY = countInFrame === 1 ? Math.max(maxH * 0.85, 180) : maxH * 0.55;
+    const minRatio = countInFrame === 1 ? 0.38 : 0.50;
+    if (dx < limitX && dy < limitY && sizeRatio > minRatio) {
+      const normDist = Math.hypot(dx / limitX, dy / limitY);
       if (normDist < 1) return Math.max(iou, 0.75 * (1 - normDist * 0.6));
     }
     return iou;
@@ -370,7 +373,7 @@
         for (const t of trackers) {
           if (matchedTrackerIds.has(t.id)) continue;
 
-          const score = computeMatchScore(t, box);
+          const score = computeMatchScore(t, box, filtered.length);
           if (score > bestIoU) {
             bestIoU = score;
             bestMatch = t;
@@ -382,20 +385,21 @@
           bestMatch.y = bestMatch.y * 0.30 + box.y * 0.70;
           bestMatch.w = bestMatch.w * 0.30 + box.w * 0.70;
           bestMatch.h = bestMatch.h * 0.30 + box.h * 0.70;
-          bestMatch.score = box.score;
+          bestMatch.score = Math.max(bestMatch.score, box.score);
           bestMatch.lastSeen = now;
           bestMatch.missed = 0;
           bestMatch.hits++;
           matchedTrackerIds.add(bestMatch.id);
 
-          // Confirmación y Auto-Registro en Frame 2
-          if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
+          // Confirmación y Auto-Registro en Frame 2 (o inmediato si supera 0.40)
+          if ((bestMatch.hits >= CONFIG.CONFIRMATION_HITS || bestMatch.score >= 0.40) && !bestMatch.registered) {
             bestMatch.registered = true;
             newlyRegistered.push(bestMatch);
           }
         } else {
           // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
           const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
+          const instantConfirm = isLoopActive && box.score >= 0.40;
           const newTracker = {
             id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
             x: box.x,
@@ -406,13 +410,16 @@
             rawClass: box.rawClass,
             meta: meta,
             label: meta.label,
-            hits: 1,
+            hits: instantConfirm ? CONFIG.CONFIRMATION_HITS : 1,
             lastSeen: now,
             missed: 0,
-            registered: false
+            registered: instantConfirm
           };
           trackers.push(newTracker);
           matchedTrackerIds.add(newTracker.id);
+          if (instantConfirm) {
+            newlyRegistered.push(newTracker);
+          }
         }
       }
 
@@ -420,7 +427,7 @@
       for (const t of trackers) {
         if (!matchedTrackerIds.has(t.id)) {
           t.missed++;
-          if (!t.registered) t.hits = 0;
+          if (!t.registered && t.missed >= 2) t.hits = 0;
         }
       }
 
