@@ -766,7 +766,14 @@
         takeCount = 0;
         dom.statusText.textContent = 'Analizando fotografía con IA...';
 
+        if (!detector) {
+          await initNeuralEngines();
+        }
         await processVisualFrame();
+        if (dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
+          dom.dailyCurrentInput.value = String(visibleBoxes.length);
+          updateDailyPreview();
+        }
         // En fotos, confirmar directamente las botellas visibles
         const found = visibleBoxes.filter(t => !t.registered);
         for (const t of found) {
@@ -778,7 +785,7 @@
         renderCanvasHUD();
 
         if (visibleBoxes.length === 0) {
-          dom.statusText.textContent = 'No se distinguieron botellas en la imagen. Intenta con una foto con mejor iluminación.';
+          dom.statusText.textContent = 'No se distinguieron botellas en la imagen (Quedan: 0).';
         }
       };
       img.src = e.target.result;
@@ -1207,6 +1214,7 @@
 
     dom.btnUploadPhoto.addEventListener('change', (e) => {
       handlePhotoUpload(e.target.files[0]);
+      e.target.value = '';
     });
 
     if (dom.btnManualScan) {
