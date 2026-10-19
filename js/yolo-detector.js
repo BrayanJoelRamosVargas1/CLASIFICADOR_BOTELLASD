@@ -14,6 +14,42 @@
         return false;
       }
     }
+    static async fetchModelCached(url) {
+      // Cache ONNX binary in IndexedDB so even Ctrl+F5 reloads in <50ms without 14MB network wait
+      if (typeof indexedDB === 'undefined' || typeof fetch === 'undefined') return url;
+      const dbName = 'ecolens_onnx_model_cache_v1';
+      const storeName = 'models';
+      const openDb = () => new Promise((resolve, reject) => {
+        const req = indexedDB.open(dbName, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(storeName);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      try {
+        const db = await openDb();
+        const cached = await new Promise((resolve) => {
+          const tx = db.transaction(storeName, 'readonly');
+          const getReq = tx.objectStore(storeName).get(url);
+          getReq.onsuccess = () => resolve(getReq.result || null);
+          getReq.onerror = () => resolve(null);
+        });
+        if (cached && cached.byteLength > 1000000) {
+          db.close();
+          return new Uint8Array(cached);
+        }
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const buf = await resp.arrayBuffer();
+        try {
+          const tx = db.transaction(storeName, 'readwrite');
+          tx.objectStore(storeName).put(buf, url);
+        } catch (e) {}
+        db.close();
+        return new Uint8Array(buf);
+      } catch (e) {
+        return url;
+      }
+    }
     static async load(modelUrl = './models/yolov10n/model.onnx') {
       ort.env.wasm.wasmPaths = scriptDir
         ? new URL('./ort/', scriptDir).href
@@ -32,7 +68,8 @@
         try {
           ort.env.wasm.proxy = false;
           const fp16Url = resolvedUrl.replace(/model\.onnx(\?.*)?$/, 'model_fp16.onnx$1');
-          session = await ort.InferenceSession.create(fp16Url, {
+          const modelSource = await YoloBottleDetector.fetchModelCached(fp16Url);
+          session = await ort.InferenceSession.create(modelSource, {
             executionProviders: ['webgpu'],
             graphOptimizationLevel: 'all'
           });
@@ -43,7 +80,8 @@
       }
       if (!session) {
         ort.env.wasm.proxy = !isolated && typeof Worker !== 'undefined';
-        session = await ort.InferenceSession.create(resolvedUrl, {
+        const modelSource = await YoloBottleDetector.fetchModelCached(resolvedUrl);
+        session = await ort.InferenceSession.create(modelSource, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all'
         });
@@ -87,7 +125,7 @@
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
-      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.21;
+      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.15;
       const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
       const isVideo = Boolean(source.videoWidth);
       if (isVideo && bestDirect >= threshold) {
@@ -102,13 +140,27 @@
       if (!width || !height) return direct;
 
       if (isVideo) {
-        // On live camera, if locked onto an auxiliary mode, repeat it immediately; otherwise cycle.
+        // On WebGPU live camera, always test Foveated HD crop first if not locked onto a rotation mode,
+        // and if crop also misses, immediately test the next rotation mode in the same cycle.
+        if (this.backend === 'webgpu') {
+          const primaryMode = this.lastAuxMode || 'crop';
+          const aux1 = await this.runAuxPass(primaryMode, source, width, height, maxBoxes, minScore);
+          if (aux1.some(p => p.score >= threshold)) {
+            this.lastAuxMode = primaryMode;
+            return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1)), threshold);
+          }
+          const rotModes = ['rot90', 'rot180', 'rot270'];
+          const rotMode = rotModes[(++this.videoFrameCount) % rotModes.length];
+          const aux2 = await this.runAuxPass(rotMode, source, width, height, maxBoxes, minScore);
+          this.lastAuxMode = aux2.some(p => p.score >= threshold) ? rotMode : null;
+          return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1, aux2)), threshold);
+        }
+        // WASM fallback: throttle auxiliary pass to every 2nd empty frame
         const modes = ['crop', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
-          if (this.backend !== 'webgpu' && ++this.videoFrameCount % 2 !== 0) return direct;
-          const step = this.backend === 'webgpu' ? ++this.videoFrameCount : (this.videoFrameCount >> 1);
-          mode = modes[step % modes.length];
+          if (++this.videoFrameCount % 2 !== 0) return direct;
+          mode = modes[(this.videoFrameCount >> 1) % modes.length];
         }
         const aux = await this.runAuxPass(mode, source, width, height, maxBoxes, minScore);
         this.lastAuxMode = aux.some(p => p.score >= threshold) ? mode : null;
@@ -176,7 +228,7 @@
         if ('filter' in ctx) ctx.filter = 'contrast(1.12) saturate(1.08)';
         ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
         if ('filter' in ctx) ctx.filter = 'none';
-        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.24));
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.16));
         return preds.map(p => ({
           ...p,
           bbox: [cropX + p.bbox[0], cropY + p.bbox[1], p.bbox[2], p.bbox[3]]
@@ -298,6 +350,9 @@
             (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH];
           if (classId === 39) {
             bottles.push({ class: 'bottle', score, bbox });
+          } else if (classId === 75 && score >= 0.28 && bbox[3] > bbox[2] * 1.45) {
+            // Slender upright glass/clear bottles that COCO backbones occasionally activate as class 75
+            bottles.push({ class: 'bottle', score: score * 0.85, bbox });
           } else {
             otherClasses.push({ classId, score, bbox });
           }

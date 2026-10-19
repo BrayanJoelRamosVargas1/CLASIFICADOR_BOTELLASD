@@ -89,8 +89,8 @@ test('serializes inference and discards results arriving after the source stoppe
   assert.equal(h.getTrackers().length, 0);
   assert.equal(h.registrations.length, 0);
 });
-test('ByteTrack stage-2 hysteresis continues an active bottle track when glare drops confidence to 0.16', async () => {
-  let predictions = [{ ...bottle, score: 0.16 }];
+test('ByteTrack stage-2 hysteresis continues an active bottle track when glare drops confidence to 0.13', async () => {
+  let predictions = [{ ...bottle, score: 0.13 }];
   const h = engine(async () => predictions);
   // A low-score box alone never starts a new track
   await h.processVisualFrame();
@@ -100,8 +100,8 @@ test('ByteTrack stage-2 hysteresis continues an active bottle track when glare d
   await h.processVisualFrame();
   assert.equal(h.getTrackers().length, 1);
   assert.equal(h.registrations.length, 0);
-  // Frame 2 dips to 0.16 due to glare on transparent PET bottle, but ByteTrack stage 2 confirms it
-  predictions = [{ ...bottle, score: 0.16, bbox: [12, 22, 50, 100] }];
+  // Frame 2 dips to 0.13 due to glare on transparent PET bottle, but ByteTrack stage 2 confirms it
+  predictions = [{ ...bottle, score: 0.13, bbox: [12, 22, 50, 100] }];
   await h.processVisualFrame();
   assert.equal(h.registrations.length, 1);
 });

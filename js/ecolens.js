@@ -187,7 +187,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=22.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=23.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -465,10 +465,10 @@
           }
         }
 
-        // ByteTrack Stage 2 (ifzhang/ByteTrack & r/computervision): associate low-confidence boxes (0.13..threshold)
+        // ByteTrack Stage 2 (ifzhang/ByteTrack & r/computervision): associate low-confidence boxes (0.11..threshold)
         // ONLY with already-active trackers so momentary glare/refraction on transparent bottles never drops the track.
         if (trackers.some(t => !matchedTrackerIds.has(t.id))) {
-          const lowCandidates = window.BottleDetection.select(rawPredictions, srcW, srcH, 0.13)
+          const lowCandidates = window.BottleDetection.select(rawPredictions, srcW, srcH, 0.11)
             .filter(b => b.score < activeThreshold);
           for (const lowBox of lowCandidates) {
             let bestMatch = null;
@@ -764,13 +764,13 @@
     dom.statusText.textContent = 'Conectando sensor óptico...';
 
     try {
-      // Solicitar 640x480; la velocidad real depende de la cámara y el dispositivo.
+      // Solicitar 1280x720 HD para que el recorte Foveated/SAHI tenga zoom óptico real 2x sobre botellas pequeñas o lejanas.
       const constraints = {
         audio: false,
         video: {
           facingMode: { ideal: facingMode },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
       };
 
