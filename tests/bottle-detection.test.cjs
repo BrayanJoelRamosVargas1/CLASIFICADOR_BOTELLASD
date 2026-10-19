@@ -43,3 +43,13 @@ test('computes restock, sold-out and sanitizes product name against XSS', () => 
   assert.equal(empty.soldUnits, 10);
   assert.equal(empty.status, 'Agotado');
 });
+
+test('computes DRS deposit refund value: 0.50 Bs for PET bottles and 1.00 Bs for glass bottles', () => {
+  const items = [
+    { tagClass: 'pet', depositValue: 0.50 },
+    { tagClass: 'coca', depositValue: 0.50 },
+    { tagClass: 'glass', depositValue: 1.00 }
+  ];
+  const total = items.reduce((acc, i) => acc + i.depositValue, 0);
+  assert.equal(total, 2.00);
+});

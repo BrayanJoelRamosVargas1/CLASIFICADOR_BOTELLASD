@@ -88,6 +88,7 @@
     kpiTotalGrams: document.getElementById('kpiTotalGrams'),
     kpiTotalCo2: document.getElementById('kpiTotalCo2'),
     kpiTotalWater: document.getElementById('kpiTotalWater'),
+    kpiTotalDeposit: document.getElementById('kpiTotalDeposit'),
     counterHeader: document.getElementById('counterHeaderNum'),
     
     // HUD Live
@@ -258,15 +259,40 @@
     return iou;
   }
 
-  // Heurística visual de material sobre el núcleo central del envase (evitando el fondo de las esquinas).
+  // Heurística de Física Óptica e Inspección de Botellas (Estándar RVM / TOMRA)
   function inspectMaterial(bx, by, bw, bh, rawClass) {
-    if (rawClass === 'wine glass') {
+    const isGlass = rawClass === 'wine glass';
+    const depositValue = isGlass ? 1.00 : 0.50;
+
+    // 1. Estimación de Volumen y Tamaño Comercial
+    const aspect = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+    const srcW = (activeSource && (activeSource.videoWidth || activeSource.naturalWidth)) || 640;
+    const srcH = (activeSource && (activeSource.videoHeight || activeSource.naturalHeight)) || 480;
+    const areaRatio = (bw * bh) / (srcW * srcH);
+
+    let sizeLabel = 'Mediana (600ml - 1L)';
+    let volumeMl = 600;
+    if (aspect >= 2.65 && areaRatio < 0.12) {
+      sizeLabel = 'Personal (330ml - 500ml)';
+      volumeMl = 500;
+    } else if (aspect < 2.2 || areaRatio >= 0.26) {
+      sizeLabel = 'Familiar (1.5L - 3L)';
+      volumeMl = 2000;
+    }
+
+    if (isGlass) {
       return {
         label: 'Botella de Vidrio (Estimado)',
         tagClass: 'glass',
         color: '#a855f7',
         fill: 'rgba(168, 85, 247, 0.22)',
-        icon: 'bx-wine'
+        icon: 'bx-wine',
+        sizeLabel,
+        volumeMl,
+        hasCap: true,
+        capLabel: 'Con Tapa/Corona',
+        liquidStatus: 'Vacía',
+        depositValue
       };
     }
 
@@ -276,14 +302,18 @@
         tagClass: 'pet',
         color: '#06b6d4',
         fill: 'rgba(6, 182, 212, 0.20)',
-        icon: 'bx-water'
+        icon: 'bx-water',
+        sizeLabel,
+        volumeMl,
+        hasCap: true,
+        capLabel: 'Con Tapa (HDPE)',
+        liquidStatus: 'Vacía',
+        depositValue
       };
     }
 
     try {
-      const srcW = activeSource.videoWidth || activeSource.naturalWidth || 640;
-      const srcH = activeSource.videoHeight || activeSource.naturalHeight || 480;
-
+      // 2. Muestreo del Núcleo Central (Material / Etiqueta)
       const coreX = bx + bw * 0.22;
       const coreY = by + bh * 0.18;
       const coreW = bw * 0.56;
@@ -319,35 +349,88 @@
       const darkRatio = darkCount / total;
       const greenRatio = greenCount / total;
 
-      // 1. Vidrio (Vino, Cerveza oscura, Tinte verde)
+      // 3. Inspección de Tapa en el Cuello Superior (Top 14%)
+      let hasCap = true;
+      try {
+        const neckX = Math.max(0, Math.min(srcW - 2, Math.floor(bx + bw * 0.25)));
+        const neckY = Math.max(0, Math.min(srcH - 2, Math.floor(by)));
+        const neckW = Math.max(4, Math.min(srcW - neckX, Math.floor(bw * 0.50)));
+        const neckH = Math.max(4, Math.min(srcH - neckY, Math.floor(bh * 0.14)));
+        sampleCtx.drawImage(activeSource, neckX, neckY, neckW, neckH, 0, 0, 16, 16);
+        const neckData = sampleCtx.getImageData(0, 0, 16, 16).data;
+        let neckSatCount = 0;
+        for (let i = 0; i < neckData.length; i += 4) {
+          const nr = neckData[i], ng = neckData[i + 1], nb = neckData[i + 2];
+          const maxC = Math.max(nr, ng, nb);
+          const minC = Math.min(nr, ng, nb);
+          const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+          if (sat > 0.26 || maxC < 40) neckSatCount++;
+        }
+        hasCap = (neckSatCount / total) > 0.28;
+      } catch (e) {}
+
+      // 4. Inspección de Líquido Residual en la Base Inferior (Bottom 25%)
+      let liquidStatus = 'Vacía';
+      try {
+        const baseY = Math.max(0, Math.min(srcH - 2, Math.floor(by + bh * 0.72)));
+        const baseH = Math.max(4, Math.min(srcH - baseY, Math.floor(bh * 0.26)));
+        sampleCtx.drawImage(activeSource, sx, baseY, sw, baseH, 0, 0, 16, 16);
+        const baseData = sampleCtx.getImageData(0, 0, 16, 16).data;
+        let baseDark = 0;
+        for (let i = 0; i < baseData.length; i += 4) {
+          const lum = 0.299 * baseData[i] + 0.587 * baseData[i + 1] + 0.114 * baseData[i + 2];
+          if (lum < 65) baseDark++;
+        }
+        if ((baseDark / total) > 0.42 && avgLum > 90) {
+          liquidStatus = 'Con Líquido';
+        }
+      } catch (e) {}
+
+      // Clasificación de Material
       if (darkRatio > 0.35 || greenRatio > 0.30 || avgLum < 85) {
         return {
           label: 'Botella de Vidrio (Estimado)',
           tagClass: 'glass',
           color: '#a855f7',
           fill: 'rgba(168, 85, 247, 0.22)',
-          icon: 'bx-wine'
+          icon: 'bx-wine',
+          sizeLabel,
+          volumeMl,
+          hasCap,
+          capLabel: hasCap ? 'Con Tapa/Corona' : 'Sin Tapa',
+          liquidStatus,
+          depositValue: 1.00
         };
       }
 
-      // 2. Coca-Cola / Bebida con etiqueta roja
       if (redRatio > 0.035) {
         return {
           label: 'Botella PET (Etiqueta Roja; Estimado)',
           tagClass: 'coca',
           color: '#ef4444',
           fill: 'rgba(239, 68, 68, 0.22)',
-          icon: 'bx-recycle'
+          icon: 'bx-recycle',
+          sizeLabel,
+          volumeMl,
+          hasCap,
+          capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
+          liquidStatus,
+          depositValue: 0.50
         };
       }
 
-      // 3. Plástico Transparente (Agua / PET)
       return {
         label: 'Botella PET (Estimado por Color)',
         tagClass: 'pet',
         color: '#06b6d4',
         fill: 'rgba(6, 182, 212, 0.20)',
-        icon: 'bx-water'
+        icon: 'bx-water',
+        sizeLabel,
+        volumeMl,
+        hasCap,
+        capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
+        liquidStatus,
+        depositValue: 0.50
       };
     } catch (e) {
       return {
@@ -355,7 +438,13 @@
         tagClass: 'pet',
         color: '#06b6d4',
         fill: 'rgba(6, 182, 212, 0.20)',
-        icon: 'bx-water'
+        icon: 'bx-water',
+        sizeLabel,
+        volumeMl,
+        hasCap: true,
+        capLabel: 'Con Tapa (HDPE)',
+        liquidStatus: 'Vacía',
+        depositValue
       };
     }
   }
@@ -597,6 +686,11 @@
       label: item.label,
       tagClass: item.meta ? item.meta.tagClass : 'pet',
       confidence: Math.round(item.score * 100),
+      sizeLabel: item.meta ? item.meta.sizeLabel : 'Personal (500ml)',
+      volumeMl: item.meta ? item.meta.volumeMl : 500,
+      hasCap: item.meta ? Boolean(item.meta.hasCap) : true,
+      liquidStatus: item.meta ? item.meta.liquidStatus : 'Vacía',
+      depositValue: item.meta && typeof item.meta.depositValue === 'number' ? item.meta.depositValue : (item.meta && item.meta.tagClass === 'glass' ? 1.00 : 0.50),
       gramsPlastic: item.meta && item.meta.tagClass === 'glass' ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
       co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
     }));
@@ -702,20 +796,35 @@
       ctx.lineTo(rx + rw, ry + rh - corner);
       ctx.stroke();
 
-      // 4. Etiqueta flotante
-      const fontSize = Math.max(13, Math.round(14 * baseScale));
+      // 4. Etiqueta flotante con Física de Botella RVM (Tamaño, Tapa, Contenido y Reembolso)
+      const subTag = `${meta.sizeLabel ? meta.sizeLabel.split(' ')[0] : '500ml'} · ${meta.hasCap ? 'Con Tapa' : 'Sin Tapa'} · ${meta.liquidStatus ? meta.liquidStatus.split(' ')[0] : 'Vacía'} · +${(meta.depositValue || 0.50).toFixed(2)}Bs`;
+      const fontSize = Math.max(12, Math.round(13 * baseScale));
+      const subFontSize = Math.max(10, Math.round(10.5 * baseScale));
       ctx.font = `700 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
       const textMetrics = ctx.measureText(tagText);
-      const tagHeight = Math.round(28 * baseScale);
+      ctx.font = `600 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
+      const subMetrics = ctx.measureText(subTag);
+
+      const tagWidth = Math.max(textMetrics.width, subMetrics.width) + 18 * baseScale;
+      const tagHeight = Math.round(44 * baseScale);
       const tagY = ry > tagHeight + 6 ? ry - tagHeight - 4 : ry + 6;
 
       ctx.fillStyle = strokeColor;
       ctx.beginPath();
-      ctx.roundRect(rx, tagY, textMetrics.width + 18 * baseScale, tagHeight, 6 * baseScale);
+      if (ctx.roundRect) {
+        ctx.roundRect(rx, tagY, tagWidth, tagHeight, 6 * baseScale);
+      } else {
+        ctx.rect(rx, tagY, tagWidth, tagHeight);
+      }
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(tagText, rx + 9 * baseScale, tagY + tagHeight * 0.68);
+      ctx.font = `700 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillText(tagText, rx + 9 * baseScale, tagY + tagHeight * 0.44);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
+      ctx.font = `600 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillText(subTag, rx + 9 * baseScale, tagY + tagHeight * 0.82);
     }
   }
 
@@ -1030,6 +1139,11 @@
       const tagClass = item.tagClass || (item.label.includes('Vidrio') ? 'glass' : item.label.includes('Coca') ? 'coca' : 'pet');
       const iconClass = tagClass === 'glass' ? 'bx-wine' : tagClass === 'coca' ? 'bx-recycle' : 'bx-water';
 
+      const deposit = (typeof item.depositValue === 'number' ? item.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
+      const sizeStr = item.sizeLabel || 'Personal (500ml)';
+      const capStr = item.hasCap ? '<span style="color:#059669; font-weight:700;">✓ Con Tapa</span>' : '<span style="color:#64748b;">Sin Tapa</span>';
+      const liquidStr = item.liquidStatus ? `<span style="font-size:0.75rem; color:${item.liquidStatus.includes('Líquido') ? '#d97706' : '#059669'};">● ${item.liquidStatus}</span>` : '<span style="font-size:0.75rem; color:#059669;">● Vacía</span>';
+
       tr.innerHTML = `
         <td style="font-weight:700; font-family:var(--font-mono); color:var(--primary);">${item.id}</td>
         <td>
@@ -1038,6 +1152,12 @@
             ${item.label}
           </span>
         </td>
+        <td style="font-size:0.8rem; font-weight:600; color:#334155;">${sizeStr}</td>
+        <td style="font-size:0.8rem;">
+          <div>${capStr}</div>
+          <div>${liquidStr}</div>
+        </td>
+        <td style="font-weight:800; font-family:var(--font-mono); color:#059669;">${deposit} Bs.</td>
         <td>
           <div style="display:flex; align-items:center; gap:0.4rem;">
             <div style="width:40px; height:6px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
@@ -1069,18 +1189,20 @@
     });
   }
 
-  // 14. Métricas de Impacto Ecológico
+  // 14. Métricas de Impacto Ecológico y Reembolso DRS
   function updateImpactMetrics(items = loadInventory()) {
     const count = items.length;
     const petCount = items.filter(i => i.tagClass !== 'glass').length;
     const gramsPlastic = Math.round(petCount * CONFIG.GRAMS_PLASTIC_PER_BOTTLE);
     const gramsCo2 = Math.round(count * CONFIG.GRAMS_CO2_PER_BOTTLE);
     const litersWater = Math.round(count * CONFIG.LITERS_WATER_PER_BOTTLE * 10) / 10;
+    const totalDeposit = items.reduce((acc, i) => acc + (typeof i.depositValue === 'number' ? i.depositValue : (i.tagClass === 'glass' ? 1.00 : 0.50)), 0);
 
-    dom.kpiTotalCount.textContent = count;
-    dom.kpiTotalGrams.textContent = `${gramsPlastic}g`;
-    dom.kpiTotalCo2.textContent = `${gramsCo2}g`;
-    dom.kpiTotalWater.textContent = `${litersWater}L`;
+    if (dom.kpiTotalCount) dom.kpiTotalCount.textContent = count;
+    if (dom.kpiTotalGrams) dom.kpiTotalGrams.textContent = `${gramsPlastic}g`;
+    if (dom.kpiTotalCo2) dom.kpiTotalCo2.textContent = `${gramsCo2}g`;
+    if (dom.kpiTotalWater) dom.kpiTotalWater.textContent = `${litersWater}L`;
+    if (dom.kpiTotalDeposit) dom.kpiTotalDeposit.textContent = `${totalDeposit.toFixed(2)} Bs.`;
   }
 
   // 15. Exportación CSV y JSON

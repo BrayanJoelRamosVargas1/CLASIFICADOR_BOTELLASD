@@ -155,6 +155,17 @@
         <div class="kpi-sub">Ahorro hídrico en manufactura (~3.2L / envase)</div>
       </div>
 
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Reembolso DRS / Retorno</span>
+          <div class="kpi-icon-wrap" style="background:#ecfdf5; color:#059669;">
+            <i class="bx bx-coin-stack"></i>
+          </div>
+        </div>
+        <div id="kpiTotalDeposit" class="kpi-val">0.00 Bs.</div>
+        <div class="kpi-sub">Valor de retorno (~0.50 Bs PET / ~1.00 Bs Vidrio)</div>
+      </div>
+
     </section>
 
     <!-- Grid Principal de Escáner Óptico y Diagnóstico -->
@@ -464,6 +475,9 @@
             <tr>
               <th>ID Objeto</th>
               <th>Material Identificado</th>
+              <th>Tamaño / Volumen</th>
+              <th>Tapa / Contenido</th>
+              <th>Reembolso DRS</th>
               <th>Certeza de IA</th>
               <th>Hora de Detección</th>
               <th style="text-align:right;">Acciones</th>
@@ -471,7 +485,7 @@
           </thead>
           <tbody id="invTableBody">
             <tr id="invEmptyRow">
-              <td colspan="5" style="text-align:center; padding:2.5rem; color:var(--text-light);">
+              <td colspan="8" style="text-align:center; padding:2.5rem; color:var(--text-light);">
                 <i class="bx bx-package" style="font-size:2rem; display:block; margin-bottom:0.5rem;"></i>
                 Todavía no hay envases registrados. Activa la cámara para comenzar el conteo.
               </td>
@@ -513,10 +527,10 @@
   </footer>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=25.0"></script>
-  <script src="js/yolo-detector.js?v=25.0"></script>
-  <script src="js/bottle-detection.js?v=25.0"></script>
-  <script src="js/ecolens.js?v=25.0"></script>
+  <script src="js/ort/ort.min.js?v=26.0"></script>
+  <script src="js/yolo-detector.js?v=26.0"></script>
+  <script src="js/bottle-detection.js?v=26.0"></script>
+  <script src="js/ecolens.js?v=26.0"></script>
 
 </body>
 </html>
