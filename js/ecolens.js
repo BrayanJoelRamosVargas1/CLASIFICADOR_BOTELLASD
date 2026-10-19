@@ -1191,16 +1191,30 @@
 
     try {
       // Solicitar resolución 640x480 nativa: óptima para YOLO (640x640) y 60 FPS fluidos en cualquier smartphone
-      const constraints = {
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+      let mediaStream = null;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+      } catch (errStrict) {
+        console.warn('EcoLens: Constraints ideales fallaron, intentando fallback de cámara básica:', errStrict);
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: facingMode } }
+          });
+        } catch (errFacing) {
+          console.warn('EcoLens: Fallback de facingMode falló, intentando video genérico:', errFacing);
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
         }
-      };
+      }
 
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      stream = mediaStream;
       dom.video.muted = true;
       dom.video.playsInline = true;
       dom.video.setAttribute('playsinline', '');
