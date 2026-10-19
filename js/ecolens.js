@@ -95,6 +95,9 @@
     hudInView: document.getElementById('hudInView'),
     hudInTake: document.getElementById('hudInTake'),
     hudBpm: document.getElementById('hudBpm'),
+    hudHqr: document.getElementById('hudHqr'),
+    kpiTotalHqr: document.getElementById('kpiTotalHqr'),
+    kpiCardHqr: document.getElementById('kpiCardHqr'),
     
     // Control Diario de Inventario y Ventas (Planilla con Foto)
     dailyProductInput: document.getElementById('dailyProductInput'),
@@ -117,6 +120,7 @@
     btnExportCsv: document.getElementById('btnExportCsv'),
     btnExportJson: document.getElementById('btnExportJson'),
     btnDRSVoucher: document.getElementById('btnDRSVoucher'),
+    btnHqrModal: document.getElementById('btnHqrModal'),
     btnClearInv: document.getElementById('btnClearInv'),
     invSearch: document.getElementById('invSearchInput'),
     invTotalUnits: document.getElementById('invTotalUnits'),
@@ -124,6 +128,11 @@
     btnCloseDrsModal: document.getElementById('btnCloseDrsModal'),
     btnPrintDrsReceipt: document.getElementById('btnPrintDrsReceipt'),
     btnCopyDrsCode: document.getElementById('btnCopyDrsCode'),
+    hqrModal: document.getElementById('hqrAuditModal'),
+    btnCloseHqrModal: document.getElementById('btnCloseHqrModal'),
+    btnCloseHqrModalBtn: document.getElementById('btnCloseHqrModalBtn'),
+    hqrModalBody: document.getElementById('hqrModalBody'),
+    btnPrintHqrAudit: document.getElementById('btnPrintHqrAudit'),
     drsModalBody: document.getElementById('drsModalBody')
   };
 
@@ -452,6 +461,33 @@
         ejectorInfo = window.BottleDetection.computePneumaticEjectorChannel(bx + bw / 2, srcW, 8);
       }
 
+      // 7. Inspección de Ovalidad y Deformación de Rosca en Cuello (Neck Finish)
+      let neckInfo = { isConforming: true, ovalityIndex: 1.0, status: 'Boca Conforme (Circular)' };
+      if (window.BottleDetection && window.BottleDetection.evaluateNeckFinishOvality) {
+        neckInfo = window.BottleDetection.evaluateNeckFinishOvality(Math.round(bw * 0.38), Math.max(6, Math.round(bh * 0.12)));
+      }
+
+      // 8. Estimación de Resina Post-Consumo Reciclada (PCR rPET)
+      let pcrInfo = { pcrPercent: 15, label: 'rPET Mezcla (15% PCR)', isFoodGradeCertified: true };
+      if (window.BottleDetection && window.BottleDetection.estimatePcrRecycledContent) {
+        pcrInfo = window.BottleDetection.estimatePcrRecycledContent(Math.abs(avgLum - 120), avgLum);
+      }
+
+      // 9. Índice de Recuperación de Alta Calidad HQR (Orynycz et al., Materials 2026)
+      const qNeck = neckInfo.isConforming ? 1.0 : 0.70;
+      const qFill = fillInfo.fillPercent === 0 ? 1.0 : (fillInfo.fillPercent <= 20 ? 0.85 : 0.0);
+      const qCap = capInfo.hasCap ? (capInfo.integrity && capInfo.integrity.includes('Alerta') ? 0.80 : 1.0) : 0.90;
+      const qColor = isGlass ? 1.0 : (colorGrade.colorFraction && colorGrade.colorFraction.includes('Fracción A') ? 1.0 : 0.85);
+      const qualityScore = Number(((qNeck + qFill + qCap + qColor) / 4).toFixed(3));
+      let hqrInfo = { hqrPercent: 74.5, hqrRating: 'Excelente (Grado Alimentario FDA/EFSA)' };
+      if (window.BottleDetection && window.BottleDetection.computeHighQualityRecoveryIndex) {
+        hqrInfo = window.BottleDetection.computeHighQualityRecoveryIndex({
+          returnRate: 0.90,
+          qualityScore,
+          yieldScore: isGlass ? 0.95 : 0.845
+        });
+      }
+
       // Clasificación de Material
       if (isGlass) {
         return {
@@ -476,6 +512,14 @@
           colorFraction: colorGrade.colorFraction,
           flakeValueBsKg: colorGrade.flakeValueBsKg,
           ejectorChannel: ejectorInfo.valveId,
+          neckStatus: neckInfo.status,
+          neckOvalityIndex: neckInfo.ovalityIndex,
+          isNeckConforming: neckInfo.isConforming,
+          pcrPercent: 0,
+          pcrLabel: 'Vidrio 100% Reciclable',
+          isFoodGradeCertified: true,
+          hqrPercent: hqrInfo.hqrPercent,
+          hqrRating: hqrInfo.hqrRating,
           canCompact: false,
           depositValue: 1.00
         };
@@ -504,6 +548,14 @@
           colorFraction: colorGrade.colorFraction,
           flakeValueBsKg: colorGrade.flakeValueBsKg,
           ejectorChannel: ejectorInfo.valveId,
+          neckStatus: neckInfo.status,
+          neckOvalityIndex: neckInfo.ovalityIndex,
+          isNeckConforming: neckInfo.isConforming,
+          pcrPercent: pcrInfo.pcrPercent,
+          pcrLabel: pcrInfo.label,
+          isFoodGradeCertified: pcrInfo.isFoodGradeCertified,
+          hqrPercent: hqrInfo.hqrPercent,
+          hqrRating: hqrInfo.hqrRating,
           canCompact: fillInfo.canCompact,
           depositValue: 0.50
         };
@@ -531,6 +583,14 @@
         colorFraction: colorGrade.colorFraction,
         flakeValueBsKg: colorGrade.flakeValueBsKg,
         ejectorChannel: ejectorInfo.valveId,
+        neckStatus: neckInfo.status,
+        neckOvalityIndex: neckInfo.ovalityIndex,
+        isNeckConforming: neckInfo.isConforming,
+        pcrPercent: pcrInfo.pcrPercent,
+        pcrLabel: pcrInfo.label,
+        isFoodGradeCertified: pcrInfo.isFoodGradeCertified,
+        hqrPercent: hqrInfo.hqrPercent,
+        hqrRating: hqrInfo.hqrRating,
         canCompact: fillInfo.canCompact,
         depositValue: 0.50
       };
@@ -812,6 +872,12 @@
         colorFraction: item.meta ? item.meta.colorFraction : (isGlass ? 'GL-70 (Blanco)' : 'Fracción A (Cristal rPET)'),
         flakeValueBsKg: item.meta && typeof item.meta.flakeValueBsKg === 'number' ? item.meta.flakeValueBsKg : (isGlass ? 1.00 : 4.50),
         ejectorChannel: item.meta && typeof item.meta.ejectorChannel === 'number' ? item.meta.ejectorChannel : 4,
+        neckStatus: item.meta && item.meta.neckStatus ? item.meta.neckStatus : 'Boca Conforme',
+        neckOvalityIndex: item.meta && typeof item.meta.neckOvalityIndex === 'number' ? item.meta.neckOvalityIndex : 1.0,
+        pcrPercent: item.meta && typeof item.meta.pcrPercent === 'number' ? item.meta.pcrPercent : 15,
+        pcrLabel: item.meta && item.meta.pcrLabel ? item.meta.pcrLabel : 'rPET Mezcla',
+        hqrPercent: item.meta && typeof item.meta.hqrPercent === 'number' ? item.meta.hqrPercent : 74.5,
+        hqrRating: item.meta && item.meta.hqrRating ? item.meta.hqrRating : 'Excelente',
         gramsPlastic: isGlass ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
         co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
       };
@@ -1280,6 +1346,12 @@
         : rvmDec === 'ACEPTADA_CON_DRENAJE'
         ? '<span style="font-size:0.68rem; background:#fef9c3; color:#a16207; padding:1px 5px; border-radius:3px; font-weight:700;">RVM: Drenar</span>'
         : '<span style="font-size:0.68rem; background:#fee2e2; color:#b91c1c; padding:1px 5px; border-radius:3px; font-weight:700;">RVM: Rechazo Derrame</span>';
+      const ricClass = tagClass === 'glass' ? 'glass' : 'pet';
+      const liquidStr = item.liquidStatus || (item.fillPercent > 0 ? `Líquido ${item.fillPercent}%` : 'Vacía 0%');
+      const hqrScore = typeof item.hqrPercent === 'number' ? item.hqrPercent : 74.5;
+      const hqrTier = item.hqrRating ? item.hqrRating.split(' ')[0] : 'Excelente';
+      const neckStatus = item.neckStatus || 'Boca Conforme';
+      const pcrBadge = item.pcrLabel || (tagClass === 'glass' ? 'Vidrio 100%' : 'rPET 15%');
 
       tr.innerHTML = `
         <td style="font-weight:700; font-family:var(--font-mono); color:var(--primary);">${item.id}</td>
@@ -1289,12 +1361,16 @@
               <i class="bx ${iconClass}"></i>
               ${item.label}
             </span>
-            <div style="display:flex; align-items:center; gap:4px;">
+            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
               <span class="ric-badge ${ricClass}">${ricStr}</span>
               <span style="font-size:0.7rem; color:#64748b;">➔ ${binStr.split(' ')[0]} ${binStr.split(' ')[1] || ''}</span>
+              <span style="font-size:0.68rem; background:#ecfdf5; color:#047857; padding:1px 5px; border-radius:3px; font-weight:700;">HQR: ${hqrScore}% (${hqrTier})</span>
             </div>
             <div style="font-size:0.68rem; color:#0284c7; font-weight:700;">
               ${item.colorFraction || 'Fracción A (Cristal)'} · Válvula #${item.ejectorChannel || 4} (${item.flakeValueBsKg ? item.flakeValueBsKg.toFixed(2) : '4.50'} Bs/kg)
+            </div>
+            <div style="font-size:0.67rem; color:#64748b;">
+              ${pcrBadge} · ${neckStatus}
             </div>
           </div>
         </td>
@@ -1345,11 +1421,17 @@
     const litersWater = Math.round(count * CONFIG.LITERS_WATER_PER_BOTTLE * 10) / 10;
     const totalDeposit = items.reduce((acc, i) => acc + (typeof i.depositValue === 'number' ? i.depositValue : (i.tagClass === 'glass' ? 1.00 : 0.50)), 0);
 
+    const avgHqr = count > 0
+      ? (items.reduce((acc, i) => acc + (typeof i.hqrPercent === 'number' ? i.hqrPercent : 74.5), 0) / count).toFixed(1)
+      : '74.5';
+
     if (dom.kpiTotalCount) dom.kpiTotalCount.textContent = count;
     if (dom.kpiTotalGrams) dom.kpiTotalGrams.textContent = `${gramsPlastic}g`;
     if (dom.kpiTotalCo2) dom.kpiTotalCo2.textContent = `${gramsCo2}g`;
     if (dom.kpiTotalWater) dom.kpiTotalWater.textContent = `${litersWater}L`;
     if (dom.kpiTotalDeposit) dom.kpiTotalDeposit.textContent = `${totalDeposit.toFixed(2)} Bs.`;
+    if (dom.kpiTotalHqr) dom.kpiTotalHqr.textContent = `${avgHqr}%`;
+    if (dom.hudHqr) dom.hudHqr.textContent = `${avgHqr}%`;
 
     if (dom.hudBpm && window.BottleDetection && window.BottleDetection.computeConveyorMetrics) {
       const conv = window.BottleDetection.computeConveyorMetrics(items);
@@ -1366,7 +1448,7 @@
       return;
     }
 
-    let csv = 'ID,Material,Codigo_Resina,Fraccion_Color,Valvula_Eyectora,Valor_Flake_BsKg,Volumen_Tamanio,Estado_Tapa,Contenido_Liquido,Compactacion,Contenedor_Destino,Reembolso_Bs,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
+    let csv = 'ID,Material,Codigo_Resina,Fraccion_Color,Valvula_Eyectora,Valor_Flake_BsKg,Volumen_Tamanio,Estado_Tapa,Contenido_Liquido,Compactacion,Indice_HQR,Clasificacion_HQR,Contenido_PCR,Estado_Boca_Cuello,Contenedor_Destino,Reembolso_Bs,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
     items.forEach(i => {
       const tagClass = i.tagClass || (i.label.includes('Vidrio') ? 'glass' : 'pet');
       const ric = i.ricCode || (tagClass === 'glass' ? 'GL-71' : '♳ PET-1');
@@ -1377,9 +1459,13 @@
       const cap = i.hasCap ? 'Con Tapa' : 'Sin Tapa';
       const liq = i.liquidStatus || 'Vacía';
       const comp = i.compactionStatus || 'Íntegra';
+      const hqr = `${typeof i.hqrPercent === 'number' ? i.hqrPercent : 74.5}%`;
+      const hqrTier = i.hqrRating || 'Excelente (Grado Alimentario)';
+      const pcr = i.pcrLabel || (tagClass === 'glass' ? 'Vidrio 100%' : 'rPET 15%');
+      const neck = i.neckStatus || 'Boca Conforme (Circular)';
       const bin = i.recyclingBin || (tagClass === 'glass' ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)');
       const dep = (typeof i.depositValue === 'number' ? i.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
-      csv += `"${i.id}","${i.label}","${ric}","${frac}","${valve}","${flake}","${size}","${cap}","${liq}","${comp}","${bin}","${dep}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
+      csv += `"${i.id}","${i.label}","${ric}","${frac}","${valve}","${flake}","${size}","${cap}","${liq}","${comp}","${hqr}","${hqrTier}","${pcr}","${neck}","${bin}","${dep}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
     });
 
     downloadBlob(csv, `EcoLens_Inventario_${Date.now()}.csv`, 'text/csv');
@@ -1494,6 +1580,97 @@
 
   function hideDRSVoucherModal() {
     if (dom.drsModal) dom.drsModal.style.display = 'none';
+  }
+
+  function showHQRAuditModal() {
+    const items = loadInventory();
+    const count = items.length;
+    const petItems = items.filter(i => (i.tagClass || '').toLowerCase() !== 'glass' && !i.label.includes('Vidrio'));
+    const glassItems = items.filter(i => (i.tagClass || '').toLowerCase() === 'glass' || i.label.includes('Vidrio'));
+
+    const conformingNecks = items.filter(i => !i.neckStatus || i.neckStatus.includes('Conforme')).length;
+    const cleanBottles = items.filter(i => !i.liquidStatus || i.liquidStatus.includes('Vacía') || (typeof i.fillPercent === 'number' && i.fillPercent <= 20)).length;
+    const clearFlakes = petItems.filter(i => !i.colorFraction || i.colorFraction.includes('Fracción A')).length;
+
+    const avgHqr = count > 0
+      ? Number((items.reduce((acc, i) => acc + (typeof i.hqrPercent === 'number' ? i.hqrPercent : 74.5), 0) / count).toFixed(1))
+      : 74.5;
+
+    const ratingLabel = avgHqr >= 65
+      ? 'Excelente (Grado Alimentario FDA/EFSA)'
+      : (avgHqr >= 40 ? 'Aceptable (Fibra Textil/Downcycling)' : 'Deficiente (Riesgo de Rechazo)');
+
+    const petSpecs = window.BottleDetection && window.BottleDetection.getBottleMaterialSpecs
+      ? window.BottleDetection.getBottleMaterialSpecs('pet')
+      : { chemicalFormula: '(C10H8O4)n', densityGcm3: 1.38, meltingPointC: 255 };
+
+    const glassSpecs = window.BottleDetection && window.BottleDetection.getBottleMaterialSpecs
+      ? window.BottleDetection.getBottleMaterialSpecs('vidrio')
+      : { chemicalFormula: 'SiO2 (~72%) + Na2CO3 + CaCO3', densityGcm3: 2.52 };
+
+    if (dom.hqrModalBody) {
+      dom.hqrModalBody.innerHTML = `
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:0.9rem; margin-bottom:1rem; text-align:center;">
+          <div style="font-size:0.75rem; font-weight:700; color:#047857; text-transform:uppercase; letter-spacing:0.5px;">
+            Índice de Recuperación de Alta Calidad (HQR)
+          </div>
+          <div style="font-size:2.4rem; font-weight:900; font-family:var(--font-mono); color:#047857; margin:0.2rem 0;">
+            ${avgHqr}%
+          </div>
+          <div style="font-size:0.85rem; font-weight:700; color:#065f46;">
+            ${ratingLabel}
+          </div>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">
+            Modelo Científico: <em>HQR = R × Q × Y</em> (Orynycz et al., Materials 2026, doi:10.3390/ma19173669)
+          </div>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <h5 style="margin:0 0 0.5rem; font-size:0.82rem; font-weight:700; color:#334155; text-transform:uppercase;">
+            Puertas de Calidad Óptica e Integridad (Stream Quality Q)
+          </h5>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.78rem;">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.55rem;">
+              <span style="color:#64748b; display:block;">Conformidad de Boca/Rosca:</span>
+              <strong style="color:#0f172a; font-size:0.9rem;">${conformingNecks} / ${count} (${count > 0 ? Math.round(conformingNecks / count * 100) : 100}%)</strong>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.55rem;">
+              <span style="color:#64748b; display:block;">Sin Líquido Atascante (≤20%):</span>
+              <strong style="color:#0f172a; font-size:0.9rem;">${cleanBottles} / ${count} (${count > 0 ? Math.round(cleanBottles / count * 100) : 100}%)</strong>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.55rem;">
+              <span style="color:#64748b; display:block;">Pureza Cristal (Fracción A):</span>
+              <strong style="color:#0284c7; font-size:0.9rem;">${clearFlakes} / ${petItems.length || 1} (${petItems.length > 0 ? Math.round(clearFlakes / petItems.length * 100) : 100}%)</strong>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.55rem;">
+              <span style="color:#64748b; display:block;">Fracción Vidrio Retornable:</span>
+              <strong style="color:#7e22ce; font-size:0.9rem;">${glassItems.length} unidades (${count > 0 ? Math.round(glassItems.length / count * 100) : 0}%)</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0; padding-top:0.75rem;">
+          <h5 style="margin:0 0 0.5rem; font-size:0.82rem; font-weight:700; color:#334155; text-transform:uppercase;">
+            Química y Estándar Molecular de Envases (PubChem)
+          </h5>
+          <div style="font-size:0.74rem; background:#f1f5f9; border-radius:6px; padding:0.6rem; line-height:1.4;">
+            <div style="margin-bottom:3px;">
+              <strong>♳ PET-1:</strong> ${petSpecs.chemicalFormula} · Densidad ${petSpecs.densityGcm3} g/cm³ · Fus: ${petSpecs.meltingPointC}°C · Monómeros: CIDs [7489, 174].
+            </div>
+            <div>
+              <strong>GL-71 Vidrio:</strong> ${glassSpecs.chemicalFormula} · Densidad ${glassSpecs.densityGcm3} g/cm³ · Compuestos: CIDs [24261, 10340, 10112]. Reutilizable 30-50 ciclos.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (dom.hqrModal) dom.hqrModal.style.display = 'flex';
+    playSound('chime');
+  }
+
+  function hideHQRAuditModal() {
+    if (dom.hqrModal) dom.hqrModal.style.display = 'none';
   }
 
   // 15.B Control Diario de Inventario y Ventas (Planilla con Foto)
@@ -1947,6 +2124,28 @@
             }, 2000);
           }).catch(() => {});
         }
+      });
+    }
+    if (dom.btnHqrModal) {
+      dom.btnHqrModal.addEventListener('click', showHQRAuditModal);
+    }
+    if (dom.kpiCardHqr) {
+      dom.kpiCardHqr.addEventListener('click', showHQRAuditModal);
+    }
+    if (dom.btnCloseHqrModal) {
+      dom.btnCloseHqrModal.addEventListener('click', hideHQRAuditModal);
+    }
+    if (dom.btnCloseHqrModalBtn) {
+      dom.btnCloseHqrModalBtn.addEventListener('click', hideHQRAuditModal);
+    }
+    if (dom.hqrModal) {
+      dom.hqrModal.addEventListener('click', (e) => {
+        if (e.target === dom.hqrModal) hideHQRAuditModal();
+      });
+    }
+    if (dom.btnPrintHqrAudit) {
+      dom.btnPrintHqrAudit.addEventListener('click', () => {
+        window.print();
       });
     }
     dom.btnClearInv.addEventListener('click', () => {

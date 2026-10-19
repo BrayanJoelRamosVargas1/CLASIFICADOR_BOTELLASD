@@ -1,0 +1,1 @@
+PubChem terms: Check https://pubchem.ncbi.nlm.nih.gov/docs/citation-guidelines and https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest. Recorded on 2026-10-18T23:07:00Z

@@ -11,7 +11,11 @@ const {
   computeConveyorMetrics,
   generateBarcodeSVG,
   classifyBottleColorGrade,
-  computePneumaticEjectorChannel
+  computePneumaticEjectorChannel,
+  evaluateNeckFinishOvality,
+  estimatePcrRecycledContent,
+  computeHighQualityRecoveryIndex,
+  getBottleMaterialSpecs
 } = require('../js/bottle-detection.js');
 const bottle = { class: 'bottle', score: 0.8, bbox: [10, 20, 50, 100] };
 
@@ -206,6 +210,59 @@ test('computes conveyor pneumatic air ejector valve assignment based on horizont
   const right = computePneumaticEjectorChannel(620, 640, 8);
   assert.equal(right.valveId, 8);
 });
+
+test('evaluates bottle neck finish ovality and thread deformation', () => {
+  // Standard circular neck: width 22, height 10 -> ratio = 22 / 22 = 1.0 (circular)
+  const circular = evaluateNeckFinishOvality(22, 10);
+  assert.equal(circular.isConforming, true);
+  assert.equal(circular.status, 'Boca Conforme (Circular)');
+
+  // Squashed/deformed neck: width 35, height 8 -> ratio = 35 / 17.6 = 1.98 (oval)
+  const deformed = evaluateNeckFinishOvality(35, 8);
+  assert.equal(deformed.isConforming, false);
+  assert.equal(deformed.status, 'Boca Deformada / Ovalada (Alerta de Rosca)');
+});
+
+test('estimates Post-Consumer Recycled (PCR) resin content and food-grade safety', () => {
+  // High optical variance and slight turbidity -> High PCR
+  const highPcr = estimatePcrRecycledContent(60, 90);
+  assert.ok(highPcr.pcrPercent >= 50);
+  assert.ok(highPcr.label.includes('rPET Alto Contenido'));
+
+  // Low variance, crystal clear -> Virgin PET
+  const virgin = estimatePcrRecycledContent(10, 135);
+  assert.ok(virgin.pcrPercent <= 10);
+  assert.ok(virgin.label.includes('PET Virgen'));
+  assert.equal(virgin.isFoodGradeCertified, true);
+});
+
+test('computes High-Quality Recovery Index (HQR) according to Orynycz et al. (2026)', () => {
+  // Target DRS scenario: R=0.90, high quality stream Q=0.98, washed yield Y=0.845
+  // HQR = 0.90 * 0.98 * 0.845 = 0.745 (74.5%) -> Food-Grade
+  const resultHigh = computeHighQualityRecoveryIndex({ returnRate: 0.90, qualityScore: 0.98, yieldScore: 0.845 });
+  assert.equal(resultHigh.hqrPercent, 74.5);
+  assert.equal(resultHigh.hqrRating, 'Excelente (Grado Alimentario FDA/EFSA)');
+  assert.equal(resultHigh.scientificCitation, 'Orynycz et al. (2026), Materials 19(17):3669');
+
+  // Baseline scenario (R=0.50): HQR ~ 37.8% -> Deficiente
+  const resultLow = computeHighQualityRecoveryIndex({ returnRate: 0.50, qualityScore: 0.90, yieldScore: 0.84 });
+  assert.equal(resultLow.hqrPercent, 37.8);
+  assert.equal(resultLow.hqrRating, 'Deficiente (Downcycling/Rechazo)');
+});
+
+test('retrieves scientific polymer & glass specifications with PubChem CIDs', () => {
+  const pet = getBottleMaterialSpecs('pet');
+  assert.equal(pet.resinCode, '♳ PET-1');
+  assert.equal(pet.densityGcm3, 1.38);
+  assert.deepEqual(pet.pubchemCids, [7489, 174]);
+
+  const glass = getBottleMaterialSpecs('vidrio');
+  assert.equal(glass.resinCode, 'GL-70 / GL-71');
+  assert.equal(glass.densityGcm3, 2.52);
+  assert.equal(glass.is100PercentClosedLoop, true);
+  assert.deepEqual(glass.pubchemCids, [24261, 10340, 10112]);
+});
+
 
 
 

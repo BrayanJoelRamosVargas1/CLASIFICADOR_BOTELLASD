@@ -18,3 +18,4 @@ Desktop.ini
 dataset/downloads/
 *.zip
 *.tar.gz
+.licenses/*.json

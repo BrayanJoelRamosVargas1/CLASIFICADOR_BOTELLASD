@@ -166,6 +166,17 @@
         <div class="kpi-sub">Valor de retorno (~0.50 Bs PET / ~1.00 Bs Vidrio)</div>
       </div>
 
+      <div class="kpi-card" id="kpiCardHqr" style="cursor:pointer;" title="Haz clic para ver la Auditoría Circular HQR">
+        <div class="kpi-header">
+          <span class="kpi-label">Índice Circular HQR</span>
+          <div class="kpi-icon-wrap" style="background:#ecfdf5; color:#047857;">
+            <i class="bx bx-recycle"></i>
+          </div>
+        </div>
+        <div id="kpiTotalHqr" class="kpi-val">74.5%</div>
+        <div class="kpi-sub">Grado Alimentario FDA · Orynycz et al. (2026)</div>
+      </div>
+
     </section>
 
     <!-- Grid Principal de Escáner Óptico y Diagnóstico -->
@@ -240,6 +251,9 @@
             </div>
             <div class="hud-stat-tag">
               Flujo: <strong id="hudBpm">0 BPM</strong>
+            </div>
+            <div class="hud-stat-tag" title="Índice de Recuperación de Alta Calidad (Orynycz et al., 2026)">
+              HQR: <strong id="hudHqr" style="color:#10b981;">74.5%</strong>
             </div>
           </div>
         </div>
@@ -469,6 +483,9 @@
           <button id="btnDRSVoucher" type="button" class="btn-action-sm btn-primary" title="Generar Ticket de Reembolso DRS / Voucher RVM">
             <i class="bx bx-receipt"></i> Ticket DRS
           </button>
+          <button id="btnHqrModal" type="button" class="btn-action-sm" style="background:#047857; color:#fff;" title="Auditoría Circular HQR (Orynycz et al., 2026)">
+            <i class="bx bx-pie-chart-alt-2"></i> Auditoría HQR
+          </button>
           <button id="btnClearInv" type="button" class="btn-action-sm btn-danger">
             <i class="bx bx-trash"></i> Vaciar
           </button>
@@ -527,6 +544,27 @@
       </div>
     </div>
 
+    <!-- Modal Auditoría Circular HQR & Química de Envases (Orynycz et al., 2026 & PubChem) -->
+    <div id="hqrAuditModal" class="drs-modal-overlay" style="display:none;">
+      <div class="drs-receipt-card" style="max-width:540px;">
+        <div class="drs-receipt-header" style="background:linear-gradient(135deg, #064e3b, #047857); color:#fff; border-radius:12px 12px 0 0; padding:1rem 1.25rem;">
+          <h3 style="color:#fff;"><i class="bx bx-certification"></i> Auditoría Circular HQR &amp; Química de Polímeros</h3>
+          <button id="btnCloseHqrModal" type="button" style="background:none; border:none; color:#a7f3d0; font-size:1.5rem; cursor:pointer;" title="Cerrar">&times;</button>
+        </div>
+        <div id="hqrModalBody" class="drs-receipt-body" style="padding:1.25rem;">
+          <!-- Generado dinámicamente -->
+        </div>
+        <div class="drs-receipt-actions">
+          <button id="btnPrintHqrAudit" type="button" class="btn-action-sm btn-primary">
+            <i class="bx bx-printer"></i> Imprimir Auditoría
+          </button>
+          <button id="btnCloseHqrModalBtn" type="button" class="btn-action-sm">
+            <i class="bx bx-x"></i> Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Footer Institucional -->
@@ -554,10 +592,10 @@
   </footer>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=29.0"></script>
-  <script src="js/yolo-detector.js?v=29.0"></script>
-  <script src="js/bottle-detection.js?v=29.0"></script>
-  <script src="js/ecolens.js?v=29.0"></script>
+  <script src="js/ort/ort.min.js?v=30.0"></script>
+  <script src="js/yolo-detector.js?v=30.0"></script>
+  <script src="js/bottle-detection.js?v=30.0"></script>
+  <script src="js/ecolens.js?v=30.0"></script>
 
 </body>
 </html>

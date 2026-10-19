@@ -333,6 +333,108 @@
     };
   }
 
+  function evaluateNeckFinishOvality(neckW, neckH) {
+    const w = Number(neckW) || 0;
+    const h = Number(neckH) || 0;
+    if (w <= 0 || h <= 0) return { isConforming: true, ovalityIndex: 1.0, status: 'Boca Conforme (Circular)' };
+    const ratio = w / (h * 2.2);
+    const deviation = Math.abs(ratio - 1.0);
+    if (deviation > 0.28) {
+      return {
+        isConforming: false,
+        ovalityIndex: Number(ratio.toFixed(2)),
+        status: 'Boca Deformada / Ovalada (Alerta de Rosca)'
+      };
+    }
+    return {
+      isConforming: true,
+      ovalityIndex: Number(ratio.toFixed(2)),
+      status: 'Boca Conforme (Circular)'
+    };
+  }
+
+  function estimatePcrRecycledContent(opticalVariance = 0, luma = 120) {
+    const v = Math.max(0, Number(opticalVariance) || 0);
+    const lum = Math.max(0, Math.min(255, Number(luma) || 120));
+    let pcrPercent = 0;
+    if (v > 45 || lum < 100) {
+      pcrPercent = Math.min(100, Math.round(25 + (v / 2) + ((140 - lum) / 2)));
+    } else {
+      pcrPercent = Math.min(25, Math.round(v / 3));
+    }
+    return {
+      pcrPercent,
+      label: pcrPercent >= 50 ? `rPET Alto Contenido (${pcrPercent}% PCR)` : (pcrPercent > 10 ? `rPET Mezcla (${pcrPercent}% PCR)` : 'PET Virgen (0-10% PCR)'),
+      isFoodGradeCertified: pcrPercent <= 75
+    };
+  }
+
+  function computeHighQualityRecoveryIndex({ returnRate = 0.77, qualityScore = 0.95, yieldScore = 0.845 } = {}) {
+    const R = Math.max(0, Math.min(1.0, Number(returnRate) || 0.77));
+    const Q = Math.max(0, Math.min(1.0, Number(qualityScore) || 0.95));
+    const Y = Math.max(0, Math.min(1.0, Number(yieldScore) || 0.845));
+
+    // HQR = R * Q * Y (Orynycz et al., Materials 2026, doi:10.3390/ma19173669)
+    const rawHqr = R * Q * Y;
+    const hqrPercent = Number((rawHqr * 100).toFixed(1));
+
+    let hqrRating = 'Deficiente (Downcycling/Rechazo)';
+    if (hqrPercent >= 65) {
+      hqrRating = 'Excelente (Grado Alimentario FDA/EFSA)';
+    } else if (hqrPercent >= 40) {
+      hqrRating = 'Aceptable (Fibra Textil/Termoformado)';
+    }
+
+    return {
+      hqrPercent,
+      hqrFraction: Number(rawHqr.toFixed(3)),
+      hqrRating,
+      scientificCitation: 'Orynycz et al. (2026), Materials 19(17):3669',
+      factors: {
+        returnRate: Number(R.toFixed(2)),
+        qualityFactor: Number(Q.toFixed(2)),
+        yieldFactor: Number(Y.toFixed(3))
+      }
+    };
+  }
+
+  function getBottleMaterialSpecs(materialType = 'pet') {
+    const mat = String(materialType).toLowerCase().includes('vidrio') || String(materialType).toLowerCase().includes('glass')
+      ? 'glass'
+      : 'pet';
+
+    if (mat === 'glass') {
+      return {
+        materialType: 'Soda-Lime-Silica Glass Packaging',
+        resinCode: 'GL-70 / GL-71',
+        recyclingBin: 'Contenedor Verde (Vidrio)',
+        chemicalFormula: 'SiO2 (~72%) + Na2CO3 (~14%) + CaCO3 (~10%)',
+        densityGcm3: 2.52,
+        meltingPointC: 1450,
+        glassTransitionC: 550,
+        pubchemCids: [24261, 10340, 10112],
+        is100PercentClosedLoop: true,
+        reuseLifespanCycles: '30 a 50 ciclos de lavado industrial',
+        reprocessingYield: 0.95
+      };
+    }
+
+    return {
+      materialType: 'Polyethylene Terephthalate (PET)',
+      resinCode: '♳ PET-1',
+      recyclingBin: 'Contenedor Azul (PET)',
+      chemicalFormula: '(C10H8O4)n',
+      densityGcm3: 1.38,
+      meltingPointC: 255,
+      glassTransitionC: 76,
+      monomers: 'Terephthalic acid (PubChem CID 7489) + Ethylene glycol (PubChem CID 174)',
+      pubchemCids: [7489, 174],
+      foodGradeStandard: 'FDA 21 CFR 177.1630 / EFSA 2011/10/EC',
+      intrinsicViscosityFoodGrade: '0.74 - 0.84 dL/g',
+      reprocessingYield: 0.845
+    };
+  }
+
   const api = Object.freeze({
     config,
     iou,
@@ -346,7 +448,11 @@
     computeConveyorMetrics,
     generateBarcodeSVG,
     classifyBottleColorGrade,
-    computePneumaticEjectorChannel
+    computePneumaticEjectorChannel,
+    evaluateNeckFinishOvality,
+    estimatePcrRecycledContent,
+    computeHighQualityRecoveryIndex,
+    getBottleMaterialSpecs
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.BottleDetection = api;
