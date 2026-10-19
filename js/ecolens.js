@@ -718,7 +718,13 @@
     activeInferencePromise = (async () => {
       try {
         // 1. Inferencia Directa sobre activeSource (Sin buffer rígido que cause deformación)
+        const tInfStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
         const rawPredictions = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, CONFIG.MIN_INFERENCE_SCORE);
+        const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - tInfStart);
+        if (dom.hardwareBadge && detector) {
+          const backendName = detector.backend === 'webgpu' ? 'WebGPU' : 'WASM';
+          dom.hardwareBadge.innerHTML = `<span class="dot"></span> ${backendName} · ${latencyMs}ms`;
+        }
 
         // Descartar resultados de una cámara o fotografía que ya fue cerrada.
         if (generation !== sourceGeneration) return;
@@ -1161,6 +1167,14 @@
     stopActiveSource();
     dom.statusText.textContent = 'Conectando sensor óptico...';
 
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      dom.statusText.textContent = 'Cámara en vivo requiere HTTPS o localhost. Abriendo captura HD con cámara del móvil...';
+      if (dom.nativeCameraInput) {
+        dom.nativeCameraInput.click();
+      }
+      return;
+    }
+
     try {
       // Solicitar resolución 640x480 nativa: óptima para YOLO (640x640) y 60 FPS fluidos en cualquier smartphone
       const constraints = {
@@ -1173,6 +1187,13 @@
       };
 
       stream = await navigator.mediaDevices.getUserMedia(constraints);
+      dom.video.muted = true;
+      dom.video.playsInline = true;
+      dom.video.setAttribute('playsinline', '');
+      dom.video.setAttribute('webkit-playsinline', '');
+      dom.video.style.display = 'block';
+      dom.idleState.style.display = 'none';
+      dom.preview.style.display = 'none';
       dom.video.srcObject = stream;
       
       await new Promise((resolve) => {
@@ -1203,9 +1224,6 @@
       syncCanvasDimensions();
       isLoopActive = true;
 
-      dom.idleState.style.display = 'none';
-      dom.preview.style.display = 'none';
-      dom.video.style.display = 'block';
       dom.canvas.style.display = 'block';
       dom.laser.classList.add('laser-active');
       dom.cameraChip.style.display = 'flex';
@@ -1411,6 +1429,40 @@
       if (visibleBoxes.length > 0) {
         dom.statusText.textContent = `✓ Las ${visibleBoxes.length} botella(s) en cuadro ya están confirmadas y registradas.`;
         return;
+      }
+
+      // Disparo manual sensible: rescatar candidato en retícula con umbral 0.10
+      if (detector && activeSource) {
+        const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
+        const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
+        if (srcW && srcH) {
+          const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.10);
+          const candidates = window.BottleDetection.select(raw, srcW, srcH, 0.10);
+          if (candidates.length > 0) {
+            const manualItems = candidates.map(c => {
+              const meta = inspectMaterial(c.x, c.y, c.w, c.h, c.rawClass);
+              return {
+                id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+                x: c.x, y: c.y, w: c.w, h: c.h,
+                vx: 0, vy: 0,
+                score: c.score,
+                rawClass: c.rawClass,
+                meta,
+                label: meta.label,
+                hits: 2,
+                lastSeen: Date.now(),
+                missed: 0,
+                registered: true
+              };
+            });
+            trackers.push(...manualItems);
+            visibleBoxes = manualItems;
+            onNewBottlesRegistered(manualItems);
+            renderCanvasHUD();
+            dom.statusText.textContent = `✓ ¡${manualItems.length} botella(s) capturada(s) con disparo manual!`;
+            return;
+          }
+        }
       }
     } catch (e) {
       console.warn('Error en escaneo manual:', e);

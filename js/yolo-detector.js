@@ -138,7 +138,9 @@
       return preds;
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
+      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       const direct = await this.detectOnce(source, maxBoxes, minScore);
+      this.lastLatencyMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.15;
       const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
       const isVideo = Boolean(source.videoWidth);
@@ -155,7 +157,10 @@
 
       if (isVideo) {
         // Live camera stream: single-pass inference is paramount to maintain smooth 60fps UI.
-        // Never run sequential multi-pass cascades (aux1 + aux2) within the same frame cycle!
+        // If single inference pass exceeds 240ms (mobile CPU WASM), avoid secondary pass to prevent severe freeze.
+        if (this.lastLatencyMs > 240) {
+          return this.rememberTarget(direct, threshold);
+        }
         // Throttle auxiliary pass to every 2nd empty frame and lock onto active mode.
         const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
@@ -387,21 +392,18 @@
       this.ctx.fillRect(0, 0, 640, 640);
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;
-      const plane = 640 * 640;
-      const plane2 = plane * 2;
+      const plane = 409600;
+      const plane2 = 819200;
       if (!this.pixels || this.pixels.length !== 3 * plane) {
         this.pixels = new Float32Array(3 * plane);
       }
       const pixels = this.pixels;
       const { lut, meanLuma } = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
       this.lastMeanLuma = meanLuma;
-      const rPlane = pixels.subarray(0, plane);
-      const gPlane = pixels.subarray(plane, plane2);
-      const bPlane = pixels.subarray(plane2, plane2 + plane);
       for (let i = 0, idx = 0; i < plane; i++, idx += 4) {
-        rPlane[i] = lut[rgba[idx]];
-        gPlane[i] = lut[rgba[idx + 1]];
-        bPlane[i] = lut[rgba[idx + 2]];
+        pixels[i] = lut[rgba[idx]];
+        pixels[plane + i] = lut[rgba[idx + 1]];
+        pixels[plane2 + i] = lut[rgba[idx + 2]];
       }
       const input = new ort.Tensor('float32', pixels, [1, 3, 640, 640]);
       let outputs;
@@ -417,11 +419,15 @@
           if (score < minScore) continue;
           const bbox = [x1 * width / resizedW, y1 * height / resizedH,
             (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH];
+          const isElongated = Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.25;
           if (classId === 39) {
-            bottles.push({ class: 'bottle', score, bbox });
-          } else if (classId === 75 && score >= 0.28 && Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.40) {
-            // Slender glass/clear bottles (any orientation) that COCO backbones occasionally activate as class 75
-            bottles.push({ class: 'bottle', score: score * 0.85, bbox });
+            bottles.push({ class: 'bottle', rawClass: 'bottle', score, bbox });
+          } else if (classId === 40 && score >= 0.20 && isElongated) {
+            // Glass bottle / wine bottle (COCO class 40: wine glass)
+            bottles.push({ class: 'bottle', rawClass: 'wine glass', score: score * 0.95, bbox });
+          } else if (classId === 75 && score >= 0.25 && isElongated) {
+            // Slender glass/clear bottles (COCO class 75: vase)
+            bottles.push({ class: 'bottle', rawClass: 'bottle', score: score * 0.88, bbox });
           } else {
             otherClasses.push({ classId, score, bbox });
           }

@@ -152,3 +152,20 @@ test('applies bio-inspired retinal gamma LUT adaptation on dark backlit and over
   assert.ok(brightLut[210] < (210 / 255)); // Gamma > 1 recovers washed-out highlights
 });
 
+test('recognizes elongated glass wine bottles (class 40) and slender bottles (class 75) as bottles', async () => {
+  // Wine bottle (class 40, elongated [100, 50, 160, 350], score 0.82) and slender clear bottle (class 75, [300, 50, 360, 350], score 0.75)
+  const h = setup([
+    [[100, 50, 160, 350, 0.82, 40], [300, 50, 360, 350, 0.75, 75]],
+    [],
+    []
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 2);
+  assert.equal(predictions[0].class, 'bottle');
+  assert.equal(predictions[0].rawClass, 'wine glass');
+  assert.ok(predictions[0].score > 0.70);
+  assert.equal(predictions[1].class, 'bottle');
+  assert.ok(predictions[1].score > 0.60);
+});
+
+
