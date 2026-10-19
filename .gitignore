@@ -19,3 +19,4 @@ dataset/downloads/
 *.zip
 *.tar.gz
 .licenses/*.json
+.licenses/*.png

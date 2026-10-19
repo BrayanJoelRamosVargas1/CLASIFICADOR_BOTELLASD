@@ -248,7 +248,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=35.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=36.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -740,7 +740,7 @@
             matchedTrackerIds.add(bestMatch.id);
 
             // Confirmación y Auto-Registro
-            const isInstant = captureMode === 'instant' && bestMatch.score >= 0.28;
+            const isInstant = captureMode === 'instant' && bestMatch.score >= activeThreshold;
             const thresholdHits = isInstant ? 1 : CONFIG.CONFIRMATION_HITS;
             if (captureMode !== 'manual' && bestMatch.hits >= thresholdHits && !bestMatch.registered) {
               bestMatch.registered = true;
@@ -749,7 +749,7 @@
           } else {
             // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
             const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
-            const isInstant = captureMode === 'instant' && box.score >= 0.28;
+            const isInstant = captureMode === 'instant' && box.score >= activeThreshold;
             const newTracker = {
               id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
               x: box.x,
@@ -801,7 +801,7 @@
               bestMatch.missed = 0;
               bestMatch.hits++;
               matchedTrackerIds.add(bestMatch.id);
-              const isInstant = captureMode === 'instant' && bestMatch.score >= 0.28;
+              const isInstant = captureMode === 'instant' && bestMatch.score >= activeThreshold;
               const thresholdHits = isInstant ? 1 : CONFIG.CONFIRMATION_HITS;
               if (captureMode !== 'manual' && bestMatch.hits >= thresholdHits && !bestMatch.registered) {
                 bestMatch.registered = true;
@@ -868,7 +868,8 @@
             if (dom.meterFill) dom.meterFill.style.width = `${pct}%`;
           }
         } else {
-          dom.statusText.textContent = 'Buscando botellas...';
+          const scanPulse = ['.', '..', '...'][Math.floor(Date.now() / 450) % 3];
+          dom.statusText.textContent = `Buscando botellas${scanPulse} (Sensor activo)`;
         }
 
         if (isLoopActive) renderCanvasHUD();
@@ -1150,9 +1151,27 @@
       dom.video.srcObject = stream;
       
       await new Promise((resolve) => {
-        dom.video.onloadedmetadata = () => {
-          dom.video.play().then(resolve);
+        let isDone = false;
+        const finish = async () => {
+          if (isDone) return;
+          isDone = true;
+          try {
+            await dom.video.play();
+          } catch (e) {
+            console.warn('EcoLens: play() advertencia:', e);
+          }
+          resolve();
         };
+
+        if (dom.video.readyState >= 1 && dom.video.videoWidth > 0) {
+          finish();
+          return;
+        }
+
+        dom.video.addEventListener('loadedmetadata', finish, { once: true });
+        dom.video.addEventListener('loadeddata', finish, { once: true });
+        dom.video.addEventListener('canplay', finish, { once: true });
+        setTimeout(finish, 600);
       });
 
       activeSource = dom.video;
