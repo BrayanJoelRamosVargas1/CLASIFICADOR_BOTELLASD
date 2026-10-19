@@ -496,6 +496,59 @@ body {
   pointer-events: none;
 }
 
+.stage-viewport.drag-over {
+  outline: 3px dashed #10b981 !important;
+  outline-offset: -8px;
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.5) inset !important;
+}
+
+.camera-focus-ring {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border: 2px solid #eab308;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.75);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.35);
+  opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
+  z-index: 30;
+}
+
+.camera-focus-ring.active {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.hud-zoom-chip {
+  position: absolute;
+  bottom: 3.4rem;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f8fafc;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 25;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.hud-zoom-chip:active {
+  transform: scale(0.94);
+  background: rgba(16, 185, 129, 0.85);
+}
+
 /* Línea de Escaneo Láser Futurista */
 .laser-scan-line {
   position: absolute;

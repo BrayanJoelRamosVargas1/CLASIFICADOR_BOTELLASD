@@ -192,6 +192,8 @@
       if (!this.auxCanvas) this.auxCanvas = document.createElement('canvas');
       const ctx = this.auxCanvas.getContext('2d');
       if (ctx.setTransform) ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
       if (mode === 'rot90') {
         this.auxCanvas.width = height;
         this.auxCanvas.height = width;
@@ -390,6 +392,8 @@
       // Ultralytics LetterBox standard neutral gray padding rgb(114, 114, 114) = #727272 so dark bottles near edges don't blend into black.
       this.ctx.fillStyle = '#727272';
       this.ctx.fillRect(0, 0, 640, 640);
+      this.ctx.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in this.ctx) this.ctx.imageSmoothingQuality = 'high';
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;
       const plane = 409600;

@@ -58,6 +58,9 @@
     stageViewport: document.querySelector('.stage-viewport'),
     targetReticle: document.getElementById('targetReticle'),
     reticleGuideText: document.getElementById('reticleGuideText'),
+    cameraFocusRing: document.getElementById('cameraFocusRing'),
+    hudZoomBtn: document.getElementById('hudZoomBtn'),
+    hudZoomText: document.getElementById('hudZoomText'),
     
     // Controles limpios
     btnStartCamera: document.getElementById('btnStartCamera'),
@@ -1252,6 +1255,28 @@
       syncCanvasDimensions();
       isLoopActive = true;
 
+      // Optimización de hardware óptico (Autoenfoque continuo, autoexposición y balance de blancos)
+      const track = mediaStream.getVideoTracks()[0];
+      if (track && track.getCapabilities) {
+        try {
+          const caps = track.getCapabilities();
+          const adv = {};
+          if (caps.focusMode && caps.focusMode.includes('continuous')) adv.focusMode = 'continuous';
+          if (caps.exposureMode && caps.exposureMode.includes('continuous')) adv.exposureMode = 'continuous';
+          if (caps.whiteBalanceMode && caps.whiteBalanceMode.includes('continuous')) adv.whiteBalanceMode = 'continuous';
+          if (Object.keys(adv).length > 0) {
+            await track.applyConstraints({ advanced: [adv] });
+          }
+          if (caps.zoom && dom.hudZoomBtn) {
+            dom.hudZoomBtn.style.display = 'flex';
+            currentZoom = 1.0;
+            if (dom.hudZoomText) dom.hudZoomText.textContent = '1.0x';
+          }
+        } catch (eCaps) {
+          console.warn('EcoLens: Ajustes avanzados de hardware no admitidos en este sensor:', eCaps);
+        }
+      }
+
       dom.canvas.style.display = 'block';
       dom.laser.classList.add('laser-active');
       dom.cameraChip.style.display = 'flex';
@@ -1311,6 +1336,8 @@
     if (dom.btnSwitchCamera) dom.btnSwitchCamera.style.display = 'none';
     if (dom.btnShutterViewport) dom.btnShutterViewport.style.display = 'none';
     if (dom.targetReticle) dom.targetReticle.style.display = 'none';
+    if (dom.hudZoomBtn) dom.hudZoomBtn.style.display = 'none';
+    if (dom.cameraFocusRing) dom.cameraFocusRing.classList.remove('active');
 
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
@@ -1336,66 +1363,101 @@
     activeSource = null;
   }
 
-  // 11. Carga de Fotografías
-  function handlePhotoUpload(file) {
+  // 11. Carga de Fotografías y Captación Multi-Fuente (Archivos, Arrastre y Portapapeles)
+  async function handlePhotoUpload(file) {
     if (!file) return;
     stopActiveSource();
     const myGeneration = sourceGeneration;
     dom.statusText.textContent = '⏳ Analizando fotografía con IA...';
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (myGeneration !== sourceGeneration) return;
+    // Auto-rotación de orientación EXIF para fotos de iPhone/Android usando createImageBitmap
+    let imgSource = null;
+    let previewDataUrl = null;
+
+    if ('createImageBitmap' in window) {
+      try {
+        const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const c = document.createElement('canvas');
+        c.width = bmp.width;
+        c.height = bmp.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        bmp.close();
+        previewDataUrl = c.toDataURL('image/jpeg', 0.92);
+        const img = new Image();
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+          img.src = previewDataUrl;
+        });
+        imgSource = img;
+      } catch (errBmp) {
+        console.warn('EcoLens: createImageBitmap fallback a FileReader:', errBmp);
+      }
+    }
+
+    if (!imgSource) {
+      previewDataUrl = await new Promise((res) => {
+        const reader = new FileReader();
+        reader.onload = (e) => res(e.target.result);
+        reader.readAsDataURL(file);
+      });
       const img = new Image();
-      img.onload = async () => {
-        if (myGeneration !== sourceGeneration) return;
-        activeSource = img;
-        dom.preview.src = e.target.result;
-        dom.idleState.style.display = 'none';
-        dom.video.style.display = 'none';
-        dom.preview.style.display = 'block';
-        dom.canvas.style.display = 'block';
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = rej;
+        img.src = previewDataUrl;
+      });
+      imgSource = img;
+    }
 
-        syncCanvasDimensions();
+    if (myGeneration !== sourceGeneration) return;
 
-        trackers = [];
-        takeCount = 0;
-        dom.statusText.textContent = '⏳ Analizando fotografía con IA...';
+    activeSource = imgSource;
+    dom.preview.src = previewDataUrl;
+    dom.idleState.style.display = 'none';
+    dom.video.style.display = 'none';
+    dom.preview.style.display = 'block';
+    dom.canvas.style.display = 'block';
 
-        if (!detector) {
-          await initNeuralEngines();
-          if (myGeneration !== sourceGeneration) return;
-        }
-        await processVisualFrame(true);
-        if (myGeneration !== sourceGeneration || activeSource !== img) return;
+    syncCanvasDimensions();
 
-        if (dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
-          dom.dailyCurrentInput.value = String(visibleBoxes.length);
-          updateDailyPreview();
-        }
-        // En fotos, confirmar directamente las botellas visibles
-        const found = visibleBoxes.filter(t => !t.registered);
-        for (const t of found) {
-          t.registered = true;
-        }
-        if (found.length > 0) {
-          onNewBottlesRegistered(found);
-        }
-        renderCanvasHUD();
+    trackers = [];
+    takeCount = 0;
+    dom.statusText.textContent = '⏳ Analizando fotografía con IA...';
 
-        if (visibleBoxes.length > 0) {
-          dom.statusText.textContent = `✓ ¡${visibleBoxes.length} botella(s) detectada(s) en la fotografía! (${Math.round(visibleBoxes[0].score * 100)}%)`;
-        } else {
-          dom.statusText.textContent = 'No se distinguieron botellas en la imagen (Quedan: 0).';
-          if (dom.resultLabel) dom.resultLabel.textContent = 'Sin botellas en la imagen';
-          if (dom.resultSub) dom.resultSub.textContent = 'Objeto descartado o sin envases válidos en escena';
-          if (dom.meterPct) dom.meterPct.textContent = '0%';
-          if (dom.meterFill) dom.meterFill.style.width = '0%';
-        }
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    if (!detector) {
+      await initNeuralEngines();
+      if (myGeneration !== sourceGeneration) return;
+    }
+
+    await processVisualFrame(true);
+    if (myGeneration !== sourceGeneration || activeSource !== imgSource) return;
+
+    if (dom.dailyCurrentInput && dom.dailyCurrentInput.value !== undefined) {
+      dom.dailyCurrentInput.value = String(visibleBoxes.length);
+      updateDailyPreview();
+    }
+
+    // En fotos, confirmar directamente las botellas visibles
+    const found = visibleBoxes.filter(t => !t.registered);
+    for (const t of found) {
+      t.registered = true;
+    }
+    if (found.length > 0) {
+      onNewBottlesRegistered(found);
+    }
+    renderCanvasHUD();
+
+    if (visibleBoxes.length > 0) {
+      dom.statusText.textContent = `✓ ¡${visibleBoxes.length} botella(s) detectada(s) en la fotografía! (${Math.round(visibleBoxes[0].score * 100)}%)`;
+    } else {
+      dom.statusText.textContent = 'No se distinguieron botellas en la imagen (Quedan: 0).';
+      if (dom.resultLabel) dom.resultLabel.textContent = 'Sin botellas en la imagen';
+      if (dom.resultSub) dom.resultSub.textContent = 'Objeto descartado o sin envases válidos en escena';
+      if (dom.meterPct) dom.meterPct.textContent = '0%';
+      if (dom.meterFill) dom.meterFill.style.width = '0%';
+    }
   }
 
   // 12. Captura Inmediata Manual de Botellas Visibles
@@ -2271,12 +2333,100 @@
       });
     }
 
-    // Tocar el visor para capturar
+    // Función de Anillo de Enfoque Visual Táctil
+    function triggerFocusRing(clientX, clientY) {
+      if (!dom.stageViewport || !dom.cameraFocusRing) return;
+      const rect = dom.stageViewport.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      dom.cameraFocusRing.style.left = `${x}px`;
+      dom.cameraFocusRing.style.top = `${y}px`;
+      dom.cameraFocusRing.classList.remove('active');
+      void dom.cameraFocusRing.offsetWidth;
+      dom.cameraFocusRing.classList.add('active');
+      setTimeout(() => {
+        if (dom.cameraFocusRing) dom.cameraFocusRing.classList.remove('active');
+      }, 750);
+
+      if (stream) {
+        const track = stream.getVideoTracks()[0];
+        if (track && track.applyConstraints) {
+          track.applyConstraints({
+            advanced: [{ focusMode: 'continuous' }]
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Tocar el visor para enfocar y disparar
     if (dom.stageViewport) {
       dom.stageViewport.addEventListener('click', (e) => {
-        if (e.target.closest && (e.target.closest('.hud-circle-btn') || e.target.closest('.hud-shutter-btn'))) return;
+        if (e.target.closest && (e.target.closest('.hud-circle-btn') || e.target.closest('.hud-shutter-btn') || e.target.closest('.hud-zoom-chip'))) return;
         if (isLoopActive) {
+          triggerFocusRing(e.clientX, e.clientY);
           forceManualScan();
+        }
+      });
+
+      // Arrastrar y Soltar Imágenes Directamente sobre el Visor
+      dom.stageViewport.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dom.stageViewport.classList.add('drag-over');
+      });
+      dom.stageViewport.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dom.stageViewport.classList.remove('drag-over');
+      });
+      dom.stageViewport.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dom.stageViewport.classList.remove('drag-over');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handlePhotoUpload(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    // Pegar Imagen desde el Portapapeles (Ctrl+V o Captura de Pantalla)
+    window.addEventListener('paste', (e) => {
+      if (e.clipboardData && e.clipboardData.items) {
+        for (const item of e.clipboardData.items) {
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              handlePhotoUpload(file);
+              playSound('click');
+              dom.statusText.textContent = '📋 Fotografía pegada desde el portapapeles. Analizando...';
+              break;
+            }
+          }
+        }
+      }
+    });
+
+    // Control de Zoom Digital / Óptico
+    let currentZoom = 1.0;
+    if (dom.hudZoomBtn) {
+      dom.hudZoomBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!stream) return;
+        const track = stream.getVideoTracks()[0];
+        if (!track || !track.getCapabilities) return;
+        const caps = track.getCapabilities();
+        if (!caps.zoom) return;
+        const maxZ = Math.min(3.0, caps.zoom.max || 1.0);
+        if (currentZoom >= 2.0 || currentZoom >= maxZ) {
+          currentZoom = 1.0;
+        } else if (currentZoom < 1.5 && maxZ >= 1.5) {
+          currentZoom = 1.5;
+        } else {
+          currentZoom = 2.0;
+        }
+        try {
+          await track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+          if (dom.hudZoomText) dom.hudZoomText.textContent = `${currentZoom.toFixed(1)}x`;
+          playSound('click');
+        } catch (errZoom) {
+          console.warn('EcoLens: Zoom no se pudo aplicar:', errZoom);
         }
       });
     }
