@@ -238,7 +238,7 @@
         if ('filter' in ctx) ctx.filter = 'contrast(1.12) saturate(1.08)';
         ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
         if ('filter' in ctx) ctx.filter = 'none';
-        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.16));
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
         return preds.map(p => ({
           ...p,
           bbox: [cropX + p.bbox[0], cropY + p.bbox[1], p.bbox[2], p.bbox[3]]
@@ -258,7 +258,7 @@
         ctx.fillStyle = '#727272';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(source, 0, 0, width, height, padX, padY, scaledW, scaledH);
-        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.15));
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
         return preds.map(p => {
           const x1 = Math.max(0, Math.min(width, (p.bbox[0] - padX) / scale));
           const y1 = Math.max(0, Math.min(height, (p.bbox[1] - padY) / scale));
@@ -345,7 +345,7 @@
       // Never suppress bottles in front of background furniture, desks, monitors, or people!
       if (!YoloBottleDetector.HARD_NEGATIVE_CLASSES.has(other.classId)) return false;
       const iou = YoloBottleDetector.boxIoU(bottle.bbox, other.bbox);
-      return iou >= 0.50 && other.score > bottle.score * 1.15;
+      return iou >= 0.50 && other.score >= 0.50 && other.score > bottle.score * 1.35;
     }
     static buildGammaLut(gamma) {
       const lut = new Float32Array(256);
