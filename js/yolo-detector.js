@@ -99,7 +99,7 @@
         }
       }
       if (!session) {
-        ort.env.wasm.proxy = !isolated && typeof Worker !== 'undefined';
+        ort.env.wasm.proxy = false;
         const modelSource = await YoloBottleDetector.fetchModelCached(resolvedUrl);
         session = await ort.InferenceSession.create(modelSource, {
           executionProviders: ['wasm'],

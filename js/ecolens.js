@@ -657,6 +657,10 @@
       dom.canvas.width = srcW;
       dom.canvas.height = srcH;
     }
+
+    if (dom.stageViewport) {
+      dom.stageViewport.style.aspectRatio = `${srcW} / ${srcH}`;
+    }
   }
 
   let activeInferencePromise = null;
@@ -1243,6 +1247,7 @@
     dom.laser.classList.remove('laser-active');
     dom.cameraChip.style.display = 'none';
     if (dom.hudLowLightChip) dom.hudLowLightChip.style.display = 'none';
+    if (dom.stageViewport) dom.stageViewport.style.aspectRatio = '';
 
     dom.btnStartCamera.innerHTML = '<i class="bx bx-camera"></i> <span>Iniciar Cámara</span>';
     dom.btnStartCamera.classList.remove('btn-danger');

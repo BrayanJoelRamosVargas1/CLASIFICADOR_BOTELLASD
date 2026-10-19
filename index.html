@@ -18,17 +18,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" media="print" onload="this.media='all'">
 
-  <!-- Script de purga de caché previo para asegurar carga limpia de la versión 9.0 -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        for (var i = 0; i < regs.length; i++) regs[i].unregister();
-      });
-    }
-  </script>
+  <!-- Cross-Origin Isolation (COOP/COEP) para habilitar SharedArrayBuffer y multihilo WASM SIMD -->
+  <script src="coi-serviceworker.js"></script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=14.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=38.0">
 </head>
 <body>
 
@@ -616,10 +610,10 @@
   </footer>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=37.0"></script>
-  <script src="js/yolo-detector.js?v=37.0"></script>
-  <script src="js/bottle-detection.js?v=37.0"></script>
-  <script src="js/ecolens.js?v=37.0"></script>
+  <script src="js/ort/ort.min.js?v=38.0"></script>
+  <script src="js/yolo-detector.js?v=38.0"></script>
+  <script src="js/bottle-detection.js?v=38.0"></script>
+  <script src="js/ecolens.js?v=38.0"></script>
 
 </body>
 </html>
