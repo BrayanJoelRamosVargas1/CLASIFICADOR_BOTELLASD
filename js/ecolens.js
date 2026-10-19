@@ -50,6 +50,7 @@
     idleState: document.getElementById('stageIdleState'),
     laser: document.getElementById('laserLine'),
     cameraChip: document.getElementById('hudCameraChip'),
+    hudLowLightChip: document.getElementById('hudLowLightChip'),
     statusText: document.getElementById('statusText'),
     hardwareBadge: document.getElementById('hardwareBadge'),
     stageViewport: document.querySelector('.stage-viewport'),
@@ -62,6 +63,17 @@
     btnSwitchCamera: document.getElementById('btnSwitchCamera'),
     btnFlashViewport: document.getElementById('btnFlashViewport'),
     btnManualScan: document.getElementById('btnManualScan'),
+    
+    // Open Food Facts API & Barcode Intelligence
+    btnOpenFoodFactsModal: document.getElementById('btnOpenFoodFactsModal'),
+    offLookupCard: document.getElementById('offLookupCard'),
+    btnCloseOffLookup: document.getElementById('btnCloseOffLookup'),
+    offBarcodeInput: document.getElementById('offBarcodeInput'),
+    btnSearchOff: document.getElementById('btnSearchOff'),
+    offResultBox: document.getElementById('offResultBox'),
+    offProductName: document.getElementById('offProductName'),
+    offProductMeta: document.getElementById('offProductMeta'),
+    btnApplyOffToSheet: document.getElementById('btnApplyOffToSheet'),
     
     // Diagnóstico
     resultIcon: document.getElementById('resultIcon'),
@@ -566,6 +578,9 @@
   // 7. Registro de Nuevas Botellas e Inventario
   function onNewBottlesRegistered(items) {
     playSound(items.length > 1 ? 'multi-chime' : 'chime');
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate([40, 25, 45]); } catch (e) {}
+    }
     takeCount += items.length;
     dom.hudInTake.textContent = takeCount;
 
@@ -627,6 +642,11 @@
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (dom.hudLowLightChip) {
+      const isDark = isLoopActive && detector && detector.lastMeanLuma !== undefined && detector.lastMeanLuma < 50;
+      dom.hudLowLightChip.style.display = isDark ? 'flex' : 'none';
+    }
 
     if (visibleBoxes.length === 0) return;
 
@@ -857,6 +877,7 @@
     dom.idleState.style.display = 'flex';
     dom.laser.classList.remove('laser-active');
     dom.cameraChip.style.display = 'none';
+    if (dom.hudLowLightChip) dom.hudLowLightChip.style.display = 'none';
 
     dom.btnStartCamera.innerHTML = '<i class="bx bx-camera"></i> <span>Iniciar Cámara</span>';
     dom.btnStartCamera.classList.remove('btn-danger');
@@ -1327,6 +1348,64 @@
     w.document.close();
   }
 
+  // 15.C Módulo Inteligente Open Food Facts API (Códigos de Barras y Envases Oficiales)
+  let lastOffProduct = null;
+  async function searchOpenFoodFacts(barcode) {
+    const code = (barcode || '').trim().replace(/[^0-9]/g, '');
+    if (!code || code.length < 8) {
+      alert('Por favor ingresa un código de barras numérico válido (8 a 13 dígitos).');
+      return;
+    }
+    if (dom.btnSearchOff) {
+      dom.btnSearchOff.disabled = true;
+      dom.btnSearchOff.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> <span>Buscando...</span>';
+    }
+    try {
+      const cacheKey = `off_cache_${code}`;
+      let data = null;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) data = JSON.parse(cached);
+      } catch (e) {}
+
+      if (!data) {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,packaging,packaging_tags,image_front_small_url`, {
+          headers: { 'User-Agent': 'EcoLensAI-BottleClassifier - v25.0' }
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        data = await res.json();
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+      }
+
+      if (data && data.status === 1 && data.product) {
+        const p = data.product;
+        const name = p.product_name || p.brands || 'Bebida en Botella';
+        const brand = p.brands ? ` · Marca: ${p.brands}` : '';
+        const pack = p.packaging || 'Envase PET/Vidrio';
+        lastOffProduct = {
+          name: `${name} (${pack})`,
+          rawName: name,
+          code: code,
+          brand: p.brands || '',
+          packaging: pack
+        };
+        if (dom.offProductName) dom.offProductName.textContent = `${name}${brand}`;
+        if (dom.offProductMeta) dom.offProductMeta.textContent = `Código: ${code} · Envase oficial: ${pack}`;
+        if (dom.offResultBox) dom.offResultBox.style.display = 'block';
+        playSound('chime');
+      } else {
+        alert(`Código ${code} no encontrado en la base global Open Food Facts. Puedes usar los botones de ejemplo rápido (Coca-Cola, San Mateo, etc.).`);
+      }
+    } catch (err) {
+      alert('No se pudo conectar con la API Open Food Facts. Revisa tu conexión a internet.');
+    } finally {
+      if (dom.btnSearchOff) {
+        dom.btnSearchOff.disabled = false;
+        dom.btnSearchOff.innerHTML = '<i class="bx bx-search"></i> <span>Consultar API</span>';
+      }
+    }
+  }
+
   // 16. Configuración de Eventos
   function setupEvents() {
     dom.btnStartCamera.addEventListener('click', () => {
@@ -1343,6 +1422,65 @@
 
     if (dom.btnFlashViewport) {
       dom.btnFlashViewport.addEventListener('click', toggleTorch);
+    }
+
+    if (dom.hudLowLightChip) {
+      dom.hudLowLightChip.addEventListener('click', toggleTorch);
+    }
+
+    // Eventos Open Food Facts API
+    if (dom.btnOpenFoodFactsModal) {
+      dom.btnOpenFoodFactsModal.addEventListener('click', () => {
+        if (!dom.offLookupCard) return;
+        const willShow = dom.offLookupCard.style.display === 'none';
+        dom.offLookupCard.style.display = willShow ? 'block' : 'none';
+        playSound('click');
+        if (willShow && dom.offBarcodeInput) dom.offBarcodeInput.focus();
+      });
+    }
+
+    if (dom.btnCloseOffLookup) {
+      dom.btnCloseOffLookup.addEventListener('click', () => {
+        if (dom.offLookupCard) dom.offLookupCard.style.display = 'none';
+        playSound('click');
+      });
+    }
+
+    if (dom.btnSearchOff) {
+      dom.btnSearchOff.addEventListener('click', () => {
+        searchOpenFoodFacts(dom.offBarcodeInput ? dom.offBarcodeInput.value : '');
+      });
+    }
+
+    if (dom.offBarcodeInput) {
+      dom.offBarcodeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchOpenFoodFacts(dom.offBarcodeInput.value);
+        }
+      });
+    }
+
+    document.querySelectorAll('.off-quick-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const code = chip.dataset.code;
+        if (dom.offBarcodeInput) dom.offBarcodeInput.value = code;
+        searchOpenFoodFacts(code);
+      });
+    });
+
+    if (dom.btnApplyOffToSheet) {
+      dom.btnApplyOffToSheet.addEventListener('click', () => {
+        if (lastOffProduct && dom.dailyProductInput) {
+          dom.dailyProductInput.value = lastOffProduct.name;
+          updateDailyPreview();
+          playSound('click');
+          if (dom.offLookupCard) dom.offLookupCard.style.display = 'none';
+          if (dom.statusText) {
+            dom.statusText.textContent = `✓ Producto oficial asignado desde Open Food Facts: ${lastOffProduct.name}`;
+          }
+        }
+      });
     }
 
     dom.btnUploadPhoto.addEventListener('change', (e) => {

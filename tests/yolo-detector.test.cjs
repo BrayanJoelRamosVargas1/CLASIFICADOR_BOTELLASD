@@ -136,8 +136,9 @@ test('applies bio-inspired retinal gamma LUT adaptation on dark backlit and over
     const v = i < half ? 20 : 65;
     darkRgba[i] = v; darkRgba[i + 1] = v; darkRgba[i + 2] = v; darkRgba[i + 3] = 255;
   }
-  const darkLut = Yolo.getLumaLut(darkRgba, 640, 480);
+  const { lut: darkLut, meanLuma: darkMean } = Yolo.getLumaLut(darkRgba, 640, 480);
   assert.equal(darkLut, Yolo.DARK_LUT);
+  assert.ok(darkMean < 75);
   assert.ok(darkLut[50] > (50 / 255)); // Gamma < 1 boosts dark shadow contrast
 
   const brightRgba = new Uint8ClampedArray(640 * 640 * 4);
@@ -145,8 +146,9 @@ test('applies bio-inspired retinal gamma LUT adaptation on dark backlit and over
     const v = i < half ? 190 : 245;
     brightRgba[i] = v; brightRgba[i + 1] = v; brightRgba[i + 2] = v; brightRgba[i + 3] = 255;
   }
-  const brightLut = Yolo.getLumaLut(brightRgba, 640, 480);
+  const { lut: brightLut, meanLuma: brightMean } = Yolo.getLumaLut(brightRgba, 640, 480);
   assert.equal(brightLut, Yolo.BRIGHT_LUT);
+  assert.ok(brightMean > 195);
   assert.ok(brightLut[210] < (210 / 255)); // Gamma > 1 recovers washed-out highlights
 });
 

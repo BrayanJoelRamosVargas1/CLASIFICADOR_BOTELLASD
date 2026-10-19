@@ -370,11 +370,11 @@
           if (luma > maxL) maxL = luma;
         }
       }
-      if (count === 0 || (maxL - minL) < 15) return YoloBottleDetector.IDENTITY_LUT;
-      const meanLuma = sum / count;
-      if (meanLuma < 75) return YoloBottleDetector.DARK_LUT;
-      if (meanLuma > 195) return YoloBottleDetector.BRIGHT_LUT;
-      return YoloBottleDetector.IDENTITY_LUT;
+      if (count === 0 || (maxL - minL) < 15) return { lut: YoloBottleDetector.IDENTITY_LUT, meanLuma: 128 };
+      const meanLuma = Math.round(sum / count);
+      if (meanLuma < 75) return { lut: YoloBottleDetector.DARK_LUT, meanLuma };
+      if (meanLuma > 195) return { lut: YoloBottleDetector.BRIGHT_LUT, meanLuma };
+      return { lut: YoloBottleDetector.IDENTITY_LUT, meanLuma };
     }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
@@ -392,7 +392,8 @@
         this.pixels = new Float32Array(3 * plane);
       }
       const pixels = this.pixels;
-      const lut = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
+      const { lut, meanLuma } = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
+      this.lastMeanLuma = meanLuma;
       for (let i = 0; i < plane; i++) {
         const idx = i * 4;
         pixels[i] = lut[rgba[idx]];

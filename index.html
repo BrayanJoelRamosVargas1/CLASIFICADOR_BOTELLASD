@@ -215,6 +215,11 @@
             <span>CÁMARA EN VIVO</span>
           </div>
 
+          <div id="hudLowLightChip" class="hud-chip-top" style="display:none; background:rgba(234, 179, 8, 0.95); color:#1c1917; cursor:pointer; top:3.2rem;" title="Pulsa para activar linterna LED">
+            <i class="bx bx-bulb" style="font-size:1.1rem;"></i>
+            <span>Poca Luz · Toca para Linterna</span>
+          </div>
+
           <div class="hud-bottom-bar">
             <div class="hud-stat-tag">
               En cuadro: <strong id="hudInView">0</strong>
@@ -318,6 +323,9 @@
           <p>Fija con cuántas botellas empiezas el día (ej. <strong>10</strong>), lee con la cámara cuántas quedan (ej. <strong>8</strong>) y guarda el día calculando automáticamente lo vendido (ej. <strong>2 vendidas</strong>) junto con la foto de evidencia.</p>
         </div>
         <div class="inv-actions">
+          <button id="btnOpenFoodFactsModal" type="button" class="btn-action-sm" style="background:#0f172a; color:#fff;" title="Consultar código de barras o marca en Open Food Facts API">
+            <i class="bx bx-barcode"></i> Consultar API Open Food Facts
+          </button>
           <button id="btnExportDailyCsv" type="button" class="btn-action-sm" title="Descargar Planilla en Excel CSV">
             <i class="bx bx-spreadsheet"></i> Exportar Planilla Excel
           </button>
@@ -327,6 +335,43 @@
           <button id="btnClearDailySheet" type="button" class="btn-action-sm btn-danger" title="Borrar planilla diaria">
             <i class="bx bx-trash"></i> Vaciar
           </button>
+        </div>
+      </div>
+
+      <!-- Panel Desplegable de Consulta Inteligente Open Food Facts (API Global) -->
+      <div id="offLookupCard" style="display:none; background:#ffffff; border:2px solid #059669; border-radius:14px; padding:1.2rem; margin-bottom:1.25rem; box-shadow:0 10px 25px rgba(5,150,105,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
+          <h4 style="margin:0; font-size:0.95rem; color:#064e3b; display:flex; align-items:center; gap:0.4rem;">
+            <i class="bx bx-barcode-reader" style="font-size:1.3rem; color:#059669;"></i>
+            <span>Base de Datos Global de Envases &amp; Códigos de Barras (Open Food Facts REST API v2)</span>
+          </h4>
+          <button id="btnCloseOffLookup" type="button" style="background:none; border:none; color:#64748b; font-size:1.3rem; cursor:pointer;" title="Cerrar">&times;</button>
+        </div>
+        <p style="font-size:0.8rem; color:#64748b; margin:0 0 0.8rem;">
+          Ingresa un código de barras de botella (EAN-13 / UPC) o selecciona un ejemplo para obtener automáticamente el nombre oficial del producto, la marca, el tipo de envase y su resina reciclable.
+        </p>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.8rem;">
+          <input id="offBarcodeInput" type="text" placeholder="Ej: 5449000000996 (EAN-13)" class="btn-action-sm" style="flex:1; min-width:200px; padding:0.55rem 0.8rem; background:#f8fafc; font-family:var(--font-mono);">
+          <button id="btnSearchOff" type="button" class="ctrl-btn btn-cam" style="padding:0.55rem 1rem; font-size:0.85rem;">
+            <i class="bx bx-search"></i> <span>Consultar API</span>
+          </button>
+        </div>
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center; margin-bottom:0.8rem;">
+          <span style="font-size:0.75rem; font-weight:700; color:#475569;">Ejemplos rápidos:</span>
+          <button type="button" class="btn-action-sm off-quick-chip" data-code="5449000000996" style="font-size:0.72rem; padding:0.25rem 0.5rem;">Coca-Cola 500ml</button>
+          <button type="button" class="btn-action-sm off-quick-chip" data-code="7750106001019" style="font-size:0.72rem; padding:0.25rem 0.5rem;">Agua San Mateo</button>
+          <button type="button" class="btn-action-sm off-quick-chip" data-code="8712000025700" style="font-size:0.72rem; padding:0.25rem 0.5rem;">Heineken Vidrio</button>
+        </div>
+        <div id="offResultBox" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:0.85rem; font-size:0.85rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong id="offProductName" style="font-size:0.95rem; color:#14532d; display:block;">—</strong>
+              <span id="offProductMeta" style="color:#15803d; font-size:0.8rem;">—</span>
+            </div>
+            <button id="btnApplyOffToSheet" type="button" class="btn-action-sm" style="background:#059669; color:#fff; font-weight:700;" title="Copiar al campo Producto / Lote de la Planilla">
+              <i class="bx bx-check"></i> Aplicar a Planilla
+            </button>
+          </div>
         </div>
       </div>
 
@@ -468,10 +513,10 @@
   </footer>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=24.0"></script>
-  <script src="js/yolo-detector.js?v=24.0"></script>
-  <script src="js/bottle-detection.js?v=24.0"></script>
-  <script src="js/ecolens.js?v=24.0"></script>
+  <script src="js/ort/ort.min.js?v=25.0"></script>
+  <script src="js/yolo-detector.js?v=25.0"></script>
+  <script src="js/bottle-detection.js?v=25.0"></script>
+  <script src="js/ecolens.js?v=25.0"></script>
 
 </body>
 </html>
