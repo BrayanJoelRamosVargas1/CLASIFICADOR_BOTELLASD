@@ -317,6 +317,8 @@
       computeIoU({ x: projX, y: projY, w: a.w, h: a.h }, b)
     );
     if (iou > 0.12) return iou;
+    // En escenas con 2 o más botellas, exigir superposición real para evitar absorción mutua
+    if (countInFrame > 1 && iou === 0) return 0;
     const acx = projX + a.w * 0.5, acy = projY + a.h * 0.5;
     const bcx = b.x + b.w * 0.5, bcy = b.y + b.h * 0.5;
     const dx = Math.abs(acx - bcx);
@@ -1219,6 +1221,12 @@
 
       updateTorchUI();
       renderCanvasHUD();
+      function startHudLoop() {
+        if (!isLoopActive) return;
+        renderCanvasHUD();
+        animFrameId = requestAnimationFrame(startHudLoop);
+      }
+      animFrameId = requestAnimationFrame(startHudLoop);
       playSound('click');
 
       if (!detector) {
@@ -1379,6 +1387,12 @@
       return;
     }
 
+    if (visibleBoxes.length > 0) {
+      dom.statusText.textContent = `✓ Las ${visibleBoxes.length} botella(s) en cuadro ya están confirmadas y registradas.`;
+      playSound('chime');
+      return;
+    }
+
     // Escanear con el mismo umbral y bloqueo que el modo automático.
     try {
       await processVisualFrame(true);
@@ -1394,11 +1408,15 @@
         dom.statusText.textContent = `✓ ¡${newlyFound.length} botella(s) capturada(s) con éxito!`;
         return;
       }
+      if (visibleBoxes.length > 0) {
+        dom.statusText.textContent = `✓ Las ${visibleBoxes.length} botella(s) en cuadro ya están confirmadas y registradas.`;
+        return;
+      }
     } catch (e) {
       console.warn('Error en escaneo manual:', e);
     }
 
-    dom.statusText.textContent = 'No se distinguió botella en la toma. Apunta al envase y dispara de nuevo.';
+    dom.statusText.textContent = 'Enfoca tus botellas dentro de la retícula y mantén la cámara estable.';
   }
 
   // 13. Persistencia en LocalStorage
