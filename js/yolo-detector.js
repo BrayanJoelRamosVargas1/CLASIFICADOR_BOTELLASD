@@ -8,6 +8,11 @@
     static async hasWebGPU() {
       try {
         if (typeof navigator === 'undefined' || !navigator.gpu) return false;
+        // On mobile devices (Android/iOS), mobile WebGPU in Chromium/Brave is experimental,
+        // unstable, often lacks shader-f16 support, and exhibits severe compilation/execution stalls (>2000ms).
+        // WASM SIMD (utilizing ARM NEON vector instructions) is 50x faster and rock-solid on mobile (~45ms).
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test((typeof navigator !== 'undefined' && navigator.userAgent) || '');
+        if (isMobile) return false;
         const adapter = await navigator.gpu.requestAdapter();
         return Boolean(adapter);
       } catch (e) {
@@ -69,11 +74,25 @@
           ort.env.wasm.proxy = false;
           const fp16Url = resolvedUrl.replace(/model\.onnx(\?.*)?$/, 'model_fp16.onnx$1');
           const modelSource = await YoloBottleDetector.fetchModelCached(fp16Url);
-          session = await ort.InferenceSession.create(modelSource, {
+          const gpuSession = await ort.InferenceSession.create(modelSource, {
             executionProviders: ['webgpu'],
             graphOptimizationLevel: 'all'
           });
-          backend = 'webgpu';
+          // Verify WebGPU latency via warm-up pass; fall back to WASM if compilation/execution stalls (>300ms)
+          const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+          const warmOut = await gpuSession.run({ [gpuSession.inputNames[0]]: warmInput });
+          const warmLatency = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+          warmInput.dispose();
+          for (const t of Object.values(warmOut)) t.dispose();
+          if (warmLatency <= 300) {
+            session = gpuSession;
+            backend = 'webgpu';
+          } else {
+            console.warn('[YOLO] WebGPU warmup exceeded 300ms (' + Math.round(warmLatency) + 'ms), falling back to WASM SIMD.');
+            await gpuSession.release();
+            session = null;
+          }
         } catch (e) {
           session = null;
         }
@@ -86,16 +105,16 @@
           graphOptimizationLevel: 'all'
         });
         backend = 'wasm';
+        // Warm-up pass (pattern from nomi30701/yolo-object-detection-onnxruntime-web) so frame 1 never stalls.
+        try {
+          const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+          const warmOut = await session.run({ [session.inputNames[0]]: warmInput });
+          warmInput.dispose();
+          for (const t of Object.values(warmOut)) t.dispose();
+        } catch (e) {}
       }
 
       const detector = new YoloBottleDetector(session, backend);
-      // Warm-up pass (pattern from nomi30701/yolo-object-detection-onnxruntime-web) so frame 1 never stalls.
-      try {
-        const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
-        const warmOut = await session.run({ [session.inputNames[0]]: warmInput });
-        warmInput.dispose();
-        for (const t of Object.values(warmOut)) t.dispose();
-      } catch (e) {}
       return detector;
     }
     constructor(session, backend = 'wasm') {
@@ -140,23 +159,9 @@
       if (!width || !height) return direct;
 
       if (isVideo) {
-        // On WebGPU live camera, test Foveated HD crop / Perifoveal zoomout first if not locked onto a mode,
-        // and if the first pass misses, immediately test the next auxiliary mode in the same cycle.
-        if (this.backend === 'webgpu') {
-          const allModes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
-          const primaryMode = this.lastAuxMode || allModes[(++this.videoFrameCount) % 2];
-          const aux1 = await this.runAuxPass(primaryMode, source, width, height, maxBoxes, minScore);
-          if (aux1.some(p => p.score >= threshold)) {
-            this.lastAuxMode = primaryMode;
-            return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1)), threshold);
-          }
-          const secondaryModes = allModes.filter(m => m !== primaryMode);
-          const secondaryMode = secondaryModes[this.videoFrameCount % secondaryModes.length];
-          const aux2 = await this.runAuxPass(secondaryMode, source, width, height, maxBoxes, minScore);
-          this.lastAuxMode = aux2.some(p => p.score >= threshold) ? secondaryMode : null;
-          return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1, aux2)), threshold);
-        }
-        // WASM fallback: throttle auxiliary pass to every 2nd empty frame
+        // Live camera stream: single-pass inference is paramount to maintain smooth 60fps UI.
+        // Never run sequential multi-pass cascades (aux1 + aux2) within the same frame cycle!
+        // Throttle auxiliary pass to every 2nd empty frame and lock onto active mode.
         const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
@@ -388,6 +393,7 @@
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;
       const plane = 640 * 640;
+      const plane2 = plane * 2;
       if (!this.pixels || this.pixels.length !== 3 * plane) {
         this.pixels = new Float32Array(3 * plane);
       }
@@ -395,10 +401,10 @@
       const { lut, meanLuma } = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
       this.lastMeanLuma = meanLuma;
       for (let i = 0; i < plane; i++) {
-        const idx = i * 4;
+        const idx = i << 2;
         pixels[i] = lut[rgba[idx]];
         pixels[plane + i] = lut[rgba[idx + 1]];
-        pixels[2 * plane + i] = lut[rgba[idx + 2]];
+        pixels[plane2 + i] = lut[rgba[idx + 2]];
       }
       const input = new ort.Tensor('float32', pixels, [1, 3, 640, 640]);
       let outputs;

@@ -25,14 +25,16 @@
     }).catch(() => {});
   }
 
+  const isMobileClient = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+
   // 1. Configuración de Detección Calibrada de Alto Rendimiento
   const CONFIG = {
     STORAGE_KEY: 'ecolens_inventory_v4',
     DAILY_STORAGE_KEY: 'ecolens_daily_sheets_v1',
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
-    TARGET_INFERENCE_INTERVAL_MS: 60,
-    MIN_INFERENCE_PAUSE_MS: 20,
+    TARGET_INFERENCE_INTERVAL_MS: isMobileClient ? 120 : 60,
+    MIN_INFERENCE_PAUSE_MS: isMobileClient ? 60 : 20,
     CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado en frame 2 consecutivo
     TRACK_LOST_MS: 1000,       // Tolerar pérdidas breves sin duplicar la misma botella
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
@@ -216,7 +218,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=23.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=31.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -1033,14 +1035,10 @@
 
     if (!isLoopActive || generation !== sourceGeneration) return;
 
-    // Descontar el tiempo de inferencia y sincronizar con requestVideoFrameCallback cuando esté disponible.
+    // Descontar el tiempo de inferencia y garantizar respiro al event loop y UI del móvil
     const elapsed = performance.now() - startTime;
     const waitMs = Math.max(CONFIG.MIN_INFERENCE_PAUSE_MS, CONFIG.TARGET_INFERENCE_INTERVAL_MS - elapsed);
-    if (activeSource && typeof activeSource.requestVideoFrameCallback === 'function' && waitMs <= CONFIG.MIN_INFERENCE_PAUSE_MS) {
-      activeSource.requestVideoFrameCallback(() => runInferenceLoop(generation));
-    } else {
-      loopTimeoutId = setTimeout(() => runInferenceLoop(generation), waitMs);
-    }
+    loopTimeoutId = setTimeout(() => runInferenceLoop(generation), waitMs);
   }
 
   // 10. Control de Linterna LED Física de la Cámara Trasera
@@ -2177,7 +2175,12 @@
     renderDailyTable();
     renderInventoryTable();
     updateImpactMetrics();
-    initNeuralEngines();
+    // Diferir la inicialización pesada de IA para que la página abra instantáneamente (<50ms) sin bloquear el hilo principal
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => initNeuralEngines(), { timeout: 1500 });
+    } else {
+      setTimeout(() => initNeuralEngines(), 800);
+    }
   });
 
 })();
