@@ -33,15 +33,16 @@ class CoiHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    socketserver.TCPServer.allow_reuse_address = True
     local_ip = get_local_ip()
     print("========================================================")
-    print("  Servidor EcoLens AI activo:")
+    print("  Servidor EcoLens AI activo (ThreadingHTTPServer):")
     print(f"  [-] PC / Local:     http://localhost:{PORT}")
     print(f"  [-] Movil / Red:    http://{local_ip}:{PORT}")
     print("  Cabeceras COOP/COEP inyectadas para WASM SIMD y WebGPU")
     print("========================================================")
-    with socketserver.TCPServer(("", PORT), CoiHandler) as httpd:
+    server_class = getattr(http.server, "ThreadingHTTPServer", http.server.HTTPServer)
+    server_class.allow_reuse_address = True
+    with server_class(("", PORT), CoiHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

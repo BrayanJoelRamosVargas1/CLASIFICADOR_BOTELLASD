@@ -73,18 +73,26 @@
             executionProviders: ['webgpu'],
             graphOptimizationLevel: 'all'
           });
-          // Verify WebGPU latency via warm-up pass; fall back to WASM if compilation/execution stalls (>300ms)
-          const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+          // Two-stage WebGPU warm-up:
+          // Pass 1: JIT compilation of Dawn/Tint WGSL shader pipelines (can take 350-800ms on first run)
+          const warmInput1 = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+          const warmOut1 = await gpuSession.run({ [gpuSession.inputNames[0]]: warmInput1 });
+          warmInput1.dispose();
+          for (const t of Object.values(warmOut1)) t.dispose();
+
+          // Pass 2: Measure actual steady-state GPU execution latency without shader compilation overhead
+          const warmInput2 = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
           const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-          const warmOut = await gpuSession.run({ [gpuSession.inputNames[0]]: warmInput });
+          const warmOut2 = await gpuSession.run({ [gpuSession.inputNames[0]]: warmInput2 });
           const warmLatency = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-          warmInput.dispose();
-          for (const t of Object.values(warmOut)) t.dispose();
-          if (warmLatency <= 300) {
+          warmInput2.dispose();
+          for (const t of Object.values(warmOut2)) t.dispose();
+
+          if (warmLatency <= 450) {
             session = gpuSession;
             backend = 'webgpu';
           } else {
-            console.warn('[YOLO] WebGPU warmup exceeded 300ms (' + Math.round(warmLatency) + 'ms), falling back to WASM SIMD.');
+            console.warn('[YOLO] WebGPU steady-state latency exceeded 450ms (' + Math.round(warmLatency) + 'ms), falling back to WASM SIMD.');
             await gpuSession.release();
             session = null;
           }
@@ -137,11 +145,11 @@
       }
       return preds;
     }
-    async detect(source, maxBoxes = 30, minScore = 0.1) {
+    async detect(source, maxBoxes = 30, minScore = 0.08) {
       const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       const direct = await this.detectOnce(source, maxBoxes, minScore);
       this.lastLatencyMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.15;
+      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.14;
       const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
       const isVideo = Boolean(source.videoWidth);
       if (isVideo && bestDirect >= threshold) {
@@ -157,16 +165,22 @@
 
       if (isVideo) {
         // Live camera stream: single-pass inference is paramount to maintain smooth 60fps UI.
-        // If single inference pass exceeds 240ms (mobile CPU WASM), avoid secondary pass to prevent severe freeze.
-        if (this.lastLatencyMs > 240) {
+        // If single inference pass exceeds 850ms (very slow mobile CPU WASM), avoid secondary pass to prevent severe freeze.
+        if (this.lastLatencyMs > 850) {
           return this.rememberTarget(direct, threshold);
         }
         // Throttle auxiliary pass to every 2nd empty frame and lock onto active mode.
         const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
-          if (++this.videoFrameCount % 2 !== 0) return direct;
-          mode = modes[(this.videoFrameCount >> 1) % modes.length];
+          // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.25), prioritize rot90
+          const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.25));
+          if (hasHorizontalCandidate) {
+            mode = 'rot90';
+          } else {
+            if (++this.videoFrameCount % 2 !== 0) return direct;
+            mode = modes[(this.videoFrameCount >> 1) % modes.length];
+          }
         }
         const aux = await this.runAuxPass(mode, source, width, height, maxBoxes, minScore);
         this.lastAuxMode = aux.some(p => p.score >= threshold) ? mode : null;
@@ -345,6 +359,8 @@
       // 76: scissors, 78: hair drier, 79: toothbrush).
       // Never suppress bottles in front of background furniture, desks, monitors, or people!
       if (!YoloBottleDetector.HARD_NEGATIVE_CLASSES.has(other.classId)) return false;
+      // Do not let toothbrush (79) suppress large containers/bottles (toothbrushes are thin <45px, not wide bottles)
+      if (other.classId === 79 && Math.min(other.bbox[2], other.bbox[3]) > 45) return false;
       const iou = YoloBottleDetector.boxIoU(bottle.bbox, other.bbox);
       return iou >= 0.50 && other.score >= 0.50 && other.score > bottle.score * 1.35;
     }
