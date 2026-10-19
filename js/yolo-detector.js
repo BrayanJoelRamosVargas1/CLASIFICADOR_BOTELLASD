@@ -162,7 +162,7 @@
         // Live camera stream: single-pass inference is paramount to maintain smooth 60fps UI.
         // Never run sequential multi-pass cascades (aux1 + aux2) within the same frame cycle!
         // Throttle auxiliary pass to every 2nd empty frame and lock onto active mode.
-        const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
+        const modes = ['zoomout', 'crop', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
           if (++this.videoFrameCount % 2 !== 0) return direct;

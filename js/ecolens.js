@@ -33,8 +33,8 @@
     DAILY_STORAGE_KEY: 'ecolens_daily_sheets_v1',
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
-    TARGET_INFERENCE_INTERVAL_MS: isMobileClient ? 160 : 60,
-    MIN_INFERENCE_PAUSE_MS: isMobileClient ? 90 : 20,
+    TARGET_INFERENCE_INTERVAL_MS: isMobileClient ? 100 : 50,
+    MIN_INFERENCE_PAUSE_MS: isMobileClient ? 50 : 20,
     CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado en frame 2 consecutivo
     TRACK_LOST_MS: 1000,       // Tolerar pérdidas breves sin duplicar la misma botella
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
@@ -218,7 +218,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=33.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=34.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -259,7 +259,7 @@
       computeIoU(a, b),
       computeIoU({ x: projX, y: projY, w: a.w, h: a.h }, b)
     );
-    if (iou > 0.25) return iou;
+    if (iou > 0.12) return iou;
     const acx = projX + a.w * 0.5, acy = projY + a.h * 0.5;
     const bcx = b.x + b.w * 0.5, bcy = b.y + b.h * 0.5;
     const dx = Math.abs(acx - bcx);
@@ -267,9 +267,9 @@
     const maxW = Math.max(a.w, b.w, 1);
     const maxH = Math.max(a.h, b.h, 1);
     const sizeRatio = Math.min(a.w * a.h, b.w * b.h) / Math.max(a.w * a.h, b.w * b.h, 1);
-    const limitX = countInFrame === 1 ? Math.max(maxW * 2.2, 220) : maxW * 0.75;
-    const limitY = countInFrame === 1 ? Math.max(maxH * 0.85, 180) : maxH * 0.55;
-    const minRatio = countInFrame === 1 ? 0.38 : 0.50;
+    const limitX = countInFrame <= 2 ? Math.max(maxW * 3.0, 320) : maxW * 0.85;
+    const limitY = countInFrame <= 2 ? Math.max(maxH * 1.5, 260) : maxH * 0.65;
+    const minRatio = countInFrame <= 2 ? 0.30 : 0.50;
     if (dx < limitX && dy < limitY && sizeRatio > minRatio) {
       const normDist = Math.hypot(dx / limitX, dy / limitY);
       if (normDist < 1) return Math.max(iou, 0.75 * (1 - normDist * 0.6));
@@ -680,7 +680,7 @@
 
         for (const box of filtered) {
           let bestMatch = null;
-          let bestIoU = 0.25; // Requiere coincidencia espacial real
+          let bestIoU = filtered.length <= 2 ? 0.12 : 0.20; // Tolerancia a temblor manual en móvil
 
           for (const t of trackers) {
             if (matchedTrackerIds.has(t.id)) continue;
@@ -746,7 +746,7 @@
             .filter(b => b.score < activeThreshold);
           for (const lowBox of lowCandidates) {
             let bestMatch = null;
-            let bestIoU = 0.35;
+            let bestIoU = lowCandidates.length <= 2 ? 0.15 : 0.25;
             for (const t of trackers) {
               if (matchedTrackerIds.has(t.id)) continue;
               const dt = Math.max(0, Math.min(400, now - t.lastSeen));
@@ -819,8 +819,16 @@
         if (newlyRegistered.length > 0) {
           onNewBottlesRegistered(newlyRegistered);
         } else if (visibleBoxes.length > 0) {
+          const first = visibleBoxes[0];
           const labelsList = visibleBoxes.map(b => b.label.split(' ')[0] + ' ' + b.label.split(' ')[1]).join(', ');
-          dom.statusText.textContent = `● ${visibleBoxes.length} botella(s): ${labelsList} (${Math.round(visibleBoxes[0].score * 100)}%)`;
+          dom.statusText.textContent = `● ${visibleBoxes.length} botella(s): ${labelsList} (${Math.round(first.score * 100)}%)`;
+          if (dom.resultLabel && typeof dom.resultLabel.textContent === 'string' && dom.resultLabel.textContent.includes('Espera')) {
+            dom.resultLabel.textContent = `Analizando ${first.label}...`;
+            dom.resultSub.textContent = `Confirmando estabilidad (${Math.round(first.score * 100)}%)`;
+            const pct = Math.round(first.score * 100);
+            if (dom.meterPct) dom.meterPct.textContent = `${pct}%`;
+            if (dom.meterFill) dom.meterFill.style.width = `${pct}%`;
+          }
         } else {
           dom.statusText.textContent = 'Buscando botellas...';
         }
