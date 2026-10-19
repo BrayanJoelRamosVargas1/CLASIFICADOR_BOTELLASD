@@ -125,3 +125,20 @@ test('tracks two neighboring bottles simultaneously without merging when introdu
   assert.equal(h.getTrackers().length, 2);
 });
 
+test('detects bottles and wine glasses processed through WebGL fallback pipeline and registers them as bottles', async () => {
+  // Simulates COCO-SSD output mapped by ecolens WebGL fallback adapter
+  const fallbackPredictions = [
+    { class: 'bottle', rawClass: 'bottle', score: 0.85, bbox: [20, 20, 50, 120] },
+    { class: 'bottle', rawClass: 'wine glass', score: 0.78, bbox: [180, 20, 45, 130] }
+  ];
+  const h = engine(async () => fallbackPredictions);
+  await h.processVisualFrame();
+  await h.processVisualFrame();
+  assert.equal(h.registrations.length, 2);
+  const trackers = h.getTrackers();
+  assert.equal(trackers.length, 2);
+  assert.equal(trackers[0].rawClass, 'bottle');
+  assert.equal(trackers[1].rawClass, 'wine glass');
+});
+
+

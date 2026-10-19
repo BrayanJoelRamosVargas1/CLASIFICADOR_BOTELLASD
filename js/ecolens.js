@@ -263,15 +263,22 @@
         if (window.cocoSsd) {
           try {
             dom.statusText.textContent = '⏳ Activando detector GPU de respaldo (WebGL)...';
-            const tfModel = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+            let tfModel = null;
+            try {
+              tfModel = await window.cocoSsd.load({ modelUrl: './models/coco-ssd/model.json' });
+            } catch (errLocal) {
+              console.warn('EcoLens: No se pudo cargar ./models/coco-ssd/model.json local, intentando CDN...', errLocal);
+              tfModel = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+            }
             detector = {
               backend: 'webgl',
               detect: async (source, maxBoxes = 30, minScore = 0.1) => {
                 const preds = await tfModel.detect(source, maxBoxes, minScore);
                 return preds.filter(p => p.class === 'bottle' || p.class === 'wine glass')
                   .map(p => ({
-                    class: p.class === 'wine glass' ? 'wine glass' : 'bottle',
-                    score: p.score,
+                    class: 'bottle',
+                    rawClass: p.class,
+                    score: p.class === 'wine glass' ? p.score * 0.95 : p.score,
                     bbox: p.bbox
                   }));
               },
@@ -287,7 +294,7 @@
             console.error('Error en motor WebGL de respaldo:', e2);
           }
         }
-        dom.statusText.textContent = 'No se pudo cargar el detector. Recarga la página y revisa tu conexión.';
+        dom.statusText.textContent = 'No se pudo cargar el detector. Revisa que el servidor local esté activo en http://localhost:8080';
         dom.hardwareBadge.style.background = '#fef2f2';
         dom.hardwareBadge.style.color = '#dc2626';
         dom.hardwareBadge.textContent = 'Detector no disponible';
@@ -696,6 +703,11 @@
 
   // 6. Procesamiento asíncrono de botellas
   async function processVisualFrame(forceWait = false) {
+    if (!detector) {
+      try {
+        await initNeuralEngines();
+      } catch (e) {}
+    }
     if (!detector || !activeSource) return;
     if (isDetecting) {
       if (!forceWait || !activeInferencePromise) return;
@@ -722,7 +734,9 @@
         const rawPredictions = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, CONFIG.MIN_INFERENCE_SCORE);
         const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - tInfStart);
         if (dom.hardwareBadge && detector) {
-          const backendName = detector.backend === 'webgpu' ? 'WebGPU' : 'WASM';
+          const backendName = detector.backend === 'webgpu'
+            ? 'WebGPU'
+            : (detector.backend === 'webgl' ? 'WebGL' : 'WASM');
           dom.hardwareBadge.innerHTML = `<span class="dot"></span> ${backendName} · ${latencyMs}ms`;
         }
 
@@ -1375,6 +1389,14 @@
     if (!activeSource) {
       alert('Primero inicia la cámara o sube una fotografía.');
       return;
+    }
+    if (!detector) {
+      dom.statusText.textContent = '⏳ Inicializando detector IA...';
+      await initNeuralEngines();
+      if (!detector) {
+        dom.statusText.textContent = 'No se pudo cargar el detector IA. Revisa la consola o conexión.';
+        return;
+      }
     }
 
     playSound('click');

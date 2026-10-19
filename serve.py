@@ -4,6 +4,13 @@ import os
 import sys
 import socket
 
+# Force UTF-8 stdout if possible on Windows cmd
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 
 def get_local_ip():
@@ -29,9 +36,9 @@ if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     local_ip = get_local_ip()
     print("========================================================")
-    print(f"  Servidor EcoLens AI activo:")
-    print(f"  ● PC / Local:     http://localhost:{PORT}")
-    print(f"  ● Teléfono / Red:  http://{local_ip}:{PORT}")
+    print("  Servidor EcoLens AI activo:")
+    print(f"  [-] PC / Local:     http://localhost:{PORT}")
+    print(f"  [-] Movil / Red:    http://{local_ip}:{PORT}")
     print("  Cabeceras COOP/COEP inyectadas para WASM SIMD y WebGPU")
     print("========================================================")
     with socketserver.TCPServer(("", PORT), CoiHandler) as httpd:

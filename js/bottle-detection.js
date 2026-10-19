@@ -22,7 +22,7 @@
         const [x, y, w, h] = p.bbox;
         const left = Math.max(0, x), top = Math.max(0, y);
         return { x: left, y: top, w: Math.min(width, x + w) - left,
-          h: Math.min(height, y + h) - top, score: p.score, rawClass: p.class };
+          h: Math.min(height, y + h) - top, score: p.score, rawClass: p.rawClass || p.class };
       })
       .filter(b => [b.x, b.y, b.w, b.h, b.score].every(Number.isFinite) && b.w >= 14 && b.h >= 14)
       .sort((a, b) => b.score - a.score);
