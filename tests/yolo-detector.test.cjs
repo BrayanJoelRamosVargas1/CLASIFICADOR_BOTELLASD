@@ -82,5 +82,20 @@ test('keeps bottle held in front of a person on webcam even when inside the pers
   assert.equal(Math.round(predictions[0].score * 100), 32);
 });
 
-
+test('keeps bottle placed on a desk or in front of monitor/chair/laptop even when background has higher score', async () => {
+  // Dining table (60, score 0.88), TV/monitor (62, score 0.91), chair (56, score 0.79) contain bottle (39, score 0.42)
+  const h = setup([
+    [
+      [0, 100, 640, 480, 0.88, 60],
+      [100, 20, 520, 380, 0.91, 62],
+      [80, 50, 500, 460, 0.79, 56],
+      [260, 150, 330, 350, 0.42, 39]
+    ],
+    [],
+    []
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 1);
+  assert.equal(Math.round(predictions[0].score * 100), 42);
+});
 

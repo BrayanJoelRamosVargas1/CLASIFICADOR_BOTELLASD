@@ -5,6 +5,15 @@
     ? new URL('./', document.currentScript.src).href
     : (typeof location !== 'undefined' && location.href ? new URL('./js/', location.href).href : '');
   class YoloBottleDetector {
+    static async hasWebGPU() {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.gpu) return false;
+        const adapter = await navigator.gpu.requestAdapter();
+        return Boolean(adapter);
+      } catch (e) {
+        return false;
+      }
+    }
     static async load(modelUrl = './models/yolov10n/model.onnx') {
       ort.env.wasm.wasmPaths = scriptDir
         ? new URL('./ort/', scriptDir).href
@@ -13,15 +22,35 @@
       const hwThreads = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
       ort.env.wasm.numThreads = isolated ? Math.min(4, Math.max(2, hwThreads)) : 1;
       ort.env.wasm.simd = true;
-      ort.env.wasm.proxy = !isolated && typeof Worker !== 'undefined';
       const resolvedUrl = (typeof location !== 'undefined' && location.href)
         ? new URL(modelUrl, location.href).href
         : modelUrl;
-      const session = await ort.InferenceSession.create(resolvedUrl, {
-        executionProviders: ['wasm'],
-        graphOptimizationLevel: 'all'
-      });
-      const detector = new YoloBottleDetector(session);
+
+      let session = null;
+      let backend = 'wasm';
+      if (await YoloBottleDetector.hasWebGPU()) {
+        try {
+          ort.env.wasm.proxy = false;
+          const fp16Url = resolvedUrl.replace(/model\.onnx(\?.*)?$/, 'model_fp16.onnx$1');
+          session = await ort.InferenceSession.create(fp16Url, {
+            executionProviders: ['webgpu'],
+            graphOptimizationLevel: 'all'
+          });
+          backend = 'webgpu';
+        } catch (e) {
+          session = null;
+        }
+      }
+      if (!session) {
+        ort.env.wasm.proxy = !isolated && typeof Worker !== 'undefined';
+        session = await ort.InferenceSession.create(resolvedUrl, {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all'
+        });
+        backend = 'wasm';
+      }
+
+      const detector = new YoloBottleDetector(session, backend);
       // Warm-up pass (pattern from nomi30701/yolo-object-detection-onnxruntime-web) so frame 1 never stalls.
       try {
         const warmInput = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
@@ -31,8 +60,9 @@
       } catch (e) {}
       return detector;
     }
-    constructor(session) {
+    constructor(session, backend = 'wasm') {
       this.session = session;
+      this.backend = backend;
       this.canvas = document.createElement('canvas');
       this.canvas.width = this.canvas.height = 640;
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
@@ -57,25 +87,29 @@
       if (!width || !height) return direct;
 
       if (isVideo) {
-        // On live camera, if locked onto an auxiliary mode, repeat it immediately; otherwise cycle every 2nd frame.
-        const modes = ['crop', 'rot90', 'rot180'];
+        // On live camera, if locked onto an auxiliary mode, repeat it immediately; otherwise cycle.
+        const modes = ['crop', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
-          if (++this.videoFrameCount % 2 !== 0) return direct;
-          mode = modes[(this.videoFrameCount >> 1) % modes.length];
+          if (this.backend !== 'webgpu' && ++this.videoFrameCount % 2 !== 0) return direct;
+          const step = this.backend === 'webgpu' ? ++this.videoFrameCount : (this.videoFrameCount >> 1);
+          mode = modes[step % modes.length];
         }
         const aux = await this.runAuxPass(mode, source, width, height, maxBoxes, minScore);
         this.lastAuxMode = aux.some(p => p.score >= threshold) ? mode : null;
         return direct.concat(aux);
       }
 
-      // Static image multi-orientation & SAHI crop synthesis (0° + 90° + 180° + center zoom fallback)
+      // Static image multi-orientation & SAHI crop synthesis (0° + 90° + 180° + center zoom + 270° fallback)
       const rot90 = await this.runAuxPass('rot90', source, width, height, maxBoxes, minScore);
       const rot180 = await this.runAuxPass('rot180', source, width, height, maxBoxes, minScore);
       const combined = direct.concat(rot90, rot180);
       if (combined.some(p => p.score >= threshold)) return combined;
       const crop = await this.runAuxPass('crop', source, width, height, maxBoxes, minScore);
-      return combined.concat(crop);
+      const withCrop = combined.concat(crop);
+      if (withCrop.some(p => p.score >= threshold)) return withCrop;
+      const rot270 = await this.runAuxPass('rot270', source, width, height, maxBoxes, minScore);
+      return withCrop.concat(rot270);
     }
     async runAuxPass(mode, source, width, height, maxBoxes, minScore) {
       if (!this.auxCanvas) this.auxCanvas = document.createElement('canvas');
@@ -89,6 +123,15 @@
         ctx.drawImage(source, 0, 0, width, height);
         const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
         return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox(p.bbox, height) }));
+      }
+      if (mode === 'rot270') {
+        this.auxCanvas.width = height;
+        this.auxCanvas.height = width;
+        ctx.translate(0, width);
+        ctx.rotate(-Math.PI / 2);
+        ctx.drawImage(source, 0, 0, width, height);
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
+        return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox270(p.bbox, width) }));
       }
       if (mode === 'rot180') {
         this.auxCanvas.width = width;
@@ -119,6 +162,9 @@
     static unrotateBox([x, y, w, h], originalHeight) {
       return [y, originalHeight - x - w, h, w];
     }
+    static unrotateBox270([x, y, w, h], originalWidth) {
+      return [originalWidth - y - h, x, h, w];
+    }
     static unrotateBox180([x, y, w, h], originalWidth, originalHeight) {
       return [originalWidth - x - w, originalHeight - y - h, w, h];
     }
@@ -130,27 +176,14 @@
       return union > 0 ? inter / union : 0;
     }
     static isDominatedByOtherClass(bottle, other) {
-      const [bx, by, bw, bh] = bottle.bbox;
-      const [ox, oy, ow, oh] = other.bbox;
-      const interW = Math.max(0, Math.min(bx + bw, ox + ow) - Math.max(bx, ox));
-      const interH = Math.max(0, Math.min(by + bh, oy + oh) - Math.max(by, oy));
-      const inter = interW * interH;
-      if (inter <= 0) return false;
-      const bArea = Math.max(bw * bh, 1);
-      const oArea = Math.max(ow * oh, 1);
-      const iou = inter / (bArea + oArea - inter);
-      const containment = inter / Math.min(bArea, oArea);
-      if (other.classId !== 0) {
-        if (other.classId === 75) {
-          return iou >= 0.45 && other.score > bottle.score * 1.15;
-        }
-        if (iou >= 0.35 && other.score >= bottle.score * 0.90) return true;
-        if (containment >= 0.65 && other.score > bottle.score) return true;
-        return false;
-      }
-      // Person (classId 0): never suppress a bottle merely because it is held in front of a person's body!
-      // Only suppress if the bottle bounding box IS the person bounding box itself (iou >= 0.55).
-      return iou >= 0.55 && other.score > 0.60 && bottle.score < 0.35;
+      // Only suppress when the SAME physical object bounding box (IoU >= 0.50) has a
+      // strictly higher score on a true non-bottle handheld/container lookalike class
+      // (10: fire hydrant/cylinder, 41: cup/mug, 64: mouse, 65: remote, 67: cell phone,
+      // 76: scissors, 78: hair drier, 79: toothbrush).
+      // Never suppress bottles in front of background furniture, desks, monitors, or people!
+      if (!YoloBottleDetector.HARD_NEGATIVE_CLASSES.has(other.classId)) return false;
+      const iou = YoloBottleDetector.boxIoU(bottle.bbox, other.bbox);
+      return iou >= 0.50 && other.score > bottle.score * 1.15;
     }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
@@ -206,5 +239,6 @@
     }
     async dispose() { await this.session.release(); }
   }
+  YoloBottleDetector.HARD_NEGATIVE_CLASSES = new Set([10, 41, 64, 65, 67, 76, 78, 79]);
   window.YoloBottleDetector = YoloBottleDetector;
 })();

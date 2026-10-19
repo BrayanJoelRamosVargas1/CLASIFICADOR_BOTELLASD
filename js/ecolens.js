@@ -33,8 +33,8 @@
     MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
     TARGET_INFERENCE_INTERVAL_MS: 60,
     MIN_INFERENCE_PAUSE_MS: 20,
-    CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado de inmediato si >= 26%
-    TRACK_LOST_MS: 2200,       // Tolerar pérdidas breves o giros de mano sin duplicar la misma botella
+    CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado en frame 2 consecutivo
+    TRACK_LOST_MS: 1000,       // Tolerar pérdidas breves sin duplicar la misma botella
     GRAMS_PLASTIC_PER_BOTTLE: 24.5,
     GRAMS_CO2_PER_BOTTLE: 82.3,
     LITERS_WATER_PER_BOTTLE: 3.2
@@ -187,12 +187,14 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=19.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=20.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
         const threads = (window.ort && window.ort.env && window.ort.env.wasm && window.ort.env.wasm.numThreads) || 1;
-        dom.hardwareBadge.innerHTML = `<span class="dot"></span> YOLO · WASM ${threads > 1 ? threads + 'T' : 'SIMD'}`;
+        dom.hardwareBadge.innerHTML = detector.backend === 'webgpu'
+          ? '<span class="dot"></span> YOLO · WebGPU FP16'
+          : `<span class="dot"></span> YOLO · WASM ${threads > 1 ? threads + 'T' : 'SIMD'}`;
         if (dom.btnManualScan) dom.btnManualScan.disabled = false;
         return detector;
       } catch (error) {
@@ -422,15 +424,14 @@
             bestMatch.hits++;
             matchedTrackerIds.add(bestMatch.id);
 
-            // Confirmación y Auto-Registro en Frame 2 (o inmediato si supera 0.26)
-            if ((bestMatch.hits >= CONFIG.CONFIRMATION_HITS || bestMatch.score >= 0.26) && !bestMatch.registered) {
+            // Confirmación y Auto-Registro en Frame 2 consecutivo
+            if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
               bestMatch.registered = true;
               newlyRegistered.push(bestMatch);
             }
           } else {
             // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
             const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
-            const instantConfirm = isLoopActive && box.score >= 0.26;
             const newTracker = {
               id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
               x: box.x,
@@ -441,16 +442,13 @@
               rawClass: box.rawClass,
               meta: meta,
               label: meta.label,
-              hits: instantConfirm ? CONFIG.CONFIRMATION_HITS : 1,
+              hits: 1,
               lastSeen: now,
               missed: 0,
-              registered: instantConfirm
+              registered: false
             };
             trackers.push(newTracker);
             matchedTrackerIds.add(newTracker.id);
-            if (instantConfirm) {
-              newlyRegistered.push(newTracker);
-            }
           }
         }
 
@@ -458,7 +456,7 @@
         for (const t of trackers) {
           if (!matchedTrackerIds.has(t.id)) {
             t.missed++;
-            if (!t.registered && t.missed >= 2) t.hits = 0;
+            if (!t.registered) t.hits = 0;
           }
         }
 
