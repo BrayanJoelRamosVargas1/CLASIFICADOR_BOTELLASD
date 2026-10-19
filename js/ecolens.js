@@ -115,9 +115,15 @@
     invEmpty: document.getElementById('invEmptyRow'),
     btnExportCsv: document.getElementById('btnExportCsv'),
     btnExportJson: document.getElementById('btnExportJson'),
+    btnDRSVoucher: document.getElementById('btnDRSVoucher'),
     btnClearInv: document.getElementById('btnClearInv'),
     invSearch: document.getElementById('invSearchInput'),
-    invTotalUnits: document.getElementById('invTotalUnits')
+    invTotalUnits: document.getElementById('invTotalUnits'),
+    drsModal: document.getElementById('drsReceiptModal'),
+    btnCloseDrsModal: document.getElementById('btnCloseDrsModal'),
+    btnPrintDrsReceipt: document.getElementById('btnPrintDrsReceipt'),
+    btnCopyDrsCode: document.getElementById('btnCopyDrsCode'),
+    drsModalBody: document.getElementById('drsModalBody')
   };
 
   // Canvas auxiliar de 16x16 para estimación de color
@@ -280,6 +286,8 @@
       volumeMl = 2000;
     }
 
+    const compactionStatus = aspect < 1.95 && (bw * bh) > 22000 ? 'Compactada' : 'Íntegra';
+
     if (isGlass) {
       return {
         label: 'Botella de Vidrio (Estimado)',
@@ -289,6 +297,9 @@
         icon: 'bx-wine',
         sizeLabel,
         volumeMl,
+        ricCode: 'GL-71 (Vidrio)',
+        recyclingBin: 'Contenedor Verde (Vidrio)',
+        compactionStatus: 'Íntegra (Rígido)',
         hasCap: true,
         capLabel: 'Con Tapa/Corona',
         liquidStatus: 'Vacía',
@@ -305,6 +316,9 @@
         icon: 'bx-water',
         sizeLabel,
         volumeMl,
+        ricCode: '♳ PET-1',
+        recyclingBin: 'Contenedor Azul (PET)',
+        compactionStatus,
         hasCap: true,
         capLabel: 'Con Tapa (HDPE)',
         liquidStatus: 'Vacía',
@@ -396,6 +410,9 @@
           icon: 'bx-wine',
           sizeLabel,
           volumeMl,
+          ricCode: 'GL-71 (Vidrio)',
+          recyclingBin: 'Contenedor Verde (Vidrio)',
+          compactionStatus: 'Íntegra (Rígido)',
           hasCap,
           capLabel: hasCap ? 'Con Tapa/Corona' : 'Sin Tapa',
           liquidStatus,
@@ -412,6 +429,9 @@
           icon: 'bx-recycle',
           sizeLabel,
           volumeMl,
+          ricCode: '♳ PET-1',
+          recyclingBin: 'Contenedor Azul (PET)',
+          compactionStatus,
           hasCap,
           capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
           liquidStatus,
@@ -427,6 +447,9 @@
         icon: 'bx-water',
         sizeLabel,
         volumeMl,
+        ricCode: '♳ PET-1',
+        recyclingBin: 'Contenedor Azul (PET)',
+        compactionStatus,
         hasCap,
         capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
         liquidStatus,
@@ -441,6 +464,9 @@
         icon: 'bx-water',
         sizeLabel,
         volumeMl,
+        ricCode: '♳ PET-1',
+        recyclingBin: 'Contenedor Azul (PET)',
+        compactionStatus,
         hasCap: true,
         capLabel: 'Con Tapa (HDPE)',
         liquidStatus: 'Vacía',
@@ -680,20 +706,27 @@
       }, 400);
     }
 
-    const newRecords = items.map(item => ({
-      id: item.id,
-      timestamp: new Date().toISOString(),
-      label: item.label,
-      tagClass: item.meta ? item.meta.tagClass : 'pet',
-      confidence: Math.round(item.score * 100),
-      sizeLabel: item.meta ? item.meta.sizeLabel : 'Personal (500ml)',
-      volumeMl: item.meta ? item.meta.volumeMl : 500,
-      hasCap: item.meta ? Boolean(item.meta.hasCap) : true,
-      liquidStatus: item.meta ? item.meta.liquidStatus : 'Vacía',
-      depositValue: item.meta && typeof item.meta.depositValue === 'number' ? item.meta.depositValue : (item.meta && item.meta.tagClass === 'glass' ? 1.00 : 0.50),
-      gramsPlastic: item.meta && item.meta.tagClass === 'glass' ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
-      co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
-    }));
+    const newRecords = items.map(item => {
+      const tagClass = item.meta ? item.meta.tagClass : 'pet';
+      const isGlass = tagClass === 'glass';
+      return {
+        id: item.id,
+        timestamp: new Date().toISOString(),
+        label: item.label,
+        tagClass,
+        confidence: Math.round(item.score * 100),
+        sizeLabel: item.meta ? item.meta.sizeLabel : 'Personal (500ml)',
+        volumeMl: item.meta ? item.meta.volumeMl : 500,
+        ricCode: item.meta && item.meta.ricCode ? item.meta.ricCode : (isGlass ? 'GL-71' : '♳ PET-1'),
+        recyclingBin: item.meta && item.meta.recyclingBin ? item.meta.recyclingBin : (isGlass ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)'),
+        compactionStatus: item.meta && item.meta.compactionStatus ? item.meta.compactionStatus : 'Íntegra',
+        hasCap: item.meta ? Boolean(item.meta.hasCap) : true,
+        liquidStatus: item.meta ? item.meta.liquidStatus : 'Vacía',
+        depositValue: item.meta && typeof item.meta.depositValue === 'number' ? item.meta.depositValue : (isGlass ? 1.00 : 0.50),
+        gramsPlastic: isGlass ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
+        co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
+      };
+    });
 
     const currentInv = loadInventory();
     const updatedInv = [...newRecords, ...currentInv];
@@ -796,8 +829,10 @@
       ctx.lineTo(rx + rw, ry + rh - corner);
       ctx.stroke();
 
-      // 4. Etiqueta flotante con Física de Botella RVM (Tamaño, Tapa, Contenido y Reembolso)
-      const subTag = `${meta.sizeLabel ? meta.sizeLabel.split(' ')[0] : '500ml'} · ${meta.hasCap ? 'Con Tapa' : 'Sin Tapa'} · ${meta.liquidStatus ? meta.liquidStatus.split(' ')[0] : 'Vacía'} · +${(meta.depositValue || 0.50).toFixed(2)}Bs`;
+      // 4. Etiqueta flotante con Física de Botella RVM (RIC, Tamaño, Tapa, Contenido y Reembolso)
+      const ricSymbol = meta.ricCode ? meta.ricCode.split(' ')[0] : '♳';
+      const compLabel = meta.compactionStatus && meta.compactionStatus.includes('Compactada') ? 'Compactada' : (meta.liquidStatus ? meta.liquidStatus.split(' ')[0] : 'Vacía');
+      const subTag = `${ricSymbol} · ${meta.sizeLabel ? meta.sizeLabel.split(' ')[0] : '500ml'} · ${meta.hasCap ? 'Con Tapa' : 'Sin Tapa'} · ${compLabel} · +${(meta.depositValue || 0.50).toFixed(2)}Bs`;
       const fontSize = Math.max(12, Math.round(13 * baseScale));
       const subFontSize = Math.max(10, Math.round(10.5 * baseScale));
       ctx.font = `700 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -1141,21 +1176,32 @@
 
       const deposit = (typeof item.depositValue === 'number' ? item.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
       const sizeStr = item.sizeLabel || 'Personal (500ml)';
+      const ricStr = item.ricCode || (tagClass === 'glass' ? 'GL-71' : '♳ PET-1');
+      const binStr = item.recyclingBin || (tagClass === 'glass' ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)');
+      const compactStr = item.compactionStatus || 'Íntegra';
       const capStr = item.hasCap ? '<span style="color:#059669; font-weight:700;">✓ Con Tapa</span>' : '<span style="color:#64748b;">Sin Tapa</span>';
       const liquidStr = item.liquidStatus ? `<span style="font-size:0.75rem; color:${item.liquidStatus.includes('Líquido') ? '#d97706' : '#059669'};">● ${item.liquidStatus}</span>` : '<span style="font-size:0.75rem; color:#059669;">● Vacía</span>';
+      const ricClass = tagClass === 'glass' ? 'ric-glass' : 'ric-pet';
 
       tr.innerHTML = `
         <td style="font-weight:700; font-family:var(--font-mono); color:var(--primary);">${item.id}</td>
         <td>
-          <span class="material-tag ${tagClass}">
-            <i class="bx ${iconClass}"></i>
-            ${item.label}
-          </span>
+          <div style="display:flex; flex-direction:column; gap:3px;">
+            <span class="material-tag ${tagClass}">
+              <i class="bx ${iconClass}"></i>
+              ${item.label}
+            </span>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span class="ric-badge ${ricClass}">${ricStr}</span>
+              <span style="font-size:0.7rem; color:#64748b;">➔ ${binStr.split(' ')[0]} ${binStr.split(' ')[1] || ''}</span>
+            </div>
+          </div>
         </td>
         <td style="font-size:0.8rem; font-weight:600; color:#334155;">${sizeStr}</td>
         <td style="font-size:0.8rem;">
           <div>${capStr}</div>
           <div>${liquidStr}</div>
+          <div style="font-size:0.7rem; color:${compactStr.includes('Compactada') ? '#0284c7' : '#64748b'}; font-weight:600;">${compactStr}</div>
         </td>
         <td style="font-weight:800; font-family:var(--font-mono); color:#059669;">${deposit} Bs.</td>
         <td>
@@ -1205,7 +1251,7 @@
     if (dom.kpiTotalDeposit) dom.kpiTotalDeposit.textContent = `${totalDeposit.toFixed(2)} Bs.`;
   }
 
-  // 15. Exportación CSV y JSON
+  // 15. Exportación CSV y JSON con Estándares Industriales RVM
   function exportCSV() {
     const items = loadInventory();
     if (!items.length) {
@@ -1213,9 +1259,17 @@
       return;
     }
 
-    let csv = 'ID,Material,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
+    let csv = 'ID,Material,Codigo_Resina,Volumen_Tamanio,Estado_Tapa,Contenido_Liquido,Compactacion,Contenedor_Destino,Reembolso_Bs,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
     items.forEach(i => {
-      csv += `"${i.id}","${i.label}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
+      const tagClass = i.tagClass || (i.label.includes('Vidrio') ? 'glass' : 'pet');
+      const ric = i.ricCode || (tagClass === 'glass' ? 'GL-71' : '♳ PET-1');
+      const size = i.sizeLabel || 'Personal (500ml)';
+      const cap = i.hasCap ? 'Con Tapa' : 'Sin Tapa';
+      const liq = i.liquidStatus || 'Vacía';
+      const comp = i.compactionStatus || 'Íntegra';
+      const bin = i.recyclingBin || (tagClass === 'glass' ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)');
+      const dep = (typeof i.depositValue === 'number' ? i.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
+      csv += `"${i.id}","${i.label}","${ric}","${size}","${cap}","${liq}","${comp}","${bin}","${dep}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
     });
 
     downloadBlob(csv, `EcoLens_Inventario_${Date.now()}.csv`, 'text/csv');
@@ -1239,6 +1293,97 @@
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // 15.A Emisión de Ticket de Reembolso DRS / Voucher RVM (Reverse Vending Machine)
+  function showDRSVoucherModal() {
+    const items = loadInventory();
+    if (!items.length) {
+      alert('El inventario está vacío. Registra botellas primero para generar un comprobante DRS.');
+      return;
+    }
+
+    const ticket = window.BottleDetection && window.BottleDetection.generateDRSTicket
+      ? window.BottleDetection.generateDRSTicket(items)
+      : {
+          ticketCode: `DRS-RVM-${Date.now().toString(16).toUpperCase()}`,
+          machineId: 'RVM-STK-01',
+          totalBottles: items.length,
+          totalDeposit: items.reduce((acc, i) => acc + (typeof i.depositValue === 'number' ? i.depositValue : 0.50), 0),
+          currency: 'Bs.',
+          gramsPlasticSaved: items.filter(i => i.tagClass !== 'glass').length * 28,
+          gramsCo2Saved: items.length * 82,
+          itemsBreakdown: []
+        };
+
+    const dateStr = new Date().toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+
+    let breakdownHtml = '';
+    if (ticket.itemsBreakdown && ticket.itemsBreakdown.length) {
+      ticket.itemsBreakdown.forEach(row => {
+        if (row.quantity > 0) {
+          breakdownHtml += `
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem; font-size:0.82rem;">
+              <span><strong>${row.quantity}x</strong> ${row.ricCode} ${row.material}</span>
+              <span>${row.subtotal.toFixed(2)} Bs.</span>
+            </div>
+            <div style="font-size:0.72rem; color:#64748b; margin-bottom:0.4rem; padding-left:1.2rem;">
+              ➔ ${row.bin} (${row.unitRefund.toFixed(2)} Bs./u)
+            </div>
+          `;
+        }
+      });
+    }
+
+    if (dom.drsModalBody) {
+      dom.drsModalBody.innerHTML = `
+        <div style="text-align:center; border-bottom:1px dashed #cbd5e1; padding-bottom:0.75rem; margin-bottom:0.75rem;">
+          <h4 style="margin:0; font-size:1.05rem; letter-spacing:0.5px; font-weight:800;">ECOLENS RVM SYSTEMS</h4>
+          <div style="font-size:0.75rem; color:#64748b;">REVERSE VENDING &amp; DRS DEPOSIT RETURN</div>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:2px;">Terminal: ${ticket.machineId} · La Paz, Bolivia</div>
+          <div style="font-size:0.72rem; color:#64748b;">${dateStr}</div>
+        </div>
+
+        <div style="margin-bottom:0.85rem;">
+          <div style="font-size:0.75rem; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:0.4rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.2rem;">
+            Detalle de Envases Retornados
+          </div>
+          ${breakdownHtml}
+        </div>
+
+        <div style="border-top:2px solid #0f172a; padding-top:0.6rem; margin-bottom:0.85rem;">
+          <div style="display:flex; justify-content:space-between; font-size:1rem; font-weight:800; color:#0f172a;">
+            <span>TOTAL REEMBOLSO:</span>
+            <span>${ticket.totalDeposit.toFixed(2)} Bs.</span>
+          </div>
+          <div style="font-size:0.75rem; color:#059669; font-weight:700; margin-top:0.25rem;">
+            Total Envases: ${ticket.totalBottles} unidades procesadas
+          </div>
+        </div>
+
+        <div style="background:#f1f5f9; padding:0.6rem 0.75rem; border-radius:6px; margin-bottom:0.85rem; font-size:0.75rem;">
+          <div style="font-weight:700; color:#0f172a; margin-bottom:2px;">Impacto Ambiental Acreditado:</div>
+          <div>♻️ Plástico evitado: <strong>${ticket.gramsPlasticSaved} g</strong></div>
+          <div>🌱 Huella CO₂ reducida: <strong>${ticket.gramsCo2Saved} g</strong></div>
+        </div>
+
+        <div style="text-align:center; border-top:1px dashed #cbd5e1; padding-top:0.75rem;">
+          <div style="font-family:monospace; font-size:0.95rem; font-weight:800; letter-spacing:1px; color:#0f172a; background:#e2e8f0; padding:6px 10px; border-radius:4px; display:inline-block;" id="drsVoucherCodeText">
+            ${ticket.ticketCode}
+          </div>
+          <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">
+            Presenta este código en caja o terminal para canjear tu dinero o descuento.
+          </div>
+        </div>
+      `;
+    }
+
+    if (dom.drsModal) dom.drsModal.style.display = 'flex';
+    playSound('chime');
+  }
+
+  function hideDRSVoucherModal() {
+    if (dom.drsModal) dom.drsModal.style.display = 'none';
   }
 
   // 15.B Control Diario de Inventario y Ventas (Planilla con Foto)
@@ -1662,9 +1807,38 @@
       }
     });
 
-    // Exportación y Borrado
+    // Exportación, Ticket DRS y Borrado
     dom.btnExportCsv.addEventListener('click', exportCSV);
     dom.btnExportJson.addEventListener('click', exportJSON);
+    if (dom.btnDRSVoucher) {
+      dom.btnDRSVoucher.addEventListener('click', showDRSVoucherModal);
+    }
+    if (dom.btnCloseDrsModal) {
+      dom.btnCloseDrsModal.addEventListener('click', hideDRSVoucherModal);
+    }
+    if (dom.drsModal) {
+      dom.drsModal.addEventListener('click', (e) => {
+        if (e.target === dom.drsModal) hideDRSVoucherModal();
+      });
+    }
+    if (dom.btnPrintDrsReceipt) {
+      dom.btnPrintDrsReceipt.addEventListener('click', () => {
+        window.print();
+      });
+    }
+    if (dom.btnCopyDrsCode) {
+      dom.btnCopyDrsCode.addEventListener('click', () => {
+        const codeEl = document.getElementById('drsVoucherCodeText');
+        if (codeEl && navigator.clipboard) {
+          navigator.clipboard.writeText(codeEl.textContent.trim()).then(() => {
+            dom.btnCopyDrsCode.innerHTML = '<i class="bx bx-check"></i> ¡Copiado!';
+            setTimeout(() => {
+              if (dom.btnCopyDrsCode) dom.btnCopyDrsCode.innerHTML = '<i class="bx bx-copy"></i> Copiar Código';
+            }, 2000);
+          }).catch(() => {});
+        }
+      });
+    }
     dom.btnClearInv.addEventListener('click', () => {
       if (confirm('¿Estás seguro de que deseas vaciar todo el inventario de botellas?')) {
         saveInventory([]);

@@ -53,7 +53,101 @@
     };
   }
 
-  const api = Object.freeze({ config, iou, select, computeDailyCut });
+  function classifyResinAndBin(tagClass, options = {}) {
+    const isGlass = tagClass === 'glass';
+    if (isGlass) {
+      return {
+        ricCode: 'GL-71',
+        ricSymbol: 'GL-71',
+        resinName: 'Vidrio (Silicato Sódico-Cálcico)',
+        recyclingBin: 'Contenedor Verde (Vidrio)',
+        depositValue: 1.00,
+        isReturnable: true,
+        capRicCode: options.hasCap ? 'FE-40 (Chapa/Corona)' : null
+      };
+    }
+    return {
+      ricCode: '♳ PET-1',
+      ricSymbol: '♳',
+      resinName: 'Polietileno Tereftalato (PET)',
+      recyclingBin: 'Contenedor Azul (Plástico PET)',
+      depositValue: 0.50,
+      isReturnable: false,
+      capRicCode: options.hasCap ? '♴ HDPE-2 (Tapa Rosca)' : null
+    };
+  }
+
+  function computeCompactionStatus(box) {
+    if (!box || !Number.isFinite(box.w) || !Number.isFinite(box.h) || box.w <= 0 || box.h <= 0) {
+      return 'Íntegra';
+    }
+    const aspectRatio = box.h / box.w;
+    if (aspectRatio < 1.20) {
+      return 'Compactada (Ahorro ~70% espacio)';
+    }
+    return 'Íntegra';
+  }
+
+  function generateDRSTicket(inventoryItems = [], options = {}) {
+    const items = Array.isArray(inventoryItems) ? inventoryItems : [];
+    const petItems = items.filter(i => i.tagClass !== 'glass');
+    const glassItems = items.filter(i => i.tagClass === 'glass');
+
+    const petDeposit = petItems.reduce((acc, i) => acc + (typeof i.depositValue === 'number' ? i.depositValue : 0.50), 0);
+    const glassDeposit = glassItems.reduce((acc, i) => acc + (typeof i.depositValue === 'number' ? i.depositValue : 1.00), 0);
+    const totalDeposit = petDeposit + glassDeposit;
+
+    const totalGramsPlastic = Math.round(petItems.length * 28);
+    const totalGramsCo2 = Math.round(items.length * 82);
+
+    const date = options.date || new Date().toISOString();
+    const machineId = options.machineId || 'RVM-STK-01';
+    const seed = (items.length * 997 + Math.round(totalDeposit * 100)).toString(16).toUpperCase().padStart(4, '0');
+    const ticketCode = `DRS-${machineId.replace(/[^A-Z0-9]/gi, '')}-${seed}-${(Date.now() % 10000).toString().padStart(4, '0')}`;
+
+    return {
+      ticketCode,
+      machineId,
+      timestamp: date,
+      totalBottles: items.length,
+      petCount: petItems.length,
+      glassCount: glassItems.length,
+      petDeposit: Number(petDeposit.toFixed(2)),
+      glassDeposit: Number(glassDeposit.toFixed(2)),
+      totalDeposit: Number(totalDeposit.toFixed(2)),
+      currency: 'Bs.',
+      gramsPlasticSaved: totalGramsPlastic,
+      gramsCo2Saved: totalGramsCo2,
+      itemsBreakdown: [
+        {
+          ricCode: '♳ PET-1',
+          material: 'Envases Plásticos PET',
+          bin: 'Contenedor Azul',
+          quantity: petItems.length,
+          unitRefund: 0.50,
+          subtotal: Number(petDeposit.toFixed(2))
+        },
+        {
+          ricCode: 'GL-71',
+          material: 'Botellas de Vidrio Retornables',
+          bin: 'Contenedor Verde',
+          quantity: glassItems.length,
+          unitRefund: 1.00,
+          subtotal: Number(glassDeposit.toFixed(2))
+        }
+      ]
+    };
+  }
+
+  const api = Object.freeze({
+    config,
+    iou,
+    select,
+    computeDailyCut,
+    classifyResinAndBin,
+    computeCompactionStatus,
+    generateDRSTicket
+  });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.BottleDetection = api;
 })();

@@ -1,6 +1,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { select, computeDailyCut } = require('../js/bottle-detection.js');
+const {
+  select,
+  computeDailyCut,
+  classifyResinAndBin,
+  computeCompactionStatus,
+  generateDRSTicket
+} = require('../js/bottle-detection.js');
 const bottle = { class: 'bottle', score: 0.8, bbox: [10, 20, 50, 100] };
 
 test('cups, vases, bowls and glasses are not bottles', () => {
@@ -53,3 +59,44 @@ test('computes DRS deposit refund value: 0.50 Bs for PET bottles and 1.00 Bs for
   const total = items.reduce((acc, i) => acc + i.depositValue, 0);
   assert.equal(total, 2.00);
 });
+
+test('classifies ASTM D7611 Resin Identification Codes and sorting bins', () => {
+  const pet = classifyResinAndBin('pet', { hasCap: true });
+  assert.equal(pet.ricCode, '♳ PET-1');
+  assert.equal(pet.recyclingBin, 'Contenedor Azul (Plástico PET)');
+  assert.equal(pet.capRicCode, '♴ HDPE-2 (Tapa Rosca)');
+  assert.equal(pet.depositValue, 0.50);
+
+  const glass = classifyResinAndBin('glass', { hasCap: true });
+  assert.equal(glass.ricCode, 'GL-71');
+  assert.equal(glass.recyclingBin, 'Contenedor Verde (Vidrio)');
+  assert.equal(glass.capRicCode, 'FE-40 (Chapa/Corona)');
+  assert.equal(glass.depositValue, 1.00);
+});
+
+test('detects bottle compaction status from aspect ratio', () => {
+  const upright = computeCompactionStatus({ w: 50, h: 100 });
+  assert.equal(upright, 'Íntegra');
+
+  const crushed = computeCompactionStatus({ w: 80, h: 50 });
+  assert.equal(crushed, 'Compactada (Ahorro ~70% espacio)');
+});
+
+test('generates RVM DRS refund ticket with breakdown and environmental savings', () => {
+  const items = [
+    { id: 'BOT-01', tagClass: 'pet', depositValue: 0.50 },
+    { id: 'BOT-02', tagClass: 'pet', depositValue: 0.50 },
+    { id: 'BOT-03', tagClass: 'glass', depositValue: 1.00 }
+  ];
+  const ticket = generateDRSTicket(items, { machineId: 'RVM-TEST-01', date: '2026-10-18T22:00:00Z' });
+  assert.equal(ticket.totalBottles, 3);
+  assert.equal(ticket.petCount, 2);
+  assert.equal(ticket.glassCount, 1);
+  assert.equal(ticket.petDeposit, 1.00);
+  assert.equal(ticket.glassDeposit, 1.00);
+  assert.equal(ticket.totalDeposit, 2.00);
+  assert.equal(ticket.gramsPlasticSaved, 56);
+  assert.equal(ticket.gramsCo2Saved, 246);
+  assert.ok(ticket.ticketCode.startsWith('DRS-RVMTEST01-'));
+});
+

@@ -1316,3 +1316,115 @@ body {
     gap: 0.45rem;
   }
 }
+
+/* 16. Códigos de Resina ASTM D7611 y Ticket de Reembolso DRS (RVM) */
+.ric-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ric-badge.ric-pet {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.ric-badge.ric-glass {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+/* Modal Ticket DRS / Recibo RVM */
+.drs-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.drs-receipt-card {
+  background: #ffffff;
+  color: #0f172a;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.drs-receipt-header {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.drs-receipt-header h3 {
+  font-size: 1rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drs-receipt-body {
+  padding: 1.5rem;
+  background: #fdfdfd;
+  font-family: "Courier Prime", monospace, monospace;
+  font-size: 0.85rem;
+  color: #1e293b;
+  border-bottom: 2px dashed #cbd5e1;
+}
+
+.drs-receipt-actions {
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .drs-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    padding: 0;
+  }
+  .drs-receipt-card, .drs-receipt-card * {
+    visibility: visible;
+  }
+  .drs-receipt-header, .drs-receipt-actions {
+    display: none !important;
+  }
+  .drs-receipt-card {
+    box-shadow: none;
+    border: none;
+    width: 80mm;
+    margin: 0 auto;
+  }
+  .drs-receipt-body {
+    padding: 0.5rem;
+    border-bottom: none;
+  }
+}
+
