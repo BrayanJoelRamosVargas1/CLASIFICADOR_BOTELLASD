@@ -247,6 +247,92 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Math.max(x + 16, width)} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto;"><rect width="100%" height="100%" fill="#ffffff"/>${rects}<text x="50%" y="${height - 4}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#334155">${clean}</text></svg>`;
   }
 
+  function classifyBottleColorGrade(rgbSample = {}, materialType = 'pet') {
+    const r = Number(rgbSample.r) || 0;
+    const g = Number(rgbSample.g) || 0;
+    const b = Number(rgbSample.b) || 0;
+    const lum = Number(rgbSample.lum) || (0.299 * r + 0.587 * g + 0.114 * b);
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+
+    if (materialType === 'glass') {
+      if (g > 60 && g > r * 1.15 && g > b) {
+        return {
+          colorGrade: 'Vidrio Verde (Esmeralda)',
+          colorFraction: 'GL-71 (Verde)',
+          flakeValueBsKg: 1.00,
+          qualityTier: 'Retornable / Reutilización',
+          badgeColor: '#15803d'
+        };
+      }
+      if (r > 70 && r > b * 1.30 && lum < 95) {
+        return {
+          colorGrade: 'Vidrio Ámbar (Marrón Cerveza)',
+          colorFraction: 'GL-72 (Ámbar)',
+          flakeValueBsKg: 1.00,
+          qualityTier: 'Retornable UV / Protección',
+          badgeColor: '#b45309'
+        };
+      }
+      return {
+        colorGrade: 'Vidrio Transparente / Blanco',
+        colorFraction: 'GL-70 (Blanco)',
+        flakeValueBsKg: 1.20,
+        qualityTier: 'Alta Pureza (Flint)',
+        badgeColor: '#64748b'
+      };
+    }
+
+    if (b > 60 && b > r * 1.15 && b > g * 1.05) {
+      return {
+        colorGrade: 'PET Azul Claro / Mineral',
+        colorFraction: 'Fracción B (Azul)',
+        flakeValueBsKg: 3.80,
+        qualityTier: 'Grado Fibras & Flejes',
+        badgeColor: '#0284c7'
+      };
+    }
+    if (g > 55 && g > r * 1.12 && g > b) {
+      return {
+        colorGrade: 'PET Verde (Sprite / Cítricos)',
+        colorFraction: 'Fracción C (Verde)',
+        flakeValueBsKg: 3.00,
+        qualityTier: 'Grado Fleje Industrial',
+        badgeColor: '#059669'
+      };
+    }
+    if (r > 60 && r > b * 1.35 && lum < 105) {
+      return {
+        colorGrade: 'PET Ámbar / Farmacéutico',
+        colorFraction: 'Fracción D (Ámbar)',
+        flakeValueBsKg: 2.20,
+        qualityTier: 'Grado Técnico UV',
+        badgeColor: '#d97706'
+      };
+    }
+    return {
+      colorGrade: 'PET Cristal (Transparente Natural)',
+      colorFraction: 'Fracción A (Cristal rPET)',
+      flakeValueBsKg: 4.50,
+      qualityTier: 'Grado Alimentario Bottle-to-Bottle (FDA/EFSA)',
+      badgeColor: '#0ea5e9'
+    };
+  }
+
+  function computePneumaticEjectorChannel(bottleCenterX, frameWidth = 640, numValves = 8) {
+    const x = Math.max(0, Math.min(frameWidth, Number(bottleCenterX) || 0));
+    const normalized = x / Math.max(1, frameWidth);
+    const valveId = Math.min(numValves, Math.max(1, Math.floor(normalized * numValves) + 1));
+    const delayMs = 120;
+    return {
+      valveId,
+      totalValves: numValves,
+      triggerDelayMs: delayMs,
+      label: `Válvula Neumática #${valveId} (Disparo ${delayMs}ms)`
+    };
+  }
+
   const api = Object.freeze({
     config,
     iou,
@@ -258,7 +344,9 @@
     evaluateCapAlignment,
     evaluateLiquidFill,
     computeConveyorMetrics,
-    generateBarcodeSVG
+    generateBarcodeSVG,
+    classifyBottleColorGrade,
+    computePneumaticEjectorChannel
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.BottleDetection = api;

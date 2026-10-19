@@ -428,8 +428,32 @@
         }
       } catch (e) {}
 
+      // 5. Clasificación Espectral de Color de Resina y Fracción de Escamas
+      const isGlass = darkRatio > 0.35 || greenRatio > 0.30 || avgLum < 85;
+      let colorGrade = {
+        colorGrade: isGlass ? 'Vidrio Transparente / Blanco' : 'PET Cristal (Transparente Natural)',
+        colorFraction: isGlass ? 'GL-70 (Blanco)' : 'Fracción A (Cristal rPET)',
+        flakeValueBsKg: isGlass ? 1.00 : 4.50,
+        qualityTier: isGlass ? 'Retornable' : 'Grado Alimentario Bottle-to-Bottle',
+        badgeColor: isGlass ? '#7e22ce' : '#0284c7'
+      };
+      if (window.BottleDetection && window.BottleDetection.classifyBottleColorGrade) {
+        colorGrade = window.BottleDetection.classifyBottleColorGrade({
+          r: Math.round(redRatio * 255),
+          g: Math.round(greenRatio * 255),
+          b: Math.round((1 - redRatio - greenRatio) * 160),
+          lum: avgLum
+        }, isGlass ? 'glass' : 'pet');
+      }
+
+      // 6. Canal de Válvula Neumática para Cinta Transportadora (8 Válvulas)
+      let ejectorInfo = { valveId: 4, label: 'Válvula Neumática #4' };
+      if (window.BottleDetection && window.BottleDetection.computePneumaticEjectorChannel) {
+        ejectorInfo = window.BottleDetection.computePneumaticEjectorChannel(bx + bw / 2, srcW, 8);
+      }
+
       // Clasificación de Material
-      if (darkRatio > 0.35 || greenRatio > 0.30 || avgLum < 85) {
+      if (isGlass) {
         return {
           label: 'Botella de Vidrio (Estimado)',
           tagClass: 'glass',
@@ -448,6 +472,10 @@
           liquidStatus: fillInfo.status,
           fillPercent: fillInfo.fillPercent,
           rvmDecision: fillInfo.rvmDecision,
+          colorGrade: colorGrade.colorGrade,
+          colorFraction: colorGrade.colorFraction,
+          flakeValueBsKg: colorGrade.flakeValueBsKg,
+          ejectorChannel: ejectorInfo.valveId,
           canCompact: false,
           depositValue: 1.00
         };
@@ -472,6 +500,10 @@
           liquidStatus: fillInfo.status,
           fillPercent: fillInfo.fillPercent,
           rvmDecision: fillInfo.rvmDecision,
+          colorGrade: colorGrade.colorGrade,
+          colorFraction: colorGrade.colorFraction,
+          flakeValueBsKg: colorGrade.flakeValueBsKg,
+          ejectorChannel: ejectorInfo.valveId,
           canCompact: fillInfo.canCompact,
           depositValue: 0.50
         };
@@ -495,6 +527,10 @@
         liquidStatus: fillInfo.status,
         fillPercent: fillInfo.fillPercent,
         rvmDecision: fillInfo.rvmDecision,
+        colorGrade: colorGrade.colorGrade,
+        colorFraction: colorGrade.colorFraction,
+        flakeValueBsKg: colorGrade.flakeValueBsKg,
+        ejectorChannel: ejectorInfo.valveId,
         canCompact: fillInfo.canCompact,
         depositValue: 0.50
       };
@@ -772,6 +808,10 @@
         rvmDecision: item.meta && item.meta.rvmDecision ? item.meta.rvmDecision : 'ACEPTADA',
         canCompact: item.meta && typeof item.meta.canCompact === 'boolean' ? item.meta.canCompact : true,
         depositValue: item.meta && typeof item.meta.depositValue === 'number' ? item.meta.depositValue : (isGlass ? 1.00 : 0.50),
+        colorGrade: item.meta ? item.meta.colorGrade : (isGlass ? 'Vidrio Blanco' : 'PET Cristal'),
+        colorFraction: item.meta ? item.meta.colorFraction : (isGlass ? 'GL-70 (Blanco)' : 'Fracción A (Cristal rPET)'),
+        flakeValueBsKg: item.meta && typeof item.meta.flakeValueBsKg === 'number' ? item.meta.flakeValueBsKg : (isGlass ? 1.00 : 4.50),
+        ejectorChannel: item.meta && typeof item.meta.ejectorChannel === 'number' ? item.meta.ejectorChannel : 4,
         gramsPlastic: isGlass ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
         co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
       };
@@ -878,10 +918,12 @@
       ctx.lineTo(rx + rw, ry + rh - corner);
       ctx.stroke();
 
-      // 4. Etiqueta flotante con Física de Botella RVM (RIC, Tamaño, Tapa, Contenido y Reembolso)
+      // 4. Etiqueta flotante con Física de Botella RVM (RIC, Color Grado, Válvula, Tapa, Contenido y Reembolso)
       const ricSymbol = meta.ricCode ? meta.ricCode.split(' ')[0] : '♳';
+      const colorTag = meta.colorFraction ? meta.colorFraction.split(' ')[0] : 'Cristal';
       const compLabel = meta.compactionStatus && meta.compactionStatus.includes('Compactada') ? 'Compactada' : (meta.liquidStatus ? meta.liquidStatus.split(' ')[0] : 'Vacía');
-      const subTag = `${ricSymbol} · ${meta.sizeLabel ? meta.sizeLabel.split(' ')[0] : '500ml'} · ${meta.hasCap ? 'Con Tapa' : 'Sin Tapa'} · ${compLabel} · +${(meta.depositValue || 0.50).toFixed(2)}Bs`;
+      const valveTag = meta.ejectorChannel ? `V${meta.ejectorChannel}` : 'V4';
+      const subTag = `${ricSymbol} ${colorTag} · ${valveTag} · ${meta.hasCap ? 'Tapa OK' : 'Sin Tapa'} · ${compLabel} · +${(meta.depositValue || 0.50).toFixed(2)}Bs`;
       const fontSize = Math.max(12, Math.round(13 * baseScale));
       const subFontSize = Math.max(10, Math.round(10.5 * baseScale));
       ctx.font = `700 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -1251,6 +1293,9 @@
               <span class="ric-badge ${ricClass}">${ricStr}</span>
               <span style="font-size:0.7rem; color:#64748b;">➔ ${binStr.split(' ')[0]} ${binStr.split(' ')[1] || ''}</span>
             </div>
+            <div style="font-size:0.68rem; color:#0284c7; font-weight:700;">
+              ${item.colorFraction || 'Fracción A (Cristal)'} · Válvula #${item.ejectorChannel || 4} (${item.flakeValueBsKg ? item.flakeValueBsKg.toFixed(2) : '4.50'} Bs/kg)
+            </div>
           </div>
         </td>
         <td style="font-size:0.8rem; font-weight:600; color:#334155;">${sizeStr}</td>
@@ -1321,17 +1366,20 @@
       return;
     }
 
-    let csv = 'ID,Material,Codigo_Resina,Volumen_Tamanio,Estado_Tapa,Contenido_Liquido,Compactacion,Contenedor_Destino,Reembolso_Bs,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
+    let csv = 'ID,Material,Codigo_Resina,Fraccion_Color,Valvula_Eyectora,Valor_Flake_BsKg,Volumen_Tamanio,Estado_Tapa,Contenido_Liquido,Compactacion,Contenedor_Destino,Reembolso_Bs,Confianza,Fecha,Gramos_Plastico,Gramos_CO2\n';
     items.forEach(i => {
       const tagClass = i.tagClass || (i.label.includes('Vidrio') ? 'glass' : 'pet');
       const ric = i.ricCode || (tagClass === 'glass' ? 'GL-71' : '♳ PET-1');
+      const frac = i.colorFraction || 'Fracción A (Cristal)';
+      const valve = `V${i.ejectorChannel || 4}`;
+      const flake = (i.flakeValueBsKg || (tagClass === 'glass' ? 1.00 : 4.50)).toFixed(2);
       const size = i.sizeLabel || 'Personal (500ml)';
       const cap = i.hasCap ? 'Con Tapa' : 'Sin Tapa';
       const liq = i.liquidStatus || 'Vacía';
       const comp = i.compactionStatus || 'Íntegra';
       const bin = i.recyclingBin || (tagClass === 'glass' ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)');
       const dep = (typeof i.depositValue === 'number' ? i.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
-      csv += `"${i.id}","${i.label}","${ric}","${size}","${cap}","${liq}","${comp}","${bin}","${dep}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
+      csv += `"${i.id}","${i.label}","${ric}","${frac}","${valve}","${flake}","${size}","${cap}","${liq}","${comp}","${bin}","${dep}","${i.confidence}%","${i.timestamp}","${i.gramsPlastic}","${i.co2Saved}"\n`;
     });
 
     downloadBlob(csv, `EcoLens_Inventario_${Date.now()}.csv`, 'text/csv');

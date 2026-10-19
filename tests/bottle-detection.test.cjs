@@ -9,7 +9,9 @@ const {
   evaluateCapAlignment,
   evaluateLiquidFill,
   computeConveyorMetrics,
-  generateBarcodeSVG
+  generateBarcodeSVG,
+  classifyBottleColorGrade,
+  computePneumaticEjectorChannel
 } = require('../js/bottle-detection.js');
 const bottle = { class: 'bottle', score: 0.8, bbox: [10, 20, 50, 100] };
 
@@ -161,5 +163,49 @@ test('generates scannable vector barcode SVG for RVM deposit ticket', () => {
   assert.ok(svg.includes('DRS-BO-999'));
   assert.ok(svg.includes('</svg>'));
 });
+
+test('classifies PET and Glass optical color grades and commercial flake values', () => {
+  // PET Cristal
+  const petClear = classifyBottleColorGrade({ r: 160, g: 165, b: 170, lum: 165 }, 'pet');
+  assert.equal(petClear.colorGrade, 'PET Cristal (Transparente Natural)');
+  assert.equal(petClear.colorFraction, 'Fracción A (Cristal rPET)');
+  assert.equal(petClear.flakeValueBsKg, 4.50);
+
+  // PET Azul
+  const petBlue = classifyBottleColorGrade({ r: 40, g: 80, b: 150, lum: 90 }, 'pet');
+  assert.equal(petBlue.colorGrade, 'PET Azul Claro / Mineral');
+  assert.equal(petBlue.colorFraction, 'Fracción B (Azul)');
+
+  // PET Verde
+  const petGreen = classifyBottleColorGrade({ r: 40, g: 130, b: 50, lum: 85 }, 'pet');
+  assert.equal(petGreen.colorGrade, 'PET Verde (Sprite / Cítricos)');
+  assert.equal(petGreen.colorFraction, 'Fracción C (Verde)');
+
+  // PET Ámbar
+  const petAmber = classifyBottleColorGrade({ r: 120, g: 70, b: 30, lum: 70 }, 'pet');
+  assert.equal(petAmber.colorGrade, 'PET Ámbar / Farmacéutico');
+  assert.equal(petAmber.colorFraction, 'Fracción D (Ámbar)');
+
+  // Vidrio Ámbar
+  const glassAmber = classifyBottleColorGrade({ r: 110, g: 60, b: 25, lum: 65 }, 'glass');
+  assert.equal(glassAmber.colorGrade, 'Vidrio Ámbar (Marrón Cerveza)');
+  assert.equal(glassAmber.colorFraction, 'GL-72 (Ámbar)');
+});
+
+test('computes conveyor pneumatic air ejector valve assignment based on horizontal belt position', () => {
+  // Bottle at far left (50px of 640px) -> Valve 1
+  const left = computePneumaticEjectorChannel(50, 640, 8);
+  assert.equal(left.valveId, 1);
+  assert.equal(left.triggerDelayMs, 120);
+
+  // Bottle at center (320px of 640px) -> Valve 5
+  const center = computePneumaticEjectorChannel(320, 640, 8);
+  assert.equal(center.valveId, 5);
+
+  // Bottle at far right (620px of 640px) -> Valve 8
+  const right = computePneumaticEjectorChannel(620, 640, 8);
+  assert.equal(right.valveId, 8);
+});
+
 
 
