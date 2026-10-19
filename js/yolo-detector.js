@@ -143,14 +143,16 @@
         return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox180(p.bbox, width, height) }));
       }
       if (mode === 'crop') {
-        // SAHI (Slicing Aided Hyper Inference) center-reticle zoom crop for small/distant webcam bottles
+        // SAHI (Slicing Aided Hyper Inference) center-reticle zoom crop + refraction edge contrast for clear PET bottles
         const cropW = Math.round(width * 0.62);
         const cropH = Math.round(height * 0.76);
         const cropX = Math.round((width - cropW) * 0.5);
         const cropY = Math.round((height - cropH) * 0.5);
         this.auxCanvas.width = cropW;
         this.auxCanvas.height = cropH;
+        if ('filter' in ctx) ctx.filter = 'contrast(1.12) saturate(1.08)';
         ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        if ('filter' in ctx) ctx.filter = 'none';
         const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.24));
         return preds.map(p => ({
           ...p,
@@ -191,8 +193,8 @@
       if (!width || !height) return [];
       const scale = 640 / Math.max(width, height);
       const resizedW = Math.round(width * scale), resizedH = Math.round(height * scale);
-      // Same preprocessing as the source processor: preserve aspect ratio, pad right/bottom with zero.
-      this.ctx.fillStyle = '#000';
+      // Ultralytics LetterBox standard neutral gray padding rgb(114, 114, 114) = #727272 so dark bottles near edges don't blend into black.
+      this.ctx.fillStyle = '#727272';
       this.ctx.fillRect(0, 0, 640, 640);
       this.ctx.drawImage(source, 0, 0, resizedW, resizedH);
       const rgba = this.ctx.getImageData(0, 0, 640, 640).data;

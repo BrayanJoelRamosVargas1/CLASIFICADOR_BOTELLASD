@@ -187,7 +187,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=20.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=21.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -452,6 +452,39 @@
           }
         }
 
+        // ByteTrack Stage 2 (ifzhang/ByteTrack & r/computervision): associate low-confidence boxes (0.13..threshold)
+        // ONLY with already-active trackers so momentary glare/refraction on transparent bottles never drops the track.
+        if (trackers.some(t => !matchedTrackerIds.has(t.id))) {
+          const lowCandidates = window.BottleDetection.select(rawPredictions, srcW, srcH, 0.13)
+            .filter(b => b.score < activeThreshold);
+          for (const lowBox of lowCandidates) {
+            let bestMatch = null;
+            let bestIoU = 0.35;
+            for (const t of trackers) {
+              if (matchedTrackerIds.has(t.id)) continue;
+              const iouScore = computeIoU(t, lowBox);
+              if (iouScore > bestIoU) {
+                bestIoU = iouScore;
+                bestMatch = t;
+              }
+            }
+            if (bestMatch) {
+              bestMatch.x = bestMatch.x * 0.45 + lowBox.x * 0.55;
+              bestMatch.y = bestMatch.y * 0.45 + lowBox.y * 0.55;
+              bestMatch.w = bestMatch.w * 0.45 + lowBox.w * 0.55;
+              bestMatch.h = bestMatch.h * 0.45 + lowBox.h * 0.55;
+              bestMatch.lastSeen = now;
+              bestMatch.missed = 0;
+              bestMatch.hits++;
+              matchedTrackerIds.add(bestMatch.id);
+              if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
+                bestMatch.registered = true;
+                newlyRegistered.push(bestMatch);
+              }
+            }
+          }
+        }
+
         // Incrementar missed a trackers no detectados en este frame
         for (const t of trackers) {
           if (!matchedTrackerIds.has(t.id)) {
@@ -657,10 +690,14 @@
 
     if (!isLoopActive || generation !== sourceGeneration) return;
 
-    // Descontar el tiempo de inferencia y ceder el hilo entre análisis sin acumular trabajo.
+    // Descontar el tiempo de inferencia y sincronizar con requestVideoFrameCallback cuando esté disponible.
     const elapsed = performance.now() - startTime;
     const waitMs = Math.max(CONFIG.MIN_INFERENCE_PAUSE_MS, CONFIG.TARGET_INFERENCE_INTERVAL_MS - elapsed);
-    loopTimeoutId = setTimeout(() => runInferenceLoop(generation), waitMs);
+    if (activeSource && typeof activeSource.requestVideoFrameCallback === 'function' && waitMs <= CONFIG.MIN_INFERENCE_PAUSE_MS) {
+      activeSource.requestVideoFrameCallback(() => runInferenceLoop(generation));
+    } else {
+      loopTimeoutId = setTimeout(() => runInferenceLoop(generation), waitMs);
+    }
   }
 
   // 10. Control de Linterna LED Física de la Cámara Trasera
