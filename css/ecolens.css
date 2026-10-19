@@ -428,6 +428,44 @@ body {
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
+/* Selector de Modos de Captación Rápida */
+.capture-mode-selector {
+  display: flex;
+  background: #f1f5f9;
+  padding: 0.25rem;
+  border-radius: 14px;
+  gap: 0.25rem;
+  border: 1px solid var(--card-border);
+}
+
+.capture-mode-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+}
+
+.capture-mode-tab:hover {
+  color: var(--text-main);
+}
+
+.capture-mode-tab.active {
+  background: white;
+  color: var(--primary-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 /* Escenario Óptico (Viewport) */
 .stage-viewport {
   position: relative;
@@ -672,10 +710,74 @@ body {
   font-size: 0.95rem;
 }
 
+/* Botón de Obturador Flotante Central (Estilo Shutter Profesional) */
+.hud-shutter-btn {
+  position: absolute;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.30);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 3.5px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 28;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.hud-shutter-btn:active {
+  transform: translateX(-50%) scale(0.92);
+}
+
+.hud-shutter-btn .shutter-inner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  transition: all 0.15s ease;
+}
+
+.hud-shutter-btn:active .shutter-inner {
+  transform: scale(0.85);
+  background: #059669;
+}
+
+.hud-shutter-btn.shutter-pulse {
+  animation: shutterGlow 1.8s infinite ease-in-out;
+}
+
+@keyframes shutterGlow {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(16, 185, 129, 0.6); }
+  50% { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 0 7px rgba(16, 185, 129, 0.2); }
+}
+
+/* Efecto Flash de Obturador de Cámara */
+.shutter-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 40;
+  transition: opacity 0.12s ease-out;
+}
+
+.shutter-flash-overlay.flash-pulse {
+  opacity: 0.85;
+}
+
 /* Teclado Táctil de Controles */
 .controls-deck {
   display: grid;
-  grid-template-columns: 1.3fr 1.2fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 0.75rem;
 }
 
@@ -733,6 +835,16 @@ body {
   color: #94a3b8;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.btn-native-cam {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  color: white;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+}
+
+.btn-native-cam:hover {
+  background: #4338ca;
 }
 
 /* Barra Lateral de Diagnóstico */

@@ -28,7 +28,7 @@
   </script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=12.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=13.0">
 </head>
 <body>
 
@@ -195,8 +195,22 @@
           </div>
         </div>
 
+        <!-- Selector de Modos de Captación Rápida -->
+        <div class="capture-mode-selector" role="tablist" aria-label="Modo de Captación">
+          <button id="modeInstant" type="button" class="capture-mode-tab active" data-mode="instant" title="Captura y registra botellas en 1 solo cuadro instantáneo">
+            <i class="bx bx-zap"></i> <span>⚡ Instantáneo</span>
+          </button>
+          <button id="modeManual" type="button" class="capture-mode-tab" data-mode="manual" title="Toca la pantalla o el obturador para capturar">
+            <i class="bx bx-target-lock"></i> <span>🎯 Disparo / Toque</span>
+          </button>
+          <button id="modeRvm" type="button" class="capture-mode-tab" data-mode="rvm" title="Conteo continuo con doble confirmación para cinta">
+            <i class="bx bx-sync"></i> <span>🔄 Auto RVM</span>
+          </button>
+        </div>
+
         <!-- Viewport con Escaneo Láser y HUD -->
         <div class="stage-viewport">
+          <div id="shutterFlashOverlay" class="shutter-flash-overlay"></div>
           <div id="laserLine" class="laser-scan-line"></div>
           
           <video id="cameraFeed" playsinline autoplay muted style="display:none;"></video>
@@ -221,6 +235,11 @@
               <i class="bx bx-transfer-alt"></i>
             </button>
           </div>
+
+          <!-- Botón de Obturador Flotante Central (Disparo Inmediato) -->
+          <button id="btnShutterViewport" type="button" class="hud-shutter-btn" title="Tomar Foto / Capturar Ahora" style="display:none;" aria-label="Capturar botella">
+            <div class="shutter-inner"></div>
+          </button>
 
           <!-- Retícula de Escaneo Inteligente -->
           <div id="targetReticle" class="target-reticle" style="display:none;">
@@ -261,11 +280,16 @@
         <!-- Teclado de Acciones Táctiles Limpio y Ergonómico -->
         <div class="controls-deck">
           <button id="btnStartCamera" type="button" class="ctrl-btn btn-cam">
-            <i class="bx bx-camera"></i> <span>Iniciar Cámara</span>
+            <i class="bx bx-camera"></i> <span>Cámara en Vivo</span>
           </button>
           
+          <button id="btnNativeCamera" type="button" class="ctrl-btn btn-native-cam" title="Abrir cámara del celular en alta resolución">
+            <i class="bx bx-camera-movie"></i> <span>Foto HD Móvil</span>
+          </button>
+          <input id="nativeCameraInput" type="file" accept="image/*" capture="environment" style="display:none;">
+
           <label for="uploadPhotoInput" class="ctrl-btn btn-photo">
-            <i class="bx bx-image-add"></i> <span>Subir Foto</span>
+            <i class="bx bx-image-add"></i> <span>Galería</span>
           </label>
           <input id="uploadPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
 
@@ -592,10 +616,10 @@
   </footer>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=34.0"></script>
-  <script src="js/yolo-detector.js?v=34.0"></script>
-  <script src="js/bottle-detection.js?v=34.0"></script>
-  <script src="js/ecolens.js?v=34.0"></script>
+  <script src="js/ort/ort.min.js?v=35.0"></script>
+  <script src="js/yolo-detector.js?v=35.0"></script>
+  <script src="js/bottle-detection.js?v=35.0"></script>
+  <script src="js/ecolens.js?v=35.0"></script>
 
 </body>
 </html>

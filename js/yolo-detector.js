@@ -8,11 +8,6 @@
     static async hasWebGPU() {
       try {
         if (typeof navigator === 'undefined' || !navigator.gpu) return false;
-        // On mobile devices (Android/iOS), mobile WebGPU in Chromium/Brave is experimental,
-        // unstable, often lacks shader-f16 support, and exhibits severe compilation/execution stalls (>2000ms).
-        // WASM SIMD (utilizing ARM NEON vector instructions) is 50x faster and rock-solid on mobile (~45ms).
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test((typeof navigator !== 'undefined' && navigator.userAgent) || '');
-        if (isMobile) return false;
         const adapter = await navigator.gpu.requestAdapter();
         return Boolean(adapter);
       } catch (e) {
@@ -400,11 +395,13 @@
       const pixels = this.pixels;
       const { lut, meanLuma } = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
       this.lastMeanLuma = meanLuma;
-      for (let i = 0; i < plane; i++) {
-        const idx = i << 2;
-        pixels[i] = lut[rgba[idx]];
-        pixels[plane + i] = lut[rgba[idx + 1]];
-        pixels[plane2 + i] = lut[rgba[idx + 2]];
+      const rPlane = pixels.subarray(0, plane);
+      const gPlane = pixels.subarray(plane, plane2);
+      const bPlane = pixels.subarray(plane2, plane2 + plane);
+      for (let i = 0, idx = 0; i < plane; i++, idx += 4) {
+        rPlane[i] = lut[rgba[idx]];
+        gPlane[i] = lut[rgba[idx + 1]];
+        bPlane[i] = lut[rgba[idx + 2]];
       }
       const input = new ort.Tensor('float32', pixels, [1, 3, 640, 640]);
       let outputs;

@@ -65,6 +65,13 @@
     btnSwitchCamera: document.getElementById('btnSwitchCamera'),
     btnFlashViewport: document.getElementById('btnFlashViewport'),
     btnManualScan: document.getElementById('btnManualScan'),
+    modeInstant: document.getElementById('modeInstant'),
+    modeManual: document.getElementById('modeManual'),
+    modeRvm: document.getElementById('modeRvm'),
+    btnShutterViewport: document.getElementById('btnShutterViewport'),
+    shutterFlash: document.getElementById('shutterFlashOverlay'),
+    btnNativeCamera: document.getElementById('btnNativeCamera'),
+    nativeCameraInput: document.getElementById('nativeCameraInput'),
     
     // Open Food Facts API & Barcode Intelligence
     btnOpenFoodFactsModal: document.getElementById('btnOpenFoodFactsModal'),
@@ -164,6 +171,29 @@
   let visibleBoxes = [];
   let takeCount = 0;
   let nextTrackId = 1;
+  let captureMode = 'rvm'; // 'instant' | 'manual' | 'rvm' (rvm por defecto garantiza suite de tests)
+
+  function setCaptureMode(mode) {
+    captureMode = mode;
+    const tabs = [
+      { el: dom.modeInstant, id: 'instant' },
+      { el: dom.modeManual, id: 'manual' },
+      { el: dom.modeRvm, id: 'rvm' }
+    ];
+    tabs.forEach(t => {
+      if (t.el && t.el.classList) {
+        t.el.classList.toggle('active', t.id === mode);
+      }
+    });
+    if (dom.btnShutterViewport && dom.btnShutterViewport.classList) {
+      dom.btnShutterViewport.classList.toggle('shutter-pulse', mode === 'manual');
+    }
+    if (dom.statusText && isLoopActive) {
+      if (mode === 'instant') dom.statusText.textContent = '⚡ Modo Instantáneo: Captura y registra en 1 solo cuadro.';
+      else if (mode === 'manual') dom.statusText.textContent = '🎯 Modo Disparo: Apunta al envase y presiona el obturador.';
+      else if (mode === 'rvm') dom.statusText.textContent = '🔄 Modo Auto RVM: Conteo continuo con 2 cuadros de estabilidad.';
+    }
+  }
 
   // 2. Sintetizador de Sonidos Web Audio API
   function playSound(type = 'chime') {
@@ -218,7 +248,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=34.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=35.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -709,14 +739,17 @@
             bestMatch.hits++;
             matchedTrackerIds.add(bestMatch.id);
 
-            // Confirmación y Auto-Registro en Frame 2 consecutivo
-            if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
+            // Confirmación y Auto-Registro
+            const isInstant = captureMode === 'instant' && bestMatch.score >= 0.28;
+            const thresholdHits = isInstant ? 1 : CONFIG.CONFIRMATION_HITS;
+            if (captureMode !== 'manual' && bestMatch.hits >= thresholdHits && !bestMatch.registered) {
               bestMatch.registered = true;
               newlyRegistered.push(bestMatch);
             }
           } else {
             // Clasificar material 1 sola vez al crear el tracker (sin repetir el muestreo de color)
             const meta = inspectMaterial(box.x, box.y, box.w, box.h, box.rawClass);
+            const isInstant = captureMode === 'instant' && box.score >= 0.28;
             const newTracker = {
               id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
               x: box.x,
@@ -729,13 +762,16 @@
               rawClass: box.rawClass,
               meta: meta,
               label: meta.label,
-              hits: 1,
+              hits: isInstant ? 2 : 1,
               lastSeen: now,
               missed: 0,
-              registered: false
+              registered: isInstant
             };
             trackers.push(newTracker);
             matchedTrackerIds.add(newTracker.id);
+            if (isInstant) {
+              newlyRegistered.push(newTracker);
+            }
           }
         }
 
@@ -765,7 +801,9 @@
               bestMatch.missed = 0;
               bestMatch.hits++;
               matchedTrackerIds.add(bestMatch.id);
-              if (bestMatch.hits >= CONFIG.CONFIRMATION_HITS && !bestMatch.registered) {
+              const isInstant = captureMode === 'instant' && bestMatch.score >= 0.28;
+              const thresholdHits = isInstant ? 1 : CONFIG.CONFIRMATION_HITS;
+              if (captureMode !== 'manual' && bestMatch.hits >= thresholdHits && !bestMatch.registered) {
                 bestMatch.registered = true;
                 newlyRegistered.push(bestMatch);
               }
@@ -1132,6 +1170,7 @@
       // Mostrar botones flotantes en viewport
       if (dom.btnFlashViewport) dom.btnFlashViewport.style.display = 'flex';
       if (dom.btnSwitchCamera) dom.btnSwitchCamera.style.display = 'flex';
+      if (dom.btnShutterViewport) dom.btnShutterViewport.style.display = 'flex';
 
       dom.btnStartCamera.innerHTML = '<i class="bx bx-stop-circle"></i> <span>Detener Cámara</span>';
       dom.btnStartCamera.classList.add('btn-danger');
@@ -1174,6 +1213,7 @@
     }
     if (dom.btnFlashViewport) dom.btnFlashViewport.style.display = 'none';
     if (dom.btnSwitchCamera) dom.btnSwitchCamera.style.display = 'none';
+    if (dom.btnShutterViewport) dom.btnShutterViewport.style.display = 'none';
     if (dom.targetReticle) dom.targetReticle.style.display = 'none';
 
     if (stream) {
@@ -1269,17 +1309,30 @@
     }
 
     playSound('click');
-    dom.statusText.textContent = 'Analizando escena...';
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(50); } catch (e) {}
+    }
+    if (dom.shutterFlash && dom.shutterFlash.classList) {
+      dom.shutterFlash.classList.add('flash-pulse');
+      setTimeout(() => {
+        if (dom.shutterFlash && dom.shutterFlash.classList) {
+          dom.shutterFlash.classList.remove('flash-pulse');
+        }
+      }, 140);
+    }
+
+    dom.statusText.textContent = '⚡ Disparando captura...';
 
     // 1. Si ya hay botellas visibles, registrarlas de inmediato
     const unreg = visibleBoxes.filter(b => !b.registered && b.missed === 0);
     if (unreg.length > 0) {
       for (const b of unreg) {
         b.registered = true;
+        b.hits = Math.max(b.hits, 2);
       }
       onNewBottlesRegistered(unreg);
       renderCanvasHUD();
-      dom.statusText.textContent = `✓ ¡${unreg.length} botella(s) registrada(s) con éxito!`;
+      dom.statusText.textContent = `✓ ¡${unreg.length} botella(s) capturada(s) con éxito!`;
       return;
     }
 
@@ -1291,17 +1344,18 @@
       if (newlyFound.length > 0) {
         for (const b of newlyFound) {
           b.registered = true;
+          b.hits = Math.max(b.hits, 2);
         }
         onNewBottlesRegistered(newlyFound);
         renderCanvasHUD();
-        dom.statusText.textContent = `✓ ¡${newlyFound.length} botella(s) registrada(s) con éxito!`;
+        dom.statusText.textContent = `✓ ¡${newlyFound.length} botella(s) capturada(s) con éxito!`;
         return;
       }
     } catch (e) {
       console.warn('Error en escaneo manual:', e);
     }
 
-    dom.statusText.textContent = 'Enfoca tus botellas hacia la cámara para capturarlas.';
+    dom.statusText.textContent = 'No se distinguió botella en la toma. Apunta al envase y dispara de nuevo.';
   }
 
   // 13. Persistencia en LocalStorage
@@ -2059,6 +2113,43 @@
       dom.btnManualScan.addEventListener('click', forceManualScan);
     }
 
+    // Botón de Obturador Central y Disparo al Toque
+    if (dom.btnShutterViewport) {
+      dom.btnShutterViewport.addEventListener('click', (e) => {
+        e.stopPropagation();
+        forceManualScan();
+      });
+    }
+
+    // Tocar el visor para capturar
+    if (dom.stageViewport) {
+      dom.stageViewport.addEventListener('click', (e) => {
+        if (e.target.closest && (e.target.closest('.hud-circle-btn') || e.target.closest('.hud-shutter-btn'))) return;
+        if (isLoopActive) {
+          forceManualScan();
+        }
+      });
+    }
+
+    // Cámara Nativa Móvil HD (Disparo directo con sensor del teléfono)
+    if (dom.btnNativeCamera && dom.nativeCameraInput) {
+      dom.btnNativeCamera.addEventListener('click', () => {
+        dom.nativeCameraInput.click();
+      });
+      dom.nativeCameraInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          handlePhotoUpload(file);
+        }
+        e.target.value = '';
+      });
+    }
+
+    // Selector de Modos de Captación (Instantáneo / Disparo / Auto RVM)
+    if (dom.modeInstant) dom.modeInstant.addEventListener('click', () => { setCaptureMode('instant'); playSound('click'); });
+    if (dom.modeManual) dom.modeManual.addEventListener('click', () => { setCaptureMode('manual'); playSound('click'); });
+    if (dom.modeRvm) dom.modeRvm.addEventListener('click', () => { setCaptureMode('rvm'); playSound('click'); });
+
     // Eventos de Planilla de Control Diario
     if (dom.dailyInitialInput && dom.dailyInitialInput.addEventListener) {
       dom.dailyInitialInput.addEventListener('input', updateDailyPreview);
@@ -2186,6 +2277,7 @@
   // Inicialización Automática
   document.addEventListener('DOMContentLoaded', () => {
     setupEvents();
+    setCaptureMode('instant');
     updateDailyPreview();
     renderDailyTable();
     renderInventoryTable();
