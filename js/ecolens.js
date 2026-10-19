@@ -94,6 +94,7 @@
     // HUD Live
     hudInView: document.getElementById('hudInView'),
     hudInTake: document.getElementById('hudInTake'),
+    hudBpm: document.getElementById('hudBpm'),
     
     // Control Diario de Inventario y Ventas (Planilla con Foto)
     dailyProductInput: document.getElementById('dailyProductInput'),
@@ -363,8 +364,8 @@
       const darkRatio = darkCount / total;
       const greenRatio = greenCount / total;
 
-      // 3. Inspección de Tapa en el Cuello Superior (Top 14%)
-      let hasCap = true;
+      // 3. Inspección Fina de Tapa e Inclinación en Cuello (Top 14%)
+      let capInfo = { hasCap: true, status: 'Con Tapa Correcta', integrity: 'Sellado Correcto', tiltDegrees: 0, isAccepted: true };
       try {
         const neckX = Math.max(0, Math.min(srcW - 2, Math.floor(bx + bw * 0.25)));
         const neckY = Math.max(0, Math.min(srcH - 2, Math.floor(by)));
@@ -372,31 +373,58 @@
         const neckH = Math.max(4, Math.min(srcH - neckY, Math.floor(bh * 0.14)));
         sampleCtx.drawImage(activeSource, neckX, neckY, neckW, neckH, 0, 0, 16, 16);
         const neckData = sampleCtx.getImageData(0, 0, 16, 16).data;
-        let neckSatCount = 0;
-        for (let i = 0; i < neckData.length; i += 4) {
-          const nr = neckData[i], ng = neckData[i + 1], nb = neckData[i + 2];
-          const maxC = Math.max(nr, ng, nb);
-          const minC = Math.min(nr, ng, nb);
-          const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
-          if (sat > 0.26 || maxC < 40) neckSatCount++;
+        let leftSat = 0, rightSat = 0;
+        let leftCount = 0, rightCount = 0;
+        for (let row = 0; row < 16; row++) {
+          for (let col = 0; col < 16; col++) {
+            const idx = (row * 16 + col) * 4;
+            const nr = neckData[idx], ng = neckData[idx + 1], nb = neckData[idx + 2];
+            const maxC = Math.max(nr, ng, nb);
+            const minC = Math.min(nr, ng, nb);
+            const sat = maxC > 0 ? (maxC - minC) / maxC : 0;
+            const isCap = sat > 0.26 || maxC < 45;
+            if (col < 8) {
+              if (isCap) leftSat++;
+              leftCount++;
+            } else {
+              if (isCap) rightSat++;
+              rightCount++;
+            }
+          }
         }
-        hasCap = (neckSatCount / total) > 0.28;
+        const leftScore = leftCount > 0 ? leftSat / leftCount : 0;
+        const rightScore = rightCount > 0 ? rightSat / rightCount : 0;
+        if (window.BottleDetection && window.BottleDetection.evaluateCapAlignment) {
+          capInfo = window.BottleDetection.evaluateCapAlignment(leftScore, rightScore);
+        } else {
+          const hasCap = ((leftSat + rightSat) / 256) > 0.28;
+          capInfo = { hasCap, status: hasCap ? 'Con Tapa' : 'Sin Tapa', integrity: hasCap ? 'Sellado' : 'Falta Tapa', tiltDegrees: 0, isAccepted: hasCap };
+        }
       } catch (e) {}
 
-      // 4. Inspección de Líquido Residual en la Base Inferior (Bottom 25%)
-      let liquidStatus = 'Vacía';
+      // 4. Medición Continua de Menisco y Nivel de Llenado (%)
+      let fillInfo = { fillPercent: 0, status: 'Vacía (0%)', rvmDecision: 'ACEPTADA', warning: null, canCompact: true };
       try {
-        const baseY = Math.max(0, Math.min(srcH - 2, Math.floor(by + bh * 0.72)));
-        const baseH = Math.max(4, Math.min(srcH - baseY, Math.floor(bh * 0.26)));
+        const baseY = Math.max(0, Math.min(srcH - 2, Math.floor(by + bh * 0.65)));
+        const baseH = Math.max(4, Math.min(srcH - baseY, Math.floor(bh * 0.33)));
         sampleCtx.drawImage(activeSource, sx, baseY, sw, baseH, 0, 0, 16, 16);
         const baseData = sampleCtx.getImageData(0, 0, 16, 16).data;
-        let baseDark = 0;
-        for (let i = 0; i < baseData.length; i += 4) {
-          const lum = 0.299 * baseData[i] + 0.587 * baseData[i + 1] + 0.114 * baseData[i + 2];
-          if (lum < 65) baseDark++;
+        let darkRows = 0;
+        for (let row = 0; row < 16; row++) {
+          let rowDark = 0;
+          for (let col = 0; col < 16; col++) {
+            const idx = (row * 16 + col) * 4;
+            const lum = 0.299 * baseData[idx] + 0.587 * baseData[idx + 1] + 0.114 * baseData[idx + 2];
+            if (lum < 75) rowDark++;
+          }
+          if (rowDark > 7) darkRows++;
         }
-        if ((baseDark / total) > 0.42 && avgLum > 90) {
-          liquidStatus = 'Con Líquido';
+        const measuredPct = Math.round((darkRows / 16) * 40);
+        if (window.BottleDetection && window.BottleDetection.evaluateLiquidFill) {
+          fillInfo = window.BottleDetection.evaluateLiquidFill(measuredPct);
+        } else {
+          fillInfo.fillPercent = measuredPct;
+          fillInfo.status = measuredPct > 20 ? 'Con Líquido' : 'Vacía';
         }
       } catch (e) {}
 
@@ -413,9 +441,14 @@
           ricCode: 'GL-71 (Vidrio)',
           recyclingBin: 'Contenedor Verde (Vidrio)',
           compactionStatus: 'Íntegra (Rígido)',
-          hasCap,
-          capLabel: hasCap ? 'Con Tapa/Corona' : 'Sin Tapa',
-          liquidStatus,
+          hasCap: capInfo.hasCap,
+          capLabel: capInfo.status,
+          capIntegrity: capInfo.integrity,
+          tiltDegrees: capInfo.tiltDegrees,
+          liquidStatus: fillInfo.status,
+          fillPercent: fillInfo.fillPercent,
+          rvmDecision: fillInfo.rvmDecision,
+          canCompact: false,
           depositValue: 1.00
         };
       }
@@ -432,9 +465,14 @@
           ricCode: '♳ PET-1',
           recyclingBin: 'Contenedor Azul (PET)',
           compactionStatus,
-          hasCap,
-          capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
-          liquidStatus,
+          hasCap: capInfo.hasCap,
+          capLabel: capInfo.status,
+          capIntegrity: capInfo.integrity,
+          tiltDegrees: capInfo.tiltDegrees,
+          liquidStatus: fillInfo.status,
+          fillPercent: fillInfo.fillPercent,
+          rvmDecision: fillInfo.rvmDecision,
+          canCompact: fillInfo.canCompact,
           depositValue: 0.50
         };
       }
@@ -450,9 +488,14 @@
         ricCode: '♳ PET-1',
         recyclingBin: 'Contenedor Azul (PET)',
         compactionStatus,
-        hasCap,
-        capLabel: hasCap ? 'Con Tapa (HDPE)' : 'Sin Tapa',
-        liquidStatus,
+        hasCap: capInfo.hasCap,
+        capLabel: capInfo.status,
+        capIntegrity: capInfo.integrity,
+        tiltDegrees: capInfo.tiltDegrees,
+        liquidStatus: fillInfo.status,
+        fillPercent: fillInfo.fillPercent,
+        rvmDecision: fillInfo.rvmDecision,
+        canCompact: fillInfo.canCompact,
         depositValue: 0.50
       };
     } catch (e) {
@@ -721,7 +764,13 @@
         recyclingBin: item.meta && item.meta.recyclingBin ? item.meta.recyclingBin : (isGlass ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)'),
         compactionStatus: item.meta && item.meta.compactionStatus ? item.meta.compactionStatus : 'Íntegra',
         hasCap: item.meta ? Boolean(item.meta.hasCap) : true,
+        capLabel: item.meta ? item.meta.capLabel : 'Con Tapa',
+        capIntegrity: item.meta && item.meta.capIntegrity ? item.meta.capIntegrity : 'Sellado Correcto',
+        tiltDegrees: item.meta && typeof item.meta.tiltDegrees === 'number' ? item.meta.tiltDegrees : 0,
         liquidStatus: item.meta ? item.meta.liquidStatus : 'Vacía',
+        fillPercent: item.meta && typeof item.meta.fillPercent === 'number' ? item.meta.fillPercent : 0,
+        rvmDecision: item.meta && item.meta.rvmDecision ? item.meta.rvmDecision : 'ACEPTADA',
+        canCompact: item.meta && typeof item.meta.canCompact === 'boolean' ? item.meta.canCompact : true,
         depositValue: item.meta && typeof item.meta.depositValue === 'number' ? item.meta.depositValue : (isGlass ? 1.00 : 0.50),
         gramsPlastic: isGlass ? 0 : CONFIG.GRAMS_PLASTIC_PER_BOTTLE,
         co2Saved: CONFIG.GRAMS_CO2_PER_BOTTLE
@@ -1179,9 +1228,16 @@
       const ricStr = item.ricCode || (tagClass === 'glass' ? 'GL-71' : '♳ PET-1');
       const binStr = item.recyclingBin || (tagClass === 'glass' ? 'Contenedor Verde (Vidrio)' : 'Contenedor Azul (PET)');
       const compactStr = item.compactionStatus || 'Íntegra';
-      const capStr = item.hasCap ? '<span style="color:#059669; font-weight:700;">✓ Con Tapa</span>' : '<span style="color:#64748b;">Sin Tapa</span>';
-      const liquidStr = item.liquidStatus ? `<span style="font-size:0.75rem; color:${item.liquidStatus.includes('Líquido') ? '#d97706' : '#059669'};">● ${item.liquidStatus}</span>` : '<span style="font-size:0.75rem; color:#059669;">● Vacía</span>';
-      const ricClass = tagClass === 'glass' ? 'ric-glass' : 'ric-pet';
+      const capStr = item.capIntegrity && item.capIntegrity.includes('Alerta')
+        ? `<span style="color:#d97706; font-weight:700;">⚠ ${item.capLabel || 'Tapa Chueca'}</span>`
+        : (item.hasCap ? '<span style="color:#059669; font-weight:700;">✓ Con Tapa</span>' : '<span style="color:#64748b;">Sin Tapa</span>');
+
+      const rvmDec = item.rvmDecision || (item.liquidStatus && item.liquidStatus.includes('Líquido') ? 'RECHAZADA_POR_CONTENIDO' : 'ACEPTADA');
+      const rvmBadge = rvmDec === 'ACEPTADA'
+        ? '<span style="font-size:0.68rem; background:#dcfce7; color:#15803d; padding:1px 5px; border-radius:3px; font-weight:700;">RVM: Aceptada</span>'
+        : rvmDec === 'ACEPTADA_CON_DRENAJE'
+        ? '<span style="font-size:0.68rem; background:#fef9c3; color:#a16207; padding:1px 5px; border-radius:3px; font-weight:700;">RVM: Drenar</span>'
+        : '<span style="font-size:0.68rem; background:#fee2e2; color:#b91c1c; padding:1px 5px; border-radius:3px; font-weight:700;">RVM: Rechazo Derrame</span>';
 
       tr.innerHTML = `
         <td style="font-weight:700; font-family:var(--font-mono); color:var(--primary);">${item.id}</td>
@@ -1200,7 +1256,7 @@
         <td style="font-size:0.8rem; font-weight:600; color:#334155;">${sizeStr}</td>
         <td style="font-size:0.8rem;">
           <div>${capStr}</div>
-          <div>${liquidStr}</div>
+          <div style="display:flex; align-items:center; gap:4px; margin:2px 0;">${liquidStr} ${rvmBadge}</div>
           <div style="font-size:0.7rem; color:${compactStr.includes('Compactada') ? '#0284c7' : '#64748b'}; font-weight:600;">${compactStr}</div>
         </td>
         <td style="font-weight:800; font-family:var(--font-mono); color:#059669;">${deposit} Bs.</td>
@@ -1235,7 +1291,7 @@
     });
   }
 
-  // 14. Métricas de Impacto Ecológico y Reembolso DRS
+  // 14. Métricas de Impacto Ecológico, Reembolso DRS y Flujo Conveyor (BPM)
   function updateImpactMetrics(items = loadInventory()) {
     const count = items.length;
     const petCount = items.filter(i => i.tagClass !== 'glass').length;
@@ -1249,6 +1305,12 @@
     if (dom.kpiTotalCo2) dom.kpiTotalCo2.textContent = `${gramsCo2}g`;
     if (dom.kpiTotalWater) dom.kpiTotalWater.textContent = `${litersWater}L`;
     if (dom.kpiTotalDeposit) dom.kpiTotalDeposit.textContent = `${totalDeposit.toFixed(2)} Bs.`;
+
+    if (dom.hudBpm && window.BottleDetection && window.BottleDetection.computeConveyorMetrics) {
+      const conv = window.BottleDetection.computeConveyorMetrics(items);
+      dom.hudBpm.textContent = `${conv.bpm} BPM`;
+      dom.hudBpm.title = `Flujo en cinta: ${conv.cadence} (${conv.velocityPxS} px/s)`;
+    }
   }
 
   // 15. Exportación CSV y JSON con Estándares Industriales RVM
@@ -1368,11 +1430,11 @@
         </div>
 
         <div style="text-align:center; border-top:1px dashed #cbd5e1; padding-top:0.75rem;">
-          <div style="font-family:monospace; font-size:0.95rem; font-weight:800; letter-spacing:1px; color:#0f172a; background:#e2e8f0; padding:6px 10px; border-radius:4px; display:inline-block;" id="drsVoucherCodeText">
-            ${ticket.ticketCode}
+          <div style="margin: 0.5rem auto; max-width:280px;">
+            ${window.BottleDetection && window.BottleDetection.generateBarcodeSVG ? window.BottleDetection.generateBarcodeSVG(ticket.ticketCode) : `<div style="font-family:monospace; font-size:0.95rem; font-weight:800; background:#e2e8f0; padding:6px 10px; border-radius:4px;">${ticket.ticketCode}</div>`}
           </div>
           <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">
-            Presenta este código en caja o terminal para canjear tu dinero o descuento.
+            Presenta o escanea este código de barras en caja o terminal para canjear tu dinero o descuento.
           </div>
         </div>
       `;

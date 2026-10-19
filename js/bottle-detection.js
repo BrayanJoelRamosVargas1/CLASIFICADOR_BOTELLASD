@@ -139,6 +139,114 @@
     };
   }
 
+  function evaluateCapAlignment(leftScore, rightScore) {
+    const l = Math.max(0, Number(leftScore) || 0);
+    const r = Math.max(0, Number(rightScore) || 0);
+    const avg = (l + r) / 2;
+    if (avg < 0.20) {
+      return {
+        hasCap: false,
+        status: 'Sin Tapa',
+        integrity: 'Falta Tapa / Destapada',
+        tiltDegrees: 0,
+        isAccepted: false
+      };
+    }
+    const maxVal = Math.max(l, r);
+    const diff = Math.abs(l - r);
+    const asymmetry = maxVal > 0 ? diff / maxVal : 0;
+    if (asymmetry > 0.38) {
+      const tilt = Math.round(asymmetry * 15);
+      return {
+        hasCap: true,
+        status: 'Tapa Desalineada/Chueca',
+        integrity: `Alerta: Inclinación ~${tilt}°`,
+        tiltDegrees: tilt,
+        isAccepted: false
+      };
+    }
+    return {
+      hasCap: true,
+      status: 'Con Tapa Correcta',
+      integrity: 'Sellado Correcto',
+      tiltDegrees: 0,
+      isAccepted: true
+    };
+  }
+
+  function evaluateLiquidFill(fillPercent) {
+    const pct = Math.max(0, Math.min(100, Math.round(Number(fillPercent) || 0)));
+    if (pct <= 5) {
+      return {
+        fillPercent: pct,
+        status: 'Vacía (0%)',
+        rvmDecision: 'ACEPTADA',
+        warning: null,
+        canCompact: true
+      };
+    }
+    if (pct <= 20) {
+      return {
+        fillPercent: pct,
+        status: `Residuo Mínimo (${pct}%)`,
+        rvmDecision: 'ACEPTADA_CON_DRENAJE',
+        warning: 'Líquido residual leve detectado',
+        canCompact: true
+      };
+    }
+    return {
+      fillPercent: pct,
+      status: `Con Contenido (${pct}%)`,
+      rvmDecision: 'RECHAZADA_POR_CONTENIDO',
+      warning: 'Riesgo de derrame en tolva de trituración',
+      canCompact: false
+    };
+  }
+
+  function computeConveyorMetrics(historyDetections = []) {
+    const records = Array.isArray(historyDetections) ? historyDetections : [];
+    if (records.length < 2) {
+      return { bpm: 0, velocityPxS: 0, cadence: 'Estática / Reposo' };
+    }
+    const recent = records.slice(-8);
+    const t0 = new Date(recent[0].timestamp).getTime();
+    const t1 = new Date(recent[recent.length - 1].timestamp).getTime();
+    const deltaSec = (t1 - t0) / 1000;
+    if (deltaSec <= 0.2) {
+      return { bpm: 0, velocityPxS: 0, cadence: 'Calculando...' };
+    }
+    const count = recent.length;
+    const bpm = Math.round((count / deltaSec) * 60);
+    let cadence = 'Baja (Kiosco / Manual)';
+    if (bpm > 25) cadence = 'Alta (Cinta Industrial)';
+    else if (bpm > 10) cadence = 'Media (Flujo Continuo)';
+    return {
+      bpm: Math.min(120, bpm),
+      velocityPxS: Math.round(count * 50 / deltaSec),
+      cadence
+    };
+  }
+
+  function generateBarcodeSVG(codeText = 'DRS-RVM-001', options = {}) {
+    const clean = String(codeText).replace(/[^A-Z0-9-]/gi, '').toUpperCase() || 'DRS-CODE';
+    const width = options.width || 280;
+    const height = options.height || 64;
+    let rects = '';
+    let x = 12;
+    const barWidths = [2, 3, 1, 4, 2, 1, 3, 2];
+    for (let i = 0; i < clean.length; i++) {
+      const charCode = clean.charCodeAt(i);
+      const w1 = barWidths[(charCode + i) % barWidths.length];
+      const w2 = barWidths[(charCode * 3 + i) % barWidths.length];
+      rects += `<rect x="${x}" y="4" width="${w1}" height="${height - 20}" fill="#0f172a" />`;
+      x += w1 + 2;
+      rects += `<rect x="${x}" y="4" width="${w2}" height="${height - 20}" fill="#0f172a" />`;
+      x += w2 + 3;
+    }
+    rects += `<rect x="${x}" y="4" width="2" height="${height - 20}" fill="#0f172a" />`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Math.max(x + 16, width)} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto;"><rect width="100%" height="100%" fill="#ffffff"/>${rects}<text x="50%" y="${height - 4}" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#334155">${clean}</text></svg>`;
+  }
+
   const api = Object.freeze({
     config,
     iou,
@@ -146,7 +254,11 @@
     computeDailyCut,
     classifyResinAndBin,
     computeCompactionStatus,
-    generateDRSTicket
+    generateDRSTicket,
+    evaluateCapAlignment,
+    evaluateLiquidFill,
+    computeConveyorMetrics,
+    generateBarcodeSVG
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.BottleDetection = api;

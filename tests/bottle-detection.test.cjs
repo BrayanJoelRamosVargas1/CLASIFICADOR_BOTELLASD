@@ -5,7 +5,11 @@ const {
   computeDailyCut,
   classifyResinAndBin,
   computeCompactionStatus,
-  generateDRSTicket
+  generateDRSTicket,
+  evaluateCapAlignment,
+  evaluateLiquidFill,
+  computeConveyorMetrics,
+  generateBarcodeSVG
 } = require('../js/bottle-detection.js');
 const bottle = { class: 'bottle', score: 0.8, bbox: [10, 20, 50, 100] };
 
@@ -99,4 +103,63 @@ test('generates RVM DRS refund ticket with breakdown and environmental savings',
   assert.equal(ticket.gramsCo2Saved, 246);
   assert.ok(ticket.ticketCode.startsWith('DRS-RVMTEST01-'));
 });
+
+test('evaluates cap presence, alignment, and tilt defect detection', () => {
+  const missing = evaluateCapAlignment(0.04, 0.05);
+  assert.equal(missing.hasCap, false);
+  assert.equal(missing.status, 'Sin Tapa');
+  assert.equal(missing.isAccepted, false);
+
+  const crooked = evaluateCapAlignment(0.88, 0.35);
+  assert.equal(crooked.hasCap, true);
+  assert.equal(crooked.status, 'Tapa Desalineada/Chueca');
+  assert.ok(crooked.tiltDegrees > 0);
+  assert.equal(crooked.isAccepted, false);
+
+  const correct = evaluateCapAlignment(0.80, 0.76);
+  assert.equal(correct.hasCap, true);
+  assert.equal(correct.status, 'Con Tapa Correcta');
+  assert.equal(correct.integrity, 'Sellado Correcto');
+  assert.equal(correct.isAccepted, true);
+});
+
+test('evaluates liquid fill level and RVM compaction acceptance or spill rejection', () => {
+  const empty = evaluateLiquidFill(2);
+  assert.equal(empty.status, 'Vacía (0%)');
+  assert.equal(empty.rvmDecision, 'ACEPTADA');
+  assert.equal(empty.canCompact, true);
+
+  const residue = evaluateLiquidFill(14);
+  assert.equal(residue.status, 'Residuo Mínimo (14%)');
+  assert.equal(residue.rvmDecision, 'ACEPTADA_CON_DRENAJE');
+  assert.equal(residue.canCompact, true);
+
+  const full = evaluateLiquidFill(60);
+  assert.equal(full.status, 'Con Contenido (60%)');
+  assert.equal(full.rvmDecision, 'RECHAZADA_POR_CONTENIDO');
+  assert.equal(full.canCompact, false);
+});
+
+test('computes conveyor cadence and velocity in bottles per minute (BPM)', () => {
+  const now = Date.now();
+  const history = [
+    { timestamp: new Date(now - 4000).toISOString() },
+    { timestamp: new Date(now - 3000).toISOString() },
+    { timestamp: new Date(now - 2000).toISOString() },
+    { timestamp: new Date(now - 1000).toISOString() }
+  ];
+  const metrics = computeConveyorMetrics(history);
+  assert.ok(metrics.bpm >= 50);
+  assert.ok(metrics.velocityPxS > 0);
+  assert.equal(metrics.cadence, 'Alta (Cinta Industrial)');
+});
+
+test('generates scannable vector barcode SVG for RVM deposit ticket', () => {
+  const svg = generateBarcodeSVG('DRS-BO-999');
+  assert.ok(svg.includes('<svg'));
+  assert.ok(svg.includes('<rect'));
+  assert.ok(svg.includes('DRS-BO-999'));
+  assert.ok(svg.includes('</svg>'));
+});
+
 
