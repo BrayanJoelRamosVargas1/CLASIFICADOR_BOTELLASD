@@ -106,3 +106,22 @@ test('ByteTrack stage-2 hysteresis continues an active bottle track when glare d
   assert.equal(h.registrations.length, 1);
 });
 
+test('tracks two neighboring bottles simultaneously without merging when introduced sequentially', async () => {
+  let predictions = [{ ...bottle, bbox: [50, 100, 60, 150] }];
+  const h = engine(async () => predictions);
+  await h.processVisualFrame();
+  await h.processVisualFrame();
+  assert.equal(h.registrations.length, 1);
+  assert.equal(h.getTrackers().length, 1);
+
+  // Frame 3: second bottle placed 90px away
+  predictions = [
+    { ...bottle, bbox: [50, 100, 60, 150] },
+    { ...bottle, bbox: [160, 100, 60, 150] }
+  ];
+  await h.processVisualFrame();
+  await h.processVisualFrame();
+  assert.equal(h.registrations.length, 2);
+  assert.equal(h.getTrackers().length, 2);
+});
+

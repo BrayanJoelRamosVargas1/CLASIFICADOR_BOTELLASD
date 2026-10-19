@@ -248,7 +248,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=36.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=37.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -297,9 +297,9 @@
     const maxW = Math.max(a.w, b.w, 1);
     const maxH = Math.max(a.h, b.h, 1);
     const sizeRatio = Math.min(a.w * a.h, b.w * b.h) / Math.max(a.w * a.h, b.w * b.h, 1);
-    const limitX = countInFrame <= 2 ? Math.max(maxW * 3.0, 320) : maxW * 0.85;
-    const limitY = countInFrame <= 2 ? Math.max(maxH * 1.5, 260) : maxH * 0.65;
-    const minRatio = countInFrame <= 2 ? 0.30 : 0.50;
+    const limitX = Math.max(maxW * 0.85, 45);
+    const limitY = Math.max(maxH * 0.65, 45);
+    const minRatio = 0.50;
     if (dx < limitX && dy < limitY && sizeRatio > minRatio) {
       const normDist = Math.hypot(dx / limitX, dy / limitY);
       if (normDist < 1) return Math.max(iou, 0.75 * (1 - normDist * 0.6));
@@ -470,9 +470,9 @@
       } catch (e) {}
 
       // 5. Clasificación Espectral de Color de Resina y Fracción de Escamas
-      const isRedLabelCoca = redRatio > 0.035;
+      const hasColoredLabel = redRatio > 0.08 || greenRatio > 0.15;
       const isLargeFamilyBottle = volumeMl >= 1500;
-      const isGlass = !isRedLabelCoca && !isLargeFamilyBottle && (
+      const isGlass = !isLargeFamilyBottle && (
         rawClass === 'wine glass' ||
         (greenRatio > 0.28 && redRatio < 0.02) ||
         (aspect > 2.3 && darkRatio > 0.45 && redRatio < 0.015)
@@ -526,46 +526,10 @@
         });
       }
 
-      // Clasificación de Material
-      if (isRedLabelCoca) {
-        return {
-          label: 'Botella PET (Coca-Cola / Etiqueta Roja)',
-          tagClass: 'coca',
-          color: '#ef4444',
-          fill: 'rgba(239, 68, 68, 0.22)',
-          icon: 'bx-recycle',
-          sizeLabel,
-          volumeMl,
-          ricCode: '♳ PET-1',
-          recyclingBin: 'Contenedor Azul (PET)',
-          compactionStatus,
-          hasCap: capInfo.hasCap,
-          capLabel: capInfo.status,
-          capIntegrity: capInfo.integrity,
-          tiltDegrees: capInfo.tiltDegrees,
-          liquidStatus: fillInfo.status,
-          fillPercent: fillInfo.fillPercent,
-          rvmDecision: fillInfo.rvmDecision,
-          colorGrade: colorGrade.colorGrade,
-          colorFraction: colorGrade.colorFraction,
-          flakeValueBsKg: colorGrade.flakeValueBsKg,
-          ejectorChannel: ejectorInfo.valveId,
-          neckStatus: neckInfo.status,
-          neckOvalityIndex: neckInfo.ovalityIndex,
-          isNeckConforming: neckInfo.isConforming,
-          pcrPercent: pcrInfo.pcrPercent,
-          pcrLabel: pcrInfo.label,
-          isFoodGradeCertified: pcrInfo.isFoodGradeCertified,
-          hqrPercent: hqrInfo.hqrPercent,
-          hqrRating: hqrInfo.hqrRating,
-          canCompact: true,
-          depositValue: 0.50
-        };
-      }
-
+      // Clasificación de Material (Norma ASTM D7611 e Inspección Óptica RVM)
       if (isGlass) {
         return {
-          label: 'Botella de Vidrio (Estimado)',
+          label: 'Botella de Vidrio (Silicato)',
           tagClass: 'glass',
           color: '#a855f7',
           fill: 'rgba(168, 85, 247, 0.22)',
@@ -599,12 +563,40 @@
         };
       }
 
+      let petLabel = 'Botella PET Cristal (Transparente)';
+      let petColor = '#10b981';
+      let petFill = 'rgba(16, 185, 129, 0.18)';
+      let petIcon = 'bx-water';
+      let tagClass = 'pet';
+
+      if (colorGrade.colorFraction && colorGrade.colorFraction.includes('Fracción B')) {
+        petLabel = 'Botella PET Azul (Agua Mineral)';
+        petColor = '#0284c7';
+        petFill = 'rgba(2, 132, 199, 0.20)';
+        petIcon = 'bx-water';
+      } else if (colorGrade.colorFraction && colorGrade.colorFraction.includes('Fracción C')) {
+        petLabel = 'Botella PET Verde (Refresco / Cítrico)';
+        petColor = '#059669';
+        petFill = 'rgba(5, 150, 105, 0.20)';
+        petIcon = 'bx-recycle';
+      } else if (colorGrade.colorFraction && colorGrade.colorFraction.includes('Fracción D')) {
+        petLabel = 'Botella PET Ámbar (Protección UV)';
+        petColor = '#d97706';
+        petFill = 'rgba(217, 119, 6, 0.20)';
+        petIcon = 'bx-recycle';
+      } else if (hasColoredLabel) {
+        petLabel = 'Botella PET (Etiqueta Impresa / Color)';
+        petColor = '#06b6d4';
+        petFill = 'rgba(6, 182, 212, 0.20)';
+        petIcon = 'bx-recycle';
+      }
+
       return {
-        label: 'Botella PET (Estimado por Color)',
-        tagClass: 'pet',
-        color: '#06b6d4',
-        fill: 'rgba(6, 182, 212, 0.20)',
-        icon: 'bx-water',
+        label: petLabel,
+        tagClass,
+        color: petColor,
+        fill: petFill,
+        icon: petIcon,
         sizeLabel,
         volumeMl,
         ricCode: '♳ PET-1',

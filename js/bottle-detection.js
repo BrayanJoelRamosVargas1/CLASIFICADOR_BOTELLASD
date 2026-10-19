@@ -295,7 +295,7 @@
     }
     if (g > 55 && g > r * 1.12 && g > b) {
       return {
-        colorGrade: 'PET Verde (Sprite / Cítricos)',
+        colorGrade: 'PET Verde (Cítrico / Esmeralda)',
         colorFraction: 'Fracción C (Verde)',
         flakeValueBsKg: 3.00,
         qualityTier: 'Grado Fleje Industrial',

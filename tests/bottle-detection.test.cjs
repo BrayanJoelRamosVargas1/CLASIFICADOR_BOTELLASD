@@ -182,7 +182,7 @@ test('classifies PET and Glass optical color grades and commercial flake values'
 
   // PET Verde
   const petGreen = classifyBottleColorGrade({ r: 40, g: 130, b: 50, lum: 85 }, 'pet');
-  assert.equal(petGreen.colorGrade, 'PET Verde (Sprite / Cítricos)');
+  assert.equal(petGreen.colorGrade, 'PET Verde (Cítrico / Esmeralda)');
   assert.equal(petGreen.colorFraction, 'Fracción C (Verde)');
 
   // PET Ámbar
