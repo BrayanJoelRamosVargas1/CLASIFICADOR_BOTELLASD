@@ -1745,7 +1745,8 @@
 
         <div style="text-align:center; border-top:1px dashed #cbd5e1; padding-top:0.75rem;">
           <div style="margin: 0.5rem auto; max-width:280px;">
-            ${window.BottleDetection && window.BottleDetection.generateBarcodeSVG ? window.BottleDetection.generateBarcodeSVG(ticket.ticketCode) : `<div style="font-family:monospace; font-size:0.95rem; font-weight:800; background:#e2e8f0; padding:6px 10px; border-radius:4px;">${ticket.ticketCode}</div>`}
+            ${window.BottleDetection && window.BottleDetection.generateBarcodeSVG ? window.BottleDetection.generateBarcodeSVG(ticket.ticketCode) : ''}
+            <div id="drsVoucherCodeText" style="font-family:monospace; font-size:0.95rem; font-weight:800; background:#e2e8f0; padding:6px 10px; border-radius:4px; margin-top:4px;">${ticket.ticketCode}</div>
           </div>
           <div style="font-size:0.7rem; color:#64748b; margin-top:4px;">
             Presenta o escanea este código de barras en caja o terminal para canjear tu dinero o descuento.
