@@ -218,7 +218,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=32.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=33.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -777,19 +777,20 @@
         for (const t of trackers) {
           if (!matchedTrackerIds.has(t.id)) {
             t.missed++;
+            if (t.missed === 1 && isLoopActive) {
+              const dt = Math.max(16, Math.min(300, now - t.lastSeen));
+              t.x = Math.max(0, Math.min(srcW - t.w, t.x + (t.vx || 0) * dt * 0.5));
+              t.y = Math.max(0, Math.min(srcH - t.h, t.y + (t.vy || 0) * dt * 0.5));
+            }
             if (!t.registered) {
               t.hits = 0;
-            } else if (t.missed === 1 && isLoopActive) {
-              const dt = Math.max(16, Math.min(250, now - t.lastSeen));
-              t.x = Math.max(0, Math.min(srcW - t.w, t.x + (t.vx || 0) * dt * 0.6));
-              t.y = Math.max(0, Math.min(srcH - t.h, t.y + (t.vy || 0) * dt * 0.6));
             }
           }
         }
 
-        // Mantener identidad durante pérdidas breves; en cámara en vivo permitir 1 frame de coasting Kalman sin parpadeo.
+        // Mantener identidad durante pérdidas breves sin parpadeo en cámara en vivo
         visibleBoxes = trackers.filter(t =>
-          t.missed === 0 || (isLoopActive && t.registered && t.missed === 1 && now - t.lastSeen < 380)
+          t.missed === 0 || (isLoopActive && t.missed === 1 && now - t.lastSeen < 1200)
         );
 
         dom.hudInView.textContent = visibleBoxes.length;
