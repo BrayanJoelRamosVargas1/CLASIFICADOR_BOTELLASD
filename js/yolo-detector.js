@@ -140,23 +140,24 @@
       if (!width || !height) return direct;
 
       if (isVideo) {
-        // On WebGPU live camera, always test Foveated HD crop first if not locked onto a rotation mode,
-        // and if crop also misses, immediately test the next rotation mode in the same cycle.
+        // On WebGPU live camera, test Foveated HD crop / Perifoveal zoomout first if not locked onto a mode,
+        // and if the first pass misses, immediately test the next auxiliary mode in the same cycle.
         if (this.backend === 'webgpu') {
-          const primaryMode = this.lastAuxMode || 'crop';
+          const allModes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
+          const primaryMode = this.lastAuxMode || allModes[(++this.videoFrameCount) % 2];
           const aux1 = await this.runAuxPass(primaryMode, source, width, height, maxBoxes, minScore);
           if (aux1.some(p => p.score >= threshold)) {
             this.lastAuxMode = primaryMode;
             return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1)), threshold);
           }
-          const rotModes = ['rot90', 'rot180', 'rot270'];
-          const rotMode = rotModes[(++this.videoFrameCount) % rotModes.length];
-          const aux2 = await this.runAuxPass(rotMode, source, width, height, maxBoxes, minScore);
-          this.lastAuxMode = aux2.some(p => p.score >= threshold) ? rotMode : null;
+          const secondaryModes = allModes.filter(m => m !== primaryMode);
+          const secondaryMode = secondaryModes[this.videoFrameCount % secondaryModes.length];
+          const aux2 = await this.runAuxPass(secondaryMode, source, width, height, maxBoxes, minScore);
+          this.lastAuxMode = aux2.some(p => p.score >= threshold) ? secondaryMode : null;
           return this.rememberTarget(YoloBottleDetector.fuseBoxes(direct.concat(aux1, aux2)), threshold);
         }
         // WASM fallback: throttle auxiliary pass to every 2nd empty frame
-        const modes = ['crop', 'rot90', 'rot180', 'rot270'];
+        const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
           if (++this.videoFrameCount % 2 !== 0) return direct;
@@ -168,7 +169,7 @@
         return this.rememberTarget(fusedVideo, threshold);
       }
 
-      // Static image multi-orientation & SAHI crop synthesis with ZFTurbo Weighted Boxes Fusion (WBF)
+      // Static image multi-orientation, SAHI crop & Perifoveal zoomout synthesis with ZFTurbo WBF
       const rot90 = await this.runAuxPass('rot90', source, width, height, maxBoxes, minScore);
       const rot180 = await this.runAuxPass('rot180', source, width, height, maxBoxes, minScore);
       const combined = YoloBottleDetector.fuseBoxes(direct.concat(rot90, rot180));
@@ -176,8 +177,11 @@
       const crop = await this.runAuxPass('crop', source, width, height, maxBoxes, minScore);
       const withCrop = YoloBottleDetector.fuseBoxes(combined.concat(crop));
       if (withCrop.some(p => p.score >= threshold)) return withCrop;
+      const zoomout = await this.runAuxPass('zoomout', source, width, height, maxBoxes, minScore);
+      const withZoomout = YoloBottleDetector.fuseBoxes(withCrop.concat(zoomout));
+      if (withZoomout.some(p => p.score >= threshold)) return withZoomout;
       const rot270 = await this.runAuxPass('rot270', source, width, height, maxBoxes, minScore);
-      return YoloBottleDetector.fuseBoxes(withCrop.concat(rot270));
+      return YoloBottleDetector.fuseBoxes(withZoomout.concat(rot270));
     }
     async runAuxPass(mode, source, width, height, maxBoxes, minScore) {
       if (!this.auxCanvas) this.auxCanvas = document.createElement('canvas');
@@ -233,6 +237,32 @@
           ...p,
           bbox: [cropX + p.bbox[0], cropY + p.bbox[1], p.bbox[2], p.bbox[3]]
         }));
+      }
+      if (mode === 'zoomout') {
+        // Bio-inspired Perifoveal Context Scale (0.58x): when a bottle is held very close to the webcam
+        // (filling 85%-100% of frame height), it exceeds YOLOv10's stride-32 receptive field. Shrinking it
+        // onto a neutral #727272 surround restores cap/base margin context and recovers detection.
+        const scale = 0.58;
+        const scaledW = Math.round(width * scale);
+        const scaledH = Math.round(height * scale);
+        const padX = Math.round((width - scaledW) * 0.5);
+        const padY = Math.round((height - scaledH) * 0.5);
+        this.auxCanvas.width = width;
+        this.auxCanvas.height = height;
+        ctx.fillStyle = '#727272';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(source, 0, 0, width, height, padX, padY, scaledW, scaledH);
+        const preds = await this.detectOnce(this.auxCanvas, maxBoxes, Math.max(minScore, 0.15));
+        return preds.map(p => {
+          const x1 = Math.max(0, Math.min(width, (p.bbox[0] - padX) / scale));
+          const y1 = Math.max(0, Math.min(height, (p.bbox[1] - padY) / scale));
+          const x2 = Math.max(0, Math.min(width, (p.bbox[0] + p.bbox[2] - padX) / scale));
+          const y2 = Math.max(0, Math.min(height, (p.bbox[1] + p.bbox[3] - padY) / scale));
+          return {
+            ...p,
+            bbox: [x1, y1, Math.max(1, x2 - x1), Math.max(1, y2 - y1)]
+          };
+        });
       }
       return [];
     }
@@ -311,6 +341,41 @@
       const iou = YoloBottleDetector.boxIoU(bottle.bbox, other.bbox);
       return iou >= 0.50 && other.score > bottle.score * 1.15;
     }
+    static buildGammaLut(gamma) {
+      const lut = new Float32Array(256);
+      for (let v = 0; v < 256; v++) {
+        lut[v] = gamma === 1 ? v / 255 : Math.pow(v / 255, gamma);
+      }
+      return lut;
+    }
+    static getLumaLut(rgba, resizedW, resizedH) {
+      // Bio-inspired Retinal Adaptation (Naka-Rushton / Weber-Fechner photoreceptor gain control):
+      // sample active image region luminance; if backlit/dark (<75) or overexposed (>195) with real
+      // contrast variance, normalize via adaptive gamma LUT so bottle silhouettes and clear PET edges stand out.
+      let sum = 0;
+      let count = 0;
+      let minL = 255;
+      let maxL = 0;
+      const step = 16;
+      const maxY = Math.min(640, Math.max(1, resizedH));
+      const maxX = Math.min(640, Math.max(1, resizedW));
+      for (let y = 0; y < maxY; y += step) {
+        const rowOffset = y * 640 * 4;
+        for (let x = 0; x < maxX; x += step) {
+          const idx = rowOffset + x * 4;
+          const luma = (rgba[idx] * 77 + rgba[idx + 1] * 150 + rgba[idx + 2] * 29) >> 8;
+          sum += luma;
+          count++;
+          if (luma < minL) minL = luma;
+          if (luma > maxL) maxL = luma;
+        }
+      }
+      if (count === 0 || (maxL - minL) < 15) return YoloBottleDetector.IDENTITY_LUT;
+      const meanLuma = sum / count;
+      if (meanLuma < 75) return YoloBottleDetector.DARK_LUT;
+      if (meanLuma > 195) return YoloBottleDetector.BRIGHT_LUT;
+      return YoloBottleDetector.IDENTITY_LUT;
+    }
     async detectOnce(source, maxBoxes = 30, minScore = 0.1) {
       const width = source.videoWidth || source.naturalWidth || source.width;
       const height = source.videoHeight || source.naturalHeight || source.height;
@@ -327,12 +392,12 @@
         this.pixels = new Float32Array(3 * plane);
       }
       const pixels = this.pixels;
-      const inv255 = 1 / 255;
+      const lut = YoloBottleDetector.getLumaLut(rgba, resizedW, resizedH);
       for (let i = 0; i < plane; i++) {
         const idx = i * 4;
-        pixels[i] = rgba[idx] * inv255;
-        pixels[plane + i] = rgba[idx + 1] * inv255;
-        pixels[2 * plane + i] = rgba[idx + 2] * inv255;
+        pixels[i] = lut[rgba[idx]];
+        pixels[plane + i] = lut[rgba[idx + 1]];
+        pixels[2 * plane + i] = lut[rgba[idx + 2]];
       }
       const input = new ort.Tensor('float32', pixels, [1, 3, 640, 640]);
       let outputs;
@@ -350,8 +415,8 @@
             (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH];
           if (classId === 39) {
             bottles.push({ class: 'bottle', score, bbox });
-          } else if (classId === 75 && score >= 0.28 && bbox[3] > bbox[2] * 1.45) {
-            // Slender upright glass/clear bottles that COCO backbones occasionally activate as class 75
+          } else if (classId === 75 && score >= 0.28 && Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.40) {
+            // Slender glass/clear bottles (any orientation) that COCO backbones occasionally activate as class 75
             bottles.push({ class: 'bottle', score: score * 0.85, bbox });
           } else {
             otherClasses.push({ classId, score, bbox });
@@ -369,5 +434,8 @@
     async dispose() { await this.session.release(); }
   }
   YoloBottleDetector.HARD_NEGATIVE_CLASSES = new Set([10, 41, 64, 65, 67, 76, 78, 79]);
+  YoloBottleDetector.IDENTITY_LUT = YoloBottleDetector.buildGammaLut(1);
+  YoloBottleDetector.DARK_LUT = YoloBottleDetector.buildGammaLut(0.72);
+  YoloBottleDetector.BRIGHT_LUT = YoloBottleDetector.buildGammaLut(1.25);
   window.YoloBottleDetector = YoloBottleDetector;
 })();

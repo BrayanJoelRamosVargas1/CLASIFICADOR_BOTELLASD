@@ -110,3 +110,43 @@ test('fuses multi-pass overlapping bottle detections with ZFTurbo Weighted Boxes
   assert.ok(predictions[0].score > 0.50);
   assert.deepEqual(Array.from(predictions[0].bbox, v => Math.round(v)), [100, 100, 100, 200]);
 });
+
+test('recovers close-up bottle filling the frame via perifoveal zoomout pass and maps coordinates back', async () => {
+  // direct=[], rot90=[], rot180=[], crop=[], zoomout=[detected at scaled box]
+  // For 640x480 with scale=0.58: padX=135, padY=101; original [100, 10, 200, 460] -> in zoomout canvas: [193, 106.8, 309, 373.6]
+  const h = setup([
+    [],
+    [],
+    [],
+    [],
+    [[193, 106.8, 309, 373.6, 0.78, 39]]
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 1);
+  assert.equal(Math.round(predictions[0].score * 100), 78);
+  assert.deepEqual(Array.from(predictions[0].bbox, v => Math.round(v)), [100, 10, 200, 460]);
+});
+
+test('applies bio-inspired retinal gamma LUT adaptation on dark backlit and overexposed frames', () => {
+  const h = setup([]);
+  const Yolo = h.detector.constructor;
+  const darkRgba = new Uint8ClampedArray(640 * 640 * 4);
+  const half = (640 * 240) * 4;
+  for (let i = 0; i < darkRgba.length; i += 4) {
+    const v = i < half ? 20 : 65;
+    darkRgba[i] = v; darkRgba[i + 1] = v; darkRgba[i + 2] = v; darkRgba[i + 3] = 255;
+  }
+  const darkLut = Yolo.getLumaLut(darkRgba, 640, 480);
+  assert.equal(darkLut, Yolo.DARK_LUT);
+  assert.ok(darkLut[50] > (50 / 255)); // Gamma < 1 boosts dark shadow contrast
+
+  const brightRgba = new Uint8ClampedArray(640 * 640 * 4);
+  for (let i = 0; i < brightRgba.length; i += 4) {
+    const v = i < half ? 190 : 245;
+    brightRgba[i] = v; brightRgba[i + 1] = v; brightRgba[i + 2] = v; brightRgba[i + 3] = 255;
+  }
+  const brightLut = Yolo.getLumaLut(brightRgba, 640, 480);
+  assert.equal(brightLut, Yolo.BRIGHT_LUT);
+  assert.ok(brightLut[210] < (210 / 255)); // Gamma > 1 recovers washed-out highlights
+});
+
