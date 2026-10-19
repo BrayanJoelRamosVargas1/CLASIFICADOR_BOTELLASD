@@ -248,7 +248,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=37.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=38.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -259,7 +259,34 @@
         if (dom.btnManualScan) dom.btnManualScan.disabled = false;
         return detector;
       } catch (error) {
-        console.error('Error al inicializar IA:', error);
+        console.warn('EcoLens: YOLOv10 no pudo iniciar en este entorno, activando motor GPU WebGL de alta resiliencia:', error);
+        if (window.cocoSsd) {
+          try {
+            dom.statusText.textContent = '⏳ Activando detector GPU de respaldo (WebGL)...';
+            const tfModel = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+            detector = {
+              backend: 'webgl',
+              detect: async (source, maxBoxes = 30, minScore = 0.1) => {
+                const preds = await tfModel.detect(source, maxBoxes, minScore);
+                return preds.filter(p => p.class === 'bottle' || p.class === 'wine glass')
+                  .map(p => ({
+                    class: p.class === 'wine glass' ? 'wine glass' : 'bottle',
+                    score: p.score,
+                    bbox: p.bbox
+                  }));
+              },
+              dispose: async () => { if (tfModel && tfModel.dispose) tfModel.dispose(); }
+            };
+            dom.statusText.textContent = isLoopActive
+              ? '● Cámara activa. Apunta hacia tus botellas.'
+              : '● Detector GPU listo. Inicia la cámara o sube una foto.';
+            dom.hardwareBadge.innerHTML = '<span class="dot"></span> GPU · WebGL Turbo';
+            if (dom.btnManualScan) dom.btnManualScan.disabled = false;
+            return detector;
+          } catch (e2) {
+            console.error('Error en motor WebGL de respaldo:', e2);
+          }
+        }
         dom.statusText.textContent = 'No se pudo cargar el detector. Recarga la página y revisa tu conexión.';
         dom.hardwareBadge.style.background = '#fef2f2';
         dom.hardwareBadge.style.color = '#dc2626';
@@ -1411,8 +1438,8 @@
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
 
-      const tagClass = item.tagClass || (item.label.includes('Vidrio') ? 'glass' : item.label.includes('Coca') ? 'coca' : 'pet');
-      const iconClass = tagClass === 'glass' ? 'bx-wine' : tagClass === 'coca' ? 'bx-recycle' : 'bx-water';
+      const tagClass = item.tagClass || (item.label.includes('Vidrio') ? 'glass' : 'pet');
+      const iconClass = tagClass === 'glass' ? 'bx-wine' : 'bx-water';
 
       const deposit = (typeof item.depositValue === 'number' ? item.depositValue : (tagClass === 'glass' ? 1.00 : 0.50)).toFixed(2);
       const sizeStr = item.sizeLabel || 'Personal (500ml)';
@@ -1467,7 +1494,7 @@
         <td>
           <div style="display:flex; align-items:center; gap:0.4rem;">
             <div style="width:40px; height:6px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
-              <div style="height:100%; width:${item.confidence}%; background:${tagClass === 'glass' ? '#a855f7' : tagClass === 'coca' ? '#ef4444' : '#10b981'};"></div>
+              <div style="height:100%; width:${item.confidence}%; background:${tagClass === 'glass' ? '#a855f7' : '#10b981'};"></div>
             </div>
             <strong style="font-size:0.8rem; font-family:var(--font-mono);">${item.confidence}%</strong>
           </div>
@@ -2031,7 +2058,7 @@
         if (dom.offResultBox) dom.offResultBox.style.display = 'block';
         playSound('chime');
       } else {
-        alert(`Código ${code} no encontrado en la base global Open Food Facts. Puedes usar los botones de ejemplo rápido (Coca-Cola, San Mateo, etc.).`);
+        alert(`Código ${code} no encontrado en la base global Open Food Facts. Puedes usar los botones de ejemplo rápido (Bebida Cola, Agua Mineral, etc.).`);
       }
     } catch (err) {
       alert('No se pudo conectar con la API Open Food Facts. Revisa tu conexión a internet.');
@@ -2298,8 +2325,12 @@
     renderDailyTable();
     renderInventoryTable();
     updateImpactMetrics();
-    // La red neuronal se carga bajo demanda (on-demand) cuando el usuario inicia la cámara o sube una foto.
-    // Esto garantiza que la página web abra instantáneamente (<30ms) sin consumo de datos ni bloqueo de CPU.
+    // Precarga inteligente en segundo plano:
+    // Precalienta la red neuronal inmediatamente en background
+    // para que cuando el usuario pulse "Iniciar Cámara", la detección sea 100% instantánea.
+    setTimeout(() => {
+      initNeuralEngines();
+    }, 150);
   });
 
 })();

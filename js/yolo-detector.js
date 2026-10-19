@@ -8,12 +8,6 @@
     static async hasWebGPU() {
       try {
         if (typeof navigator === 'undefined' || !navigator.gpu) return false;
-        // On mobile devices (Android/iOS), mobile WebGPU in Chromium/Brave is experimental,
-        // unstable, often lacks shader-f16 support, and exhibits severe compilation/execution stalls (>2000ms).
-        // WASM SIMD (utilizing ARM NEON vector instructions) is 50x faster and rock-solid on mobile.
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test((typeof navigator !== 'undefined' && navigator.userAgent) || '') ||
-          (typeof navigator !== 'undefined' && navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && (typeof screen !== 'undefined' && screen.width < 1024));
-        if (isMobile) return false;
         const adapter = await navigator.gpu.requestAdapter();
         return Boolean(adapter);
       } catch (e) {
