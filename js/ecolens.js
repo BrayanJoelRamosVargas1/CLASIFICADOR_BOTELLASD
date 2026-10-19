@@ -187,7 +187,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=21.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=22.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -221,10 +221,15 @@
     return union <= 0 ? 0 : inter / union;
   }
 
-  function computeMatchScore(a, b, countInFrame = 1) {
-    const iou = computeIoU(a, b);
+  function computeMatchScore(a, b, countInFrame = 1, dt = 0) {
+    const projX = dt > 0 && a.vx ? a.x + a.vx * dt : a.x;
+    const projY = dt > 0 && a.vy ? a.y + a.vy * dt : a.y;
+    const iou = Math.max(
+      computeIoU(a, b),
+      computeIoU({ x: projX, y: projY, w: a.w, h: a.h }, b)
+    );
     if (iou > 0.25) return iou;
-    const acx = a.x + a.w * 0.5, acy = a.y + a.h * 0.5;
+    const acx = projX + a.w * 0.5, acy = projY + a.h * 0.5;
     const bcx = b.x + b.w * 0.5, bcy = b.y + b.h * 0.5;
     const dx = Math.abs(acx - bcx);
     const dy = Math.abs(acy - bcy);
@@ -406,7 +411,8 @@
           for (const t of trackers) {
             if (matchedTrackerIds.has(t.id)) continue;
 
-            const score = computeMatchScore(t, box, filtered.length);
+            const dt = Math.max(0, Math.min(400, now - t.lastSeen));
+            const score = computeMatchScore(t, box, filtered.length, dt);
             if (score > bestIoU) {
               bestIoU = score;
               bestMatch = t;
@@ -414,6 +420,11 @@
           }
 
           if (bestMatch) {
+            const dt = Math.max(16, Math.min(400, now - bestMatch.lastSeen));
+            const instVx = (box.x - bestMatch.x) / dt;
+            const instVy = (box.y - bestMatch.y) / dt;
+            bestMatch.vx = (bestMatch.vx || 0) * 0.45 + instVx * 0.55;
+            bestMatch.vy = (bestMatch.vy || 0) * 0.45 + instVy * 0.55;
             bestMatch.x = bestMatch.x * 0.30 + box.x * 0.70;
             bestMatch.y = bestMatch.y * 0.30 + box.y * 0.70;
             bestMatch.w = bestMatch.w * 0.30 + box.w * 0.70;
@@ -438,6 +449,8 @@
               y: box.y,
               w: box.w,
               h: box.h,
+              vx: 0,
+              vy: 0,
               score: box.score,
               rawClass: box.rawClass,
               meta: meta,
@@ -462,7 +475,8 @@
             let bestIoU = 0.35;
             for (const t of trackers) {
               if (matchedTrackerIds.has(t.id)) continue;
-              const iouScore = computeIoU(t, lowBox);
+              const dt = Math.max(0, Math.min(400, now - t.lastSeen));
+              const iouScore = computeMatchScore(t, lowBox, lowCandidates.length, dt);
               if (iouScore > bestIoU) {
                 bestIoU = iouScore;
                 bestMatch = t;
@@ -485,16 +499,24 @@
           }
         }
 
-        // Incrementar missed a trackers no detectados en este frame
+        // Incrementar missed a trackers no detectados en este frame y aplicar coasting cinemático de 1 frame
         for (const t of trackers) {
           if (!matchedTrackerIds.has(t.id)) {
             t.missed++;
-            if (!t.registered) t.hits = 0;
+            if (!t.registered) {
+              t.hits = 0;
+            } else if (t.missed === 1 && isLoopActive) {
+              const dt = Math.max(16, Math.min(250, now - t.lastSeen));
+              t.x = Math.max(0, Math.min(srcW - t.w, t.x + (t.vx || 0) * dt * 0.6));
+              t.y = Math.max(0, Math.min(srcH - t.h, t.y + (t.vy || 0) * dt * 0.6));
+            }
           }
         }
 
-        // Mantener identidad durante pérdidas breves; dibujar solo detecciones actuales.
-        visibleBoxes = trackers.filter(t => t.missed === 0);
+        // Mantener identidad durante pérdidas breves; en cámara en vivo permitir 1 frame de coasting Kalman sin parpadeo.
+        visibleBoxes = trackers.filter(t =>
+          t.missed === 0 || (isLoopActive && t.registered && t.missed === 1 && now - t.lastSeen < 380)
+        );
 
         dom.hudInView.textContent = visibleBoxes.length;
         if (

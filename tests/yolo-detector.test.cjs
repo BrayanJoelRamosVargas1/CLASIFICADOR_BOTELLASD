@@ -99,3 +99,14 @@ test('keeps bottle placed on a desk or in front of monitor/chair/laptop even whe
   assert.equal(Math.round(predictions[0].score * 100), 42);
 });
 
+test('fuses multi-pass overlapping bottle detections with ZFTurbo Weighted Boxes Fusion and boosts consensus confidence', async () => {
+  const h = setup([
+    [[100, 100, 200, 300, 0.50, 39]],
+    [],
+    [[440, 180, 540, 380, 0.50, 39]] // 180-deg rotated coordinates of [100, 100, 100, 200] in 640x480
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 });
+  assert.equal(predictions.length, 1);
+  assert.ok(predictions[0].score > 0.50);
+  assert.deepEqual(predictions[0].bbox.map(v => Math.round(v)), [100, 100, 100, 200]);
+});

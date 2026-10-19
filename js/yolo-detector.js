@@ -69,6 +69,21 @@
       this.pixels = new Float32Array(3 * 640 * 640);
       this.videoFrameCount = 0;
       this.lastAuxMode = null;
+      this.lastTargetBox = null;
+      this.lastTargetAge = 0;
+    }
+    rememberTarget(preds, threshold) {
+      let best = null;
+      for (const p of preds) {
+        if (p.score >= threshold && (!best || p.score > best.score)) best = p;
+      }
+      if (best) {
+        this.lastTargetBox = best.bbox;
+        this.lastTargetAge = 0;
+      } else {
+        this.lastTargetAge++;
+      }
+      return preds;
     }
     async detect(source, maxBoxes = 30, minScore = 0.1) {
       const direct = await this.detectOnce(source, maxBoxes, minScore);
@@ -77,7 +92,7 @@
       const isVideo = Boolean(source.videoWidth);
       if (isVideo && bestDirect >= threshold) {
         this.lastAuxMode = null;
-        return direct;
+        return this.rememberTarget(direct, threshold);
       }
       if (!isVideo && bestDirect >= 0.65) {
         return direct;
@@ -97,19 +112,20 @@
         }
         const aux = await this.runAuxPass(mode, source, width, height, maxBoxes, minScore);
         this.lastAuxMode = aux.some(p => p.score >= threshold) ? mode : null;
-        return direct.concat(aux);
+        const fusedVideo = YoloBottleDetector.fuseBoxes(direct.concat(aux));
+        return this.rememberTarget(fusedVideo, threshold);
       }
 
-      // Static image multi-orientation & SAHI crop synthesis (0° + 90° + 180° + center zoom + 270° fallback)
+      // Static image multi-orientation & SAHI crop synthesis with ZFTurbo Weighted Boxes Fusion (WBF)
       const rot90 = await this.runAuxPass('rot90', source, width, height, maxBoxes, minScore);
       const rot180 = await this.runAuxPass('rot180', source, width, height, maxBoxes, minScore);
-      const combined = direct.concat(rot90, rot180);
+      const combined = YoloBottleDetector.fuseBoxes(direct.concat(rot90, rot180));
       if (combined.some(p => p.score >= threshold)) return combined;
       const crop = await this.runAuxPass('crop', source, width, height, maxBoxes, minScore);
-      const withCrop = combined.concat(crop);
+      const withCrop = YoloBottleDetector.fuseBoxes(combined.concat(crop));
       if (withCrop.some(p => p.score >= threshold)) return withCrop;
       const rot270 = await this.runAuxPass('rot270', source, width, height, maxBoxes, minScore);
-      return withCrop.concat(rot270);
+      return YoloBottleDetector.fuseBoxes(withCrop.concat(rot270));
     }
     async runAuxPass(mode, source, width, height, maxBoxes, minScore) {
       if (!this.auxCanvas) this.auxCanvas = document.createElement('canvas');
@@ -143,11 +159,18 @@
         return preds.map(p => ({ ...p, bbox: YoloBottleDetector.unrotateBox180(p.bbox, width, height) }));
       }
       if (mode === 'crop') {
-        // SAHI (Slicing Aided Hyper Inference) center-reticle zoom crop + refraction edge contrast for clear PET bottles
+        // Foveated Adaptive ROI + SAHI zoom crop: center on last known target if recent, else center reticle
         const cropW = Math.round(width * 0.62);
         const cropH = Math.round(height * 0.76);
-        const cropX = Math.round((width - cropW) * 0.5);
-        const cropY = Math.round((height - cropH) * 0.5);
+        let cropX = Math.round((width - cropW) * 0.5);
+        let cropY = Math.round((height - cropH) * 0.5);
+        if (this.lastTargetBox && this.lastTargetAge <= 5) {
+          const [tx, ty, tw, th] = this.lastTargetBox;
+          const cx = tx + tw * 0.5;
+          const cy = ty + th * 0.5;
+          cropX = Math.max(0, Math.min(width - cropW, Math.round(cx - cropW * 0.5)));
+          cropY = Math.max(0, Math.min(height - cropH, Math.round(cy - cropH * 0.5)));
+        }
         this.auxCanvas.width = cropW;
         this.auxCanvas.height = cropH;
         if ('filter' in ctx) ctx.filter = 'contrast(1.12) saturate(1.08)';
@@ -160,6 +183,55 @@
         }));
       }
       return [];
+    }
+    static fuseBoxes(boxes) {
+      // ZFTurbo Weighted Boxes Fusion (WBF): fuse overlapping multi-pass detections by confidence weight
+      if (boxes.length <= 1) return boxes;
+      const sorted = boxes.slice().sort((a, b) => b.score - a.score);
+      const clusters = [];
+      for (const box of sorted) {
+        let matched = null;
+        for (const c of clusters) {
+          if (YoloBottleDetector.boxIoU(box.bbox, c.bbox) >= 0.45) {
+            matched = c;
+            break;
+          }
+        }
+        if (!matched) {
+          clusters.push({
+            class: box.class,
+            maxScore: box.score,
+            weightSum: box.score,
+            wx: box.bbox[0] * box.score,
+            wy: box.bbox[1] * box.score,
+            ww: box.bbox[2] * box.score,
+            wh: box.bbox[3] * box.score,
+            count: 1,
+            bbox: box.bbox.slice()
+          });
+        } else {
+          const w = box.score;
+          matched.weightSum += w;
+          matched.wx += box.bbox[0] * w;
+          matched.wy += box.bbox[1] * w;
+          matched.ww += box.bbox[2] * w;
+          matched.wh += box.bbox[3] * w;
+          matched.count++;
+          matched.bbox = [
+            matched.wx / matched.weightSum,
+            matched.wy / matched.weightSum,
+            matched.ww / matched.weightSum,
+            matched.wh / matched.weightSum
+          ];
+        }
+      }
+      return clusters.map(c => ({
+        class: c.class,
+        score: c.count > 1
+          ? Math.min(0.99, c.maxScore + 0.06 * (c.count - 1) * (1 - c.maxScore))
+          : c.maxScore,
+        bbox: c.bbox
+      }));
     }
     static unrotateBox([x, y, w, h], originalHeight) {
       return [y, originalHeight - x - w, h, w];
