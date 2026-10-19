@@ -108,5 +108,5 @@ test('fuses multi-pass overlapping bottle detections with ZFTurbo Weighted Boxes
   const predictions = await h.detector.detect({ width: 640, height: 480 });
   assert.equal(predictions.length, 1);
   assert.ok(predictions[0].score > 0.50);
-  assert.deepEqual(predictions[0].bbox.map(v => Math.round(v)), [100, 100, 100, 200]);
+  assert.deepEqual(Array.from(predictions[0].bbox, v => Math.round(v)), [100, 100, 100, 200]);
 });
