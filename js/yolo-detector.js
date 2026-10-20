@@ -449,7 +449,7 @@
           } else if (classId === 40 && score >= 0.20 && isElongated) {
             // Glass bottle / wine bottle (COCO class 40: wine glass)
             bottles.push({ class: 'bottle', rawClass: 'wine glass', score: score * 0.95, bbox });
-          } else if (classId === 75 && score >= 0.25 && isElongated) {
+          } else if (classId === 75 && score >= 0.14 && isElongated) {
             // Slender glass/clear bottles (COCO class 75: vase)
             bottles.push({ class: 'bottle', rawClass: 'bottle', score: score * 0.88, bbox });
           } else {
@@ -467,7 +467,7 @@
     }
     async dispose() { await this.session.release(); }
   }
-  YoloBottleDetector.HARD_NEGATIVE_CLASSES = new Set([10, 41, 64, 65, 67, 76, 78, 79]);
+  YoloBottleDetector.HARD_NEGATIVE_CLASSES = new Set([41, 64, 65, 67, 76, 78, 79]);
   YoloBottleDetector.IDENTITY_LUT = YoloBottleDetector.buildGammaLut(1);
   YoloBottleDetector.DARK_LUT = YoloBottleDetector.buildGammaLut(0.88);
   YoloBottleDetector.BRIGHT_LUT = YoloBottleDetector.buildGammaLut(1.12);

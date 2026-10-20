@@ -32,7 +32,7 @@
     STORAGE_KEY: 'ecolens_inventory_v4',
     DAILY_STORAGE_KEY: 'ecolens_daily_sheets_v1',
     DEFAULT_THRESHOLD: window.BottleDetection.config.threshold,
-    MIN_INFERENCE_SCORE: 0.10, // Descarte temprano
+    MIN_INFERENCE_SCORE: (window.BottleDetection && window.BottleDetection.config && window.BottleDetection.config.minScore) || 0.08, // Descarte temprano alineado con ByteTrack Stage-2
     TARGET_INFERENCE_INTERVAL_MS: isMobileClient ? 100 : 50,
     MIN_INFERENCE_PAUSE_MS: isMobileClient ? 50 : 20,
     CONFIRMATION_HITS: 2,      // Visible en frame 1, registrado en frame 2 consecutivo
@@ -252,7 +252,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=38.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=39.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -288,15 +288,18 @@
             }
             detector = {
               backend: 'webgl',
-              detect: async (source, maxBoxes = 30, minScore = 0.1) => {
+              detect: async (source, maxBoxes = 30, minScore = 0.08) => {
                 const preds = await tfModel.detect(source, maxBoxes, minScore);
-                return preds.filter(p => p.class === 'bottle' || p.class === 'wine glass')
-                  .map(p => ({
-                    class: 'bottle',
-                    rawClass: p.class,
-                    score: p.class === 'wine glass' ? p.score * 0.95 : p.score,
-                    bbox: p.bbox
-                  }));
+                return preds.filter(p => {
+                  if (p.class === 'bottle' || p.class === 'wine glass') return true;
+                  const isElongated = Math.max(p.bbox[2], p.bbox[3]) > Math.min(p.bbox[2], p.bbox[3]) * 1.30;
+                  return (p.class === 'cup' || p.class === 'vase') && isElongated;
+                }).map(p => ({
+                  class: 'bottle',
+                  rawClass: p.class === 'wine glass' ? 'wine glass' : 'bottle',
+                  score: p.class === 'wine glass' ? p.score * 0.95 : (p.class === 'bottle' ? p.score : p.score * 0.90),
+                  bbox: p.bbox
+                }));
               },
               dispose: async () => { if (tfModel && tfModel.dispose) tfModel.dispose(); }
             };
@@ -1495,10 +1498,24 @@
             const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.08);
             rescuePreds.push(...raw);
           }
+          if (!cocoFallbackModel && window.cocoSsd) {
+            try {
+              cocoFallbackModel = await window.cocoSsd.load({ modelUrl: './models/coco-ssd/model.json' });
+            } catch (eLoad) {
+              try { cocoFallbackModel = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' }); } catch (eCdn) {}
+            }
+          }
           if (cocoFallbackModel) {
             const cRaw = await cocoFallbackModel.detect(activeSource, 15, 0.10);
-            rescuePreds.push(...cRaw.filter(p => p.class === 'bottle' || p.class === 'wine glass').map(p => ({
-              class: 'bottle', rawClass: p.class, score: p.score, bbox: p.bbox
+            rescuePreds.push(...cRaw.filter(p => {
+              if (p.class === 'bottle' || p.class === 'wine glass') return true;
+              const isElongated = Math.max(p.bbox[2], p.bbox[3]) > Math.min(p.bbox[2], p.bbox[3]) * 1.30;
+              return (p.class === 'cup' || p.class === 'vase') && isElongated;
+            }).map(p => ({
+              class: 'bottle',
+              rawClass: p.class === 'wine glass' ? 'wine glass' : 'bottle',
+              score: p.score * (p.class === 'bottle' ? 1.0 : 0.92),
+              bbox: p.bbox
             })));
           }
           const candidates = window.BottleDetection.select(rescuePreds, srcW, srcH, 0.09);
@@ -1615,8 +1632,27 @@
         const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
         const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
         if (srcW && srcH) {
-          const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.10);
-          const candidates = window.BottleDetection.select(raw, srcW, srcH, 0.10);
+          const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.08);
+          let candidates = window.BottleDetection.select(raw, srcW, srcH, 0.10);
+          if (candidates.length === 0 && cocoFallbackModel) {
+            try {
+              const cRaw = await cocoFallbackModel.detect(activeSource, 15, 0.10);
+              const cMapped = cRaw.filter(p => {
+                if (p.class === 'bottle' || p.class === 'wine glass') return true;
+                const isElongated = Math.max(p.bbox[2], p.bbox[3]) > Math.min(p.bbox[2], p.bbox[3]) * 1.30;
+                return (p.class === 'cup' || p.class === 'vase') && isElongated;
+              }).map(p => ({
+                class: 'bottle',
+                rawClass: p.class === 'wine glass' ? 'wine glass' : 'bottle',
+                score: p.score * (p.class === 'bottle' ? 1.0 : 0.92),
+                bbox: p.bbox
+              }));
+              if (cMapped.length > 0) {
+                const cFiltered = window.BottleDetection.select(cMapped, srcW, srcH, 0.09);
+                if (cFiltered.length > 0) candidates = cFiltered;
+              }
+            } catch (eCocoManual) {}
+          }
           if (candidates.length > 0) {
             const manualItems = candidates.map(c => {
               const meta = inspectMaterial(c.x, c.y, c.w, c.h, c.rawClass);
