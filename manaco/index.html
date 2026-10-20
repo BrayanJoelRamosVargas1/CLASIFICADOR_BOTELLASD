@@ -6,6 +6,7 @@
   <title>Caso Empresarial MANACO — Informe Gerencial (1 Hoja) + 2 Hojas de Rúbrica | Ing. Jesús Bautista</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg: #f1f5f9;
@@ -581,6 +582,7 @@
         <!-- Gráfico 1 -->
         <div class="chart-card">
           <h4>Gráfico 1: Importación vs Exportación (M USD)</h4>
+          <div style="position:relative; height:180px; margin-bottom:0.75rem;"><canvas id="chartFlujos"></canvas></div>
           <div class="bar-row">
             <span>Imp. 640399</span>
             <div class="bar-track"><div class="bar-fill" style="width:100%; background:#dc2626;"></div></div>
@@ -616,6 +618,7 @@
         <!-- Gráfico 2 -->
         <div class="chart-card">
           <h4>Gráfico 2: Top Socios (Valor USD vs Pares)</h4>
+          <div style="position:relative; height:180px; margin-bottom:0.75rem;"><canvas id="chartSocios"></canvas></div>
           <div class="bar-row">
             <span>Grecia (Imp)</span>
             <div class="bar-track"><div class="bar-fill" style="width:92%; background:#0284c7;"></div></div>
@@ -651,6 +654,7 @@
         <!-- Gráfico 3 -->
         <div class="chart-card">
           <h4>Gráfico 3: Valor Aprox. por Par (USD/Par)</h4>
+          <div style="position:relative; height:180px; margin-bottom:0.75rem;"><canvas id="chartPrecios"></canvas></div>
           <div class="bar-row">
             <span>640420 (Imp)</span>
             <div class="bar-track"><div class="bar-fill" style="width:100%; background:#7c3aed;"></div></div>
@@ -1024,7 +1028,11 @@
           <p>Fuente directa: <code>Bae de Datos MANACO - INTERMEDIO (1).xlsx</code> · Filtra en vivo por flujo, año, categoría SA6 o país socio</p>
         </div>
         <div class="sheet-meta">
-          <div id="excelCountBadge" style="font-weight:800; color:#0284c7; font-size:0.9rem;">Cargando 240 filas...</div>
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <button id="btnExportCsv" type="button" class="btn" style="background:#059669; color:#fff; font-size:0.8rem; padding:0.4rem 0.75rem; cursor:pointer;"><i class="bx bx-download"></i> Exportar CSV</button>
+            <button id="btnResetFilters" type="button" class="btn" style="background:#64748b; color:#fff; font-size:0.8rem; padding:0.4rem 0.75rem; cursor:pointer;"><i class="bx bx-reset"></i> Restablecer</button>
+            <div id="excelCountBadge" style="font-weight:800; color:#0284c7; font-size:0.85rem;">Cargando 240 filas...</div>
+          </div>
         </div>
       </div>
 
@@ -1069,15 +1077,15 @@
         <table style="margin:0;">
           <thead style="position:sticky; top:0; z-index:2;">
             <tr>
-              <th>Año</th>
-              <th>Flujo</th>
-              <th>SA6</th>
-              <th>Categoría</th>
-              <th>Socio Comercial</th>
-              <th class="num">Valor (Miles USD)</th>
-              <th class="num">Cantidad (Pares)</th>
-              <th class="num">Valor Total (USD)</th>
-              <th class="num">USD / Par</th>
+              <th style="cursor:pointer; user-select:none;" data-col="anio">Año <span class="sort-icon">↕</span></th>
+              <th style="cursor:pointer; user-select:none;" data-col="flujo">Flujo <span class="sort-icon">↕</span></th>
+              <th style="cursor:pointer; user-select:none;" data-col="sa6">SA6 <span class="sort-icon">↕</span></th>
+              <th style="cursor:pointer; user-select:none;" data-col="categoria">Categoría <span class="sort-icon">↕</span></th>
+              <th style="cursor:pointer; user-select:none;" data-col="socio">Socio Comercial <span class="sort-icon">↕</span></th>
+              <th class="num" style="cursor:pointer; user-select:none;" data-col="valorMilesUsd">Valor (Miles USD) <span class="sort-icon">↕</span></th>
+              <th class="num" style="cursor:pointer; user-select:none;" data-col="pares">Cantidad (Pares) <span class="sort-icon">↕</span></th>
+              <th class="num" style="cursor:pointer; user-select:none;" data-col="valorUsd">Valor Total (USD) <span class="sort-icon">↕</span></th>
+              <th class="num" style="cursor:pointer; user-select:none;" data-col="usdPorPar">USD / Par <span class="sort-icon">↕</span></th>
             </tr>
           </thead>
           <tbody id="excelTableBody"></tbody>
@@ -1104,12 +1112,20 @@
         const sa6 = fSa6.value;
         const socio = fSocio.value.trim().toLowerCase();
 
-        const filtered = rows.filter(r =>
+        let filtered = rows.filter(r =>
           (!flujo || r.flujo === flujo) &&
           (!anio || String(r.anio) === anio) &&
           (!sa6 || r.sa6 === sa6) &&
           (!socio || r.socio.toLowerCase().includes(socio))
         );
+
+        if (sortCol) {
+          filtered.sort((a, b) => {
+            let va = a[sortCol], vb = b[sortCol];
+            if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            return sortAsc ? (va - vb) : (vb - va);
+          });
+        }
 
         let sumUsd = 0, sumPares = 0;
         for (const r of filtered) {
@@ -1140,11 +1156,147 @@
         `).join('');
       }
 
+      let sortCol = "anio";
+      let sortAsc = true;
+
+      // Ordenamiento al pulsar columnas
+      document.querySelectorAll("#explorador-excel th[data-col]").forEach(th => {
+        th.addEventListener("click", () => {
+          const col = th.getAttribute("data-col");
+          if (sortCol === col) {
+            sortAsc = !sortAsc;
+          } else {
+            sortCol = col;
+            sortAsc = true;
+          }
+          document.querySelectorAll("#explorador-excel .sort-icon").forEach(si => si.textContent = "↕");
+          const icon = th.querySelector(".sort-icon");
+          if (icon) icon.textContent = sortAsc ? "▲" : "▼";
+          render();
+        });
+      });
+
+      // Botón restablecer filtros
+      const btnReset = document.getElementById("btnResetFilters");
+      if (btnReset) {
+        btnReset.addEventListener("click", () => {
+          fFlujo.value = "";
+          fAnio.value = "";
+          fSa6.value = "";
+          fSocio.value = "";
+          sortCol = "anio";
+          sortAsc = true;
+          document.querySelectorAll("#explorador-excel .sort-icon").forEach(si => si.textContent = "↕");
+          render();
+        });
+      }
+
+      // Botón exportar CSV con UTF-8 BOM
+      const btnExport = document.getElementById("btnExportCsv");
+      if (btnExport) {
+        btnExport.addEventListener("click", () => {
+          const flujo = fFlujo.value;
+          const anio = fAnio.value;
+          const sa6 = fSa6.value;
+          const socio = fSocio.value.trim().toLowerCase();
+          const filtered = rows.filter(r =>
+            (!flujo || r.flujo === flujo) &&
+            (!anio || String(r.anio) === anio) &&
+            (!sa6 || r.sa6 === sa6) &&
+            (!socio || r.socio.toLowerCase().includes(socio))
+          );
+          const headers = ["Año", "Flujo", "SA6", "Categoría", "Socio Comercial", "Valor Miles USD", "Cantidad Pares", "Valor Total USD", "USD por Par"];
+          const csvLines = [headers.join(",")];
+          filtered.forEach(r => {
+            csvLines.push([
+              r.anio,
+              `"${r.flujo}"`,
+              `"${r.sa6}"`,
+              `"${(r.categoria || "").replace(/"/g, '""')}"`,
+              `"${(r.socio || "").replace(/"/g, '""')}"`,
+              r.valorMilesUsd,
+              r.pares,
+              r.valorUsd,
+              r.usdPorPar
+            ].join(","));
+          });
+          const blob = new Blob(["\uFEFF" + csvLines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `Base_de_Datos_MANACO_Filtrada_${filtered.length}_filas.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      }
+
+      // Inicialización de Gráficos Chart.js interactivos
+      function initCharts() {
+        if (typeof Chart === "undefined") return;
+        const ctx1 = document.getElementById("chartFlujos");
+        if (ctx1) {
+          new Chart(ctx1, {
+            type: "bar",
+            data: {
+              labels: ["640399 (Cuero)", "640411 (Deportivo)", "640420 (Suela Cuero)"],
+              datasets: [
+                { label: "Importación (M USD)", data: [11710, 6447, 349], backgroundColor: "#dc2626", borderRadius: 4 },
+                { label: "Exportación (M USD)", data: [8514, 2174, 229], backgroundColor: "#10b981", borderRadius: 4 }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } } }
+            }
+          });
+        }
+        const ctx2 = document.getElementById("chartSocios");
+        if (ctx2) {
+          new Chart(ctx2, {
+            type: "doughnut",
+            data: {
+              labels: ["Indonesia (Exp)", "Grecia (Imp)", "P. Bajos (Imp)", "Vietnam (Ambos)", "Eslovenia (Exp)", "Otros"],
+              datasets: [{
+                data: [2286, 2110, 1754, 2304, 749, 11400],
+                backgroundColor: ["#059669", "#0284c7", "#0ea5e9", "#10b981", "#34d399", "#cbd5e1"]
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 9 } } } }
+            }
+          });
+        }
+        const ctx3 = document.getElementById("chartPrecios");
+        if (ctx3) {
+          new Chart(ctx3, {
+            type: "bar",
+            data: {
+              labels: ["640420 (Imp)", "640420 (Exp)", "640399 (Exp)", "640411 (Imp)", "640399 (Imp)"],
+              datasets: [{
+                label: "USD / Par",
+                data: [45.22, 41.42, 26.54, 21.03, 15.59],
+                backgroundColor: ["#7c3aed", "#8b5cf6", "#059669", "#ea580c", "#dc2626"],
+                borderRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, title: { display: true, text: "USD / Par", font: { size: 10 } } } }
+            }
+          });
+        }
+      }
+
       [fFlujo, fAnio, fSa6, fSocio].forEach(el => el && el.addEventListener('input', render));
 
       fetch('./datos_manaco_240.json')
         .then(res => res.json())
-        .then(data => { rows = data; render(); })
+        .then(data => { rows = data; render(); initCharts(); })
         .catch(() => { countBadge.textContent = '240 registros integrados en resumen ejecutivo'; });
     })();
   </script>

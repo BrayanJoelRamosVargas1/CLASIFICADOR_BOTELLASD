@@ -280,7 +280,9 @@
         this.auxCanvas.height = height;
         ctx.fillStyle = '#727272';
         ctx.fillRect(0, 0, width, height);
+        if ('filter' in ctx) ctx.filter = 'contrast(1.08) saturate(1.05)';
         ctx.drawImage(source, 0, 0, width, height, padX, padY, scaledW, scaledH);
+        if ('filter' in ctx) ctx.filter = 'none';
         const preds = await this.detectOnce(this.auxCanvas, maxBoxes, minScore);
         return preds.map(p => {
           const x1 = Math.max(0, Math.min(width, (p.bbox[0] - padX) / scale));

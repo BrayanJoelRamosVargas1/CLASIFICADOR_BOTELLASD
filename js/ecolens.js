@@ -170,6 +170,16 @@
   let audioCtx = null;
   let lastSpokenText = '';
   let isTorchOn = false;
+  let frameCounter = 0;
+  let nativeBarcodeDetector = null;
+  let lastScannedBarcode = '';
+  if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+    try {
+      nativeBarcodeDetector = new window.BarcodeDetector({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code']
+      });
+    } catch (e) {}
+  }
   
   // Tracking Multi-Objeto 1-a-1 Ultrarrápido
   let trackers = [];
@@ -253,7 +263,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=42.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=43.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -746,6 +756,19 @@
 
     isDetecting = true;
     const generation = sourceGeneration;
+    frameCounter++;
+    if (nativeBarcodeDetector && activeSource && (frameCounter % 15 === 0) && isLoopActive) {
+      nativeBarcodeDetector.detect(activeSource).then(barcodes => {
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          const bc = barcodes[0].rawValue;
+          if (bc !== lastScannedBarcode) {
+            lastScannedBarcode = bc;
+            if (dom.offBarcodeInput) dom.offBarcodeInput.value = bc;
+            searchOpenFoodFacts(bc);
+          }
+        }
+      }).catch(() => {});
+    }
 
     activeInferencePromise = (async () => {
       try {
