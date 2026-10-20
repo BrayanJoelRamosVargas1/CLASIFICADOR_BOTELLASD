@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Caso Empresarial MANACO — Informe Gerencial (1 Hoja) + 2 Hojas de Rúbrica | Ing. Jesús Bautista</title>
+  <title>Caso Empresarial MANACO — Presentación y Guion de Defensa | Ing. Jesús Bautista</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -312,8 +312,7 @@
         page-break-inside: avoid;
         break-inside: avoid;
       }
-      .print-sheet:last-child,
-      #hoja-evaluacion-docente {
+      #hoja-ejecutiva {
         page-break-after: avoid !important;
         break-after: avoid !important;
       }
@@ -377,6 +376,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="defensa.css?v=1">
 </head>
 <body>
 
@@ -387,7 +387,7 @@
         <i class="bx bx-arrow-back"></i> Volver al Detector de Botellas
       </a>
       <div>
-        <strong style="font-size:0.9rem;">Caso Empresarial MANACO — Entrega Ejecutiva + 2 Hojas de Rúbrica</strong>
+        <strong style="font-size:0.9rem;">Caso Empresarial MANACO — Presentación, Guion e Informe Ejecutivo</strong>
         <span style="display:block; font-size:0.74rem; color:#94a3b8;">Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios · 6º Semestre · Ing. Jesús Bautista</span>
       </div>
     </div>
@@ -399,7 +399,7 @@
         <i class="bx bx-spreadsheet"></i> Descargar Excel (.xlsx)
       </a>
       <button type="button" class="btn btn-primary" onclick="window.print()">
-        <i class="bx bx-printer"></i> Imprimir las 3 Hojas (1 Ejecutiva + 2 Rúbricas)
+        <i class="bx bx-printer"></i> Imprimir informe ejecutivo
       </button>
     </div>
   </div>
@@ -407,38 +407,16 @@
   <div class="container">
 
     <!-- GUÍA RÁPIDA PARA LA DEFENSA DE 5 MINUTOS (No se imprime en papel) -->
-    <div class="pitch-box no-print">
-      <h2><i class="bx bx-microphone"></i> Guion Ejecutivo de 5 Minutos ("Vender la Propuesta como Gerentes" en el Sorteo)</h2>
-      <p style="margin:0; font-size:0.8rem; color:#cbd5e1;">
-        Si tu grupo sale sorteado, defiende la Hoja 1 con este esquema de 5 minutos exactos:
-      </p>
-      <div class="pitch-grid">
-        <div class="pitch-step">
-          <strong>Minuto 1 · El Problema Real</strong>
-          "Somos la consultoría de Ciencia de Datos de Manaco. Auditamos 240 registros de comercio exterior (2020–2024): las importaciones ($18.5 mil M USD / 751M pares) casi duplican a las exportaciones ($10.9 mil M USD), presionando nuestros márgenes en calzado masivo."
-        </div>
-        <div class="pitch-step">
-          <strong>Minuto 2 · Hallazgo Clave de Datos</strong>
-          "Descubrimos que medir por Valor o por Cantidad cambia la estrategia: Grecia lidera en USD ($2,109M), pero Países Bajos mete más volumen físico (85.5M pares a $20.52/par). Además, el calzado 100% cuero (SA6 640420) vale casi el doble ($45.22/par vs $23.54/par)."
-        </div>
-        <div class="pitch-step">
-          <strong>Minuto 3 · La Solución Analítica</strong>
-          "Proponemos implementar el motor predictivo Manaco BI &amp; Demand Engine: integrar datos externos con ventas, inventario y tallas por tienda para pronosticar demanda regional (MAPE &lt; 12%) y reducir quiebres y sobrestock en 25%."
-        </div>
-        <div class="pitch-step">
-          <strong>Minuto 4 · Decisión Financiera</strong>
-          "Descartamos competir por precio bajo contra importaciones asiáticas/europeas de $20/par. Recomendamos la Alternativa A: defender producción propia en Cuero Premium (640420) e industrial/deportivo diferenciado, con abastecimiento ágil por pronóstico."
-        </div>
-        <div class="pitch-step">
-          <strong>Minuto 5 · Cierre y Retorno (ROI)</strong>
-          "Con una inversión escalonada y 3 KPIs trimestrales (Margen Bruto por Par, Rotación de Inventario y Tasa de Devolución &lt; 2.5%), blindamos la rentabilidad de Manaco para los próximos 3 años."
-        </div>
-      </div>
-    </div>
+<section class="defense no-print" id="defensa" aria-label="Presentación del caso MANACO" tabindex="0">
+<header class="defense-head"><h2>MANACO · Defensa individual</h2><div class="defense-links"><a href="#guion-defensa">Leer guion completo</a><a href="presentaciones/Defensa_MANACO_4_puntos.pptx" download>Descargar diapositivas</a><button type="button" data-fullscreen>Pantalla completa</button></div></header>
+<nav class="defense-tabs" aria-label="Diapositivas"><button type="button" data-slide="0" aria-controls="defense-slide-1">1. Contexto</button><button type="button" data-slide="1" aria-controls="defense-slide-2">2. Diagnóstico</button><button type="button" data-slide="2" aria-controls="defense-slide-3">3. Solución BI</button><button type="button" data-slide="3" aria-controls="defense-slide-4">4. Conclusión</button></nav>
+<article class="defense-slide" id="defense-slide-1" aria-labelledby="slide-title-1"><h3 id="slide-title-1">1. Introducción y contexto</h3><p class="defense-lead">Mejores decisiones sobre ventas e inventario</p><p>Evitar faltantes, sobrestock y costos innecesarios.</p><p class="method-note"><strong>Alcance de los datos:</strong> la base corresponde a España. Es una referencia para el análisis, no un diagnóstico directo de Bolivia ni de MANACO.</p></article>
+<article class="defense-slide" id="defense-slide-2" aria-labelledby="slide-title-2"><h3 id="slide-title-2">2. Diagnóstico de los datos</h3><p>240 registros de España, 2020–2024.</p><div class="defense-chart-grid"><figure><figcaption>Flujo comercial (miles de millones USD)</figcaption><div class="defense-bar"><div class="defense-bar-label"><span>Importación</span><strong>18,51</strong></div><div class="defense-bar-track" aria-hidden="true"><div class="defense-bar-fill " style="width:92.53%"></div></div></div><div class="defense-bar"><div class="defense-bar-label"><span>Exportación</span><strong>10,92</strong></div><div class="defense-bar-track" aria-hidden="true"><div class="defense-bar-fill export" style="width:54.587%"></div></div></div></figure><figure><figcaption>Valor ponderado por par (USD)</figcaption><div class="defense-bar"><div class="defense-bar-label"><span>Importación</span><strong>24,64</strong></div><div class="defense-bar-track" aria-hidden="true"><div class="defense-bar-fill " style="width:82.13%"></div></div></div><div class="defense-bar"><div class="defense-bar-label"><span>Exportación</span><strong>26,58</strong></div><div class="defense-bar-track" aria-hidden="true"><div class="defense-bar-fill export" style="width:88.593%"></div></div></div></figure></div><div class="defense-highlights"><div><strong>USD 7.590 millones</strong>Importaciones por encima de exportaciones</div><div><strong>USD 45,22 por par</strong>Categoría de mayor valor unitario*</div></div><p class="source-note">Fuente: base entregada, 240 registros. Valor/par = USD totales / pares totales. * Cuero según el diccionario del archivo. Validar la descripción arancelaria de SA6 640420.</p></article>
+<article class="defense-slide" id="defense-slide-3" aria-labelledby="slide-title-3"><h3 id="slide-title-3">3. Propuesta estratégica: tablero de BI</h3><p><strong>Ventas · Inventario · Transporte · Devoluciones</strong></p><p>Alertas cuando un modelo se vende bien y quedan pocas unidades.</p><table><caption>Metas propuestas</caption><thead><tr><th scope="col">Plazo</th><th scope="col">Objetivo</th><th scope="col">Meta</th></tr></thead><tbody><tr><td>Año 1</td><td>Menos productos agotados</td><td>−15%</td></tr><tr><td>Año 2</td><td>Menor costo de transporte por par</td><td>−10%</td></tr><tr><td>Año 3</td><td>Error de pronóstico (WAPE)</td><td>&lt; 20%</td></tr></tbody></table><p class="source-note">Las reducciones se comparan con una línea base interna que se establecerá al iniciar el proyecto.</p></article>
+<article class="defense-slide" id="defense-slide-4" aria-labelledby="slide-title-4"><h3 id="slide-title-4">4. Decisión financiera y conclusión</h3><p><strong>Recomendación: comenzar con la Alternativa A.</strong></p><table><thead><tr><th scope="col">Alternativa</th><th scope="col">Propuesta</th><th scope="col">Prioridad</th></tr></thead><tbody><tr><td>A</td><td>Tablero BI y pronóstico de demanda</td><td>Primero</td></tr><tr><td>B</td><td>Campañas de marketing digital</td><td>Después</td></tr></tbody></table><p class="defense-lead">Más clientes requieren tallas y modelos disponibles.</p><p class="source-note">La inversión y el retorno requieren validar los costos internos.</p></article>
+<div class="defense-controls"><button type="button" data-previous>Anterior</button><span data-slide-status role="status" aria-live="polite"></span><button type="button" data-next>Siguiente</button></div></section>
+<section class="defense-script no-print" id="guion-defensa" aria-labelledby="script-title"><h2 id="script-title">Guion completo para exponer</h2><p>Abre cada punto para leer el texto de apoyo.</p><details><summary>1. Introducción y contexto</summary><p>Buenas tardes, estimado docente.</p><p>Hoy voy a presentar mi propuesta para mejorar la toma de decisiones en la empresa MANACO mediante el uso de datos.</p><p>El principal problema que queremos resolver es que la empresa necesita conocer mejor sus ventas, sus productos, sus inventarios y sus costos para poder competir y evitar pérdidas.</p><p>Antes de empezar, quiero aclarar algo importante: el archivo de datos que utilizamos contiene información de España, no de Bolivia ni directamente de MANACO. Por eso, no podemos afirmar que esos números representen la situación real de la empresa. Los utilizamos como ejemplo para mostrar cómo se pueden analizar datos y tomar mejores decisiones.</p></details><details><summary>2. Diagnóstico de los datos (2 minutos)</summary><p>Al analizar los 240 registros correspondientes al periodo de 2020 a 2024, encontré tres resultados importantes.</p><p>Primero, en los datos analizados, las importaciones superan a las exportaciones por aproximadamente 7.590 millones de dólares. Esto significa que el valor de los productos que ingresan es mayor que el valor de los productos que salen.</p><p>Segundo, observé que el valor promedio ponderado por par importado es de 24,64 dólares, mientras que el exportado es de 26,58 dólares. Esto nos muestra que no solamente debemos analizar cuántos productos se comercializan, sino también cuánto vale cada par de zapatos.</p><p>Tercero, encontré diferencias de valor entre las categorías de calzado. Por ejemplo, la categoría de suela y parte superior de cuero alcanza un valor de 45,22 dólares por par.</p><p>¿Qué significa esto para MANACO? Que la empresa no debería tomar decisiones solamente por la cantidad de zapatos que vende. También debe analizar qué productos tienen mayor valor y cuáles pueden ofrecer mejores oportunidades de negocio.</p></details><details><summary>3. Propuesta estratégica: tablero de BI</summary><p>Para solucionar estos problemas, propongo crear un tablero de inteligencia de negocios, también conocido como BI.</p><p>¿Para qué serviría? Para reunir en un solo lugar información sobre las ventas, los productos disponibles, los costos de transporte y las devoluciones.</p><p>Por ejemplo, si un modelo de zapato se vende mucho, pero quedan pocas unidades en el almacén, el sistema podría ayudarnos a detectar ese problema antes de que se agote el producto.</p><p>También proponemos tres objetivos.</p><p>En el primer año, reducir en un 15% los productos que se agotan cuando los clientes los necesitan.</p><p>En el segundo año, reducir en un 10% el costo de transporte por cada par entregado.</p><p>En el tercer año, mejorar las predicciones de ventas para que el error del pronóstico sea menor al 20%.</p><p>De esta manera, MANACO podría organizar mejor sus productos, reducir costos y tomar decisiones basadas en información.</p></details><details><summary>4. Decisión financiera y conclusión</summary><p>Finalmente, analizamos dos alternativas para mejorar la empresa.</p><p>La primera alternativa es implementar un tablero de inteligencia de negocios y un sistema para pronosticar la demanda.</p><p>La segunda alternativa es realizar campañas de marketing digital para atraer más clientes.</p><p>Mi recomendación es comenzar con la Alternativa A.</p><p>¿Por qué? Porque antes de intentar vender más, necesitamos saber qué productos tenemos disponibles y cuáles debemos producir o reponer.</p><p>Por ejemplo, si hacemos una publicidad que atrae a muchos clientes, pero no tenemos las tallas o los modelos que buscan, perderemos ventas y los clientes podrían quedar insatisfechos.</p><p>Por eso, considero que primero debemos mejorar el control de los inventarios y la planificación. Después, cuando la empresa esté mejor organizada, podremos invertir en campañas de marketing con mejores resultados.</p><p>En conclusión, recomiendo utilizar los datos para mejorar las decisiones de MANACO, reducir costos y prepararnos para competir mejor en el mercado.</p><p>Muchas gracias. Quedo atenta a sus preguntas.</p></details></section>
 
-    <!-- ===================================================================== -->
-    <!-- HOJA 1: ONE-PAGER GERENCIAL EJECUTIVO (Estaciones 1, 2, 3 y 4)         -->
-    <!-- ===================================================================== -->
     <section class="print-sheet" id="hoja-ejecutiva">
       <div class="sheet-header">
         <div>
@@ -701,11 +679,7 @@
               </tr>
               <tr>
                 <th>3 Objetivos SMART y KPIs (2026–2029)</th>
-                <td>
-                  <strong>1. Exactitud de Pronóstico:</strong> Reducir el error de pronóstico (<code>KPI: MAPE</code>) al <strong>&lt; 12%</strong> en las 30 tiendas principales en 12 meses.<br>
-                  <strong>2. Eficiencia de Inventario:</strong> Disminuir el sobrestock y quiebres de talla en <strong>-25%</strong> (<code>KPI: Días de Inventario DIO y Fill Rate &gt; 95%</code>) al año 2.<br>
-                  <strong>3. Mix de Mayor Valor:</strong> Elevar la cuota de líneas diferenciadas de cuero (<code>640420</code>/<code>640399</code> premium) en <strong>+4.5 puntos porcentuales</strong> de margen bruto al año 3 (<code>KPI: Margen Bruto por Par USD</code>).
-                </td>
+                <td><strong>Año 1:</strong> Reducir un 15% los quiebres de stock.<br><strong>Año 2:</strong> Reducir un 10% el costo logístico por par entregado.<br><strong>Año 3:</strong> Lograr un error de pronóstico WAPE menor al 20%.<br><em>Metas propuestas respecto a la línea base interna.</em></td>
               </tr>
               <tr>
                 <th>Áreas y Responsables</th>
@@ -725,300 +699,18 @@
         <!-- Estación 4 -->
         <div>
           <div class="section-tag"><i class="bx bx-line-chart"></i> 4.4. Estación 4 — Análisis Financiero, Alternativas y Decisión</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Criterio</th>
-                <th>Alternativa A (Recomendada): Diferenciación en Cuero + Reposición Predictiva BI</th>
-                <th>Alternativa B: Competir por Precio Bajo en Deportivo Masivo (<code>640411</code>)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Beneficio Esperado</strong></td>
-                <td>Captura segmentos de <strong>$35–$45+/par</strong>, libera capital de trabajo (-25% stock inmóvil) y protege margen.</td>
-                <td>Mayor volumen a corto plazo, pero guerra de precios contra importaciones de $20–$23/par.</td>
-              </tr>
-              <tr>
-                <td><strong>Costo / Riesgo</strong></td>
-                <td>Inversión moderada en BI/datos y control de calidad de cuero. Riesgo bajo y escalable.</td>
-                <td>Alta inversión en capital de trabajo y alto riesgo de erosión del margen operativo.</td>
-              </tr>
-              <tr>
-                <td><strong>Acción Comercial y Segmento</strong></td>
-                <td colspan="2"><strong>Segmento elegido:</strong> Consumidor urbano/profesional y corporativo (25–50 años, eje troncal La Paz–SCZ–CBBA). <strong>Acción:</strong> Lanzar colección de cuero confort/ejecutivo con disponibilidad garantizada de tallas por canal digital + retiro en tienda (Click &amp; Collect).</td>
-              </tr>
-              <tr>
-                <td><strong>3 KPIs de Seguimiento</strong></td>
-                <td colspan="2">
-                  <strong>1) Margen de Contribución por Par ($USD/par)</strong> ·
-                  <strong>2) Índice de Rotación de Inventario y Quiebre de Tallas (%)</strong> ·
-                  <strong>3) Tasa de Defectos y Devoluciones (&lt; 2.0%)</strong>.<br>
-                  <em>Datos internos faltantes a solicitar:</em> Costo estándar por SKU en fábrica, tasa histórica de devoluciones por defecto y costo logístico por tramo regional.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+<table><thead><tr><th>Criterio</th><th>Alternativa A: Tablero BI y pronóstico</th><th>Alternativa B: Marketing digital</th></tr></thead><tbody><tr><th>Objetivo</th><td>Mejorar inventario, reposición y planificación.</td><td>Atraer clientes y aumentar la conversión.</td></tr><tr><th>Prioridad</th><td>Primera fase recomendada.</td><td>Después de estabilizar la operación.</td></tr><tr><th>Justificación</th><td colspan="2">Más clientes sin tallas ni modelos disponibles pueden generar ventas perdidas e insatisfacción. Primero se propone mejorar la disponibilidad y después acelerar la captación.</td></tr><tr><th>Decisión financiera</th><td colspan="2">Validar costos de inversión, operación y beneficios del piloto con datos internos antes de calcular el retorno.</td></tr></tbody></table>
         </div>
       </div>
     </section>
 
     <!-- ===================================================================== -->
-    <!-- HOJA 2 (PENÚLTIMA HOJA): RÚBRICA DE AUTOEVALUACIÓN DE ESTUDIANTES      -->
     <!-- ===================================================================== -->
-    <section class="print-sheet" id="hoja-autoevaluacion">
-      <div class="sheet-header">
-        <div>
-          <h1>RÚBRICA DE AUTOEVALUACIÓN POR GRUPO DE LOS ESTUDIANTES</h1>
-          <p>Caso de Estudio Empresarial: MANACO · Carrera: Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios (6º Semestre)</p>
-        </div>
-        <div class="sheet-meta">
-          <div><strong>Penúltima Hoja</strong></div>
-          <div>Autocalificación Grupal</div>
-        </div>
-      </div>
 
-      <div class="editable-hint no-print">
-        <i class="bx bx-edit"></i> Puedes hacer clic sobre cualquier celda de la tabla para editar o agregar los nombres completos de tus compañeros antes de imprimir.
-      </div>
-
-      <p style="font-size:0.82rem; margin:0.3rem 0 0.75rem;">
-        <strong>Calificarse con la siguiente escala:</strong> &nbsp;
-        <code>0</code> (No se presentó) &nbsp;·&nbsp;
-        <code>25</code> (Muy poco desarrollado) &nbsp;·&nbsp;
-        <code>50</code> (Poco desarrollado) &nbsp;·&nbsp;
-        <code>75</code> (Aceptable) &nbsp;·&nbsp;
-        <code>100</code> (Óptimo)
-      </p>
-
-      <table class="rubric-table" style="margin-bottom:1.4rem;">
-        <thead>
-          <tr>
-            <th style="width:45px; text-align:center;">Nº</th>
-            <th style="width:34%;">NOMBRE COMPLETO</th>
-            <th style="text-align:center;">Fase 1 – Comprensión del caso</th>
-            <th style="text-align:center;">Fase 2 – Diagnóstico empresarial</th>
-            <th style="text-align:center;">Fase 3 – Propuesta estratégica</th>
-            <th style="text-align:center;">Fase 4 – Análisis financiero y marketing</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="text-align:center;"><strong>1</strong></td>
-            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;">100</td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>2</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>3</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>4</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>5</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-            <td contenteditable="true" style="text-align:center; font-weight:700;"></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 style="font-size:0.92rem; margin:0 0 0.5rem;">Indicar sus fortalezas y debilidades en este proceso</h3>
-      <table class="rubric-table">
-        <thead>
-          <tr>
-            <th style="width:45px; text-align:center;">Nº</th>
-            <th style="width:30%;">NOMBRE COMPLETO</th>
-            <th style="width:35%;">Fortalezas</th>
-            <th>Debilidades</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="text-align:center;"><strong>1</strong></td>
-            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
-            <td contenteditable="true">Dominio en procesamiento de datos, automatización de indicadores y diseño de propuestas analíticas orientadas a decisiones gerenciales.</td>
-            <td contenteditable="true">Sintetizar gran volumen de hallazgos estadísticos dentro del límite estricto de 5 minutos de exposición ejecutiva.</td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>2</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>3</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>4</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>5</strong></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-            <td contenteditable="true"></td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
 
     <!-- ===================================================================== -->
-    <!-- HOJA 3 (ÚLTIMA HOJA): RÚBRICA DE EVALUACIÓN POR GRUPO DEL DOCENTE      -->
     <!-- ===================================================================== -->
-    <section class="print-sheet" id="hoja-evaluacion-docente">
-      <div class="sheet-header">
-        <div>
-          <h1>RÚBRICA DE EVALUACIÓN POR GRUPO DEL DOCENTE</h1>
-          <p>Caso de Estudio Empresarial: MANACO · Carrera: Ingeniería de Sistemas, Ciencia de Datos e Inteligencia de Negocios (6º Semestre)</p>
-        </div>
-        <div class="sheet-meta">
-          <div><strong>Última Hoja</strong></div>
-          <div>Evaluación del Docente</div>
-        </div>
-      </div>
 
-      <p style="font-size:0.82rem; margin:0.3rem 0 0.75rem;">
-        <strong>Calificarse con la siguiente escala:</strong> &nbsp;
-        <code>0</code> (No se presentó) &nbsp;·&nbsp;
-        <code>25</code> (Muy poco desarrollado) &nbsp;·&nbsp;
-        <code>50</code> (Poco desarrollado) &nbsp;·&nbsp;
-        <code>75</code> (Aceptable) &nbsp;·&nbsp;
-        <code>100</code> (Óptimo)
-      </p>
-
-      <table class="rubric-table" style="margin-bottom:1.4rem;">
-        <thead>
-          <tr>
-            <th style="width:45px; text-align:center;">Nº</th>
-            <th style="width:34%;">NOMBRE COMPLETO</th>
-            <th style="text-align:center;">Fase 1 – Comprensión del caso</th>
-            <th style="text-align:center;">Fase 2 – Diagnóstico empresarial</th>
-            <th style="text-align:center;">Fase 3 – Propuesta estratégica</th>
-            <th style="text-align:center;">Fase 4 – Análisis financiero y marketing</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="text-align:center;"><strong>1</strong></td>
-            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
-            <td style="height:34px;"></td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>2</strong></td>
-            <td contenteditable="true" style="height:34px;"></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>3</strong></td>
-            <td contenteditable="true" style="height:34px;"></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>4</strong></td>
-            <td contenteditable="true" style="height:34px;"></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>5</strong></td>
-            <td contenteditable="true" style="height:34px;"></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 style="font-size:0.92rem; margin:0 0 0.5rem;">Indicar las fortalezas y debilidades del estudiante en este proceso</h3>
-      <table class="rubric-table" style="margin-bottom:2rem;">
-        <thead>
-          <tr>
-            <th style="width:45px; text-align:center;">Nº</th>
-            <th style="width:30%;">NOMBRE COMPLETO</th>
-            <th style="width:35%;">Fortalezas</th>
-            <th>Debilidades</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="text-align:center;"><strong>1</strong></td>
-            <td contenteditable="true"><strong>Brayan Joel Ramos Vargas</strong></td>
-            <td style="height:42px;"></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>2</strong></td>
-            <td contenteditable="true" style="height:42px;"></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>3</strong></td>
-            <td contenteditable="true" style="height:42px;"></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>4</strong></td>
-            <td contenteditable="true" style="height:42px;"></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><strong>5</strong></td>
-            <td contenteditable="true" style="height:42px;"></td>
-            <td></td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style="margin-top:2.2rem; font-size:0.9rem; display:flex; justify-content:space-between; align-items:center;">
-        <div><strong>Nombre del docente:</strong> Ing. Jesús Bautista ....................................................................................</div>
-        <div><strong>Firma / Sello:</strong> ......................................................</div>
-      </div>
-    </section>
 
     <!-- EXPLORADOR INTERACTIVO DE LOS 240 REGISTROS DEL EXCEL DEL INGENIERO (Solo en pantalla, no se imprime) -->
     <section class="print-sheet no-print" id="explorador-excel" style="border:2px solid #0284c7;">
@@ -1233,6 +925,12 @@
       // Inicialización de Gráficos Chart.js interactivos
       function initCharts() {
         if (typeof Chart === "undefined") return;
+        const sum = (items, key) => items.reduce((total, row) => total + row[key], 0);
+        const grouped = (flow, code) => rows.filter(row => row.flujo === flow && row.sa6 === code);
+        const prices = (flow, code) => {
+          const items = grouped(flow, code);
+          return Number((sum(items, 'valorUsd') / sum(items, 'pares')).toFixed(2));
+        };
         const ctx1 = document.getElementById("chartFlujos");
         if (ctx1) {
           new Chart(ctx1, {
@@ -1240,8 +938,8 @@
             data: {
               labels: ["640399 (Cuero)", "640411 (Deportivo)", "640420 (Suela Cuero)"],
               datasets: [
-                { label: "Importación (M USD)", data: [11710, 6447, 349], backgroundColor: "#dc2626", borderRadius: 4 },
-                { label: "Exportación (M USD)", data: [8514, 2174, 229], backgroundColor: "#10b981", borderRadius: 4 }
+                { label: "Importación (M USD)", data: ['640399', '640411', '640420'].map(code => sum(grouped('Importación', code), 'valorUsd') / 1e6), backgroundColor: "#dc2626", borderRadius: 4 },
+                { label: "Exportación (M USD)", data: ['640399', '640411', '640420'].map(code => sum(grouped('Exportación', code), 'valorUsd') / 1e6), backgroundColor: "#10b981", borderRadius: 4 }
               ]
             },
             options: {
@@ -1277,7 +975,7 @@
               labels: ["640420 (Imp)", "640420 (Exp)", "640399 (Exp)", "640411 (Imp)", "640399 (Imp)"],
               datasets: [{
                 label: "USD / Par",
-                data: [45.22, 41.42, 26.54, 21.03, 15.59],
+                data: [prices('Importación', '640420'), prices('Exportación', '640420'), prices('Exportación', '640399'), prices('Importación', '640411'), prices('Importación', '640399')],
                 backgroundColor: ["#7c3aed", "#8b5cf6", "#059669", "#ea580c", "#dc2626"],
                 borderRadius: 4
               }]
@@ -1301,5 +999,6 @@
     })();
   </script>
 
+  <script src="defensa.js?v=1"></script>
 </body>
 </html>

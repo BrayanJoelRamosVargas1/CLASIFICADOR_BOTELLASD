@@ -1,0 +1,51 @@
+.defense { --wine: #7d263d; background: #faf8f2; border: 1px solid #e5ded1; border-radius: 16px; overflow: hidden; color: #262626; }
+.defense-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid #e5ded1; }
+.defense-head h2 { margin: 0; font-size: 1.25rem; color: var(--wine); }
+.defense-links { display: flex; gap: 1rem; flex-wrap: wrap; }
+.defense a, .defense button { color: var(--wine); }
+.defense button { font: inherit; cursor: pointer; background: transparent; border: 1px solid #c6b7ad; border-radius: 6px; padding: .5rem .8rem; }
+.defense a { font-weight: 700; }
+.defense button:hover, .defense button[aria-current="step"] { background: var(--wine); color: #fff; }
+.defense :focus-visible { outline: 3px solid #0284c7; outline-offset: 3px; }
+.defense-tabs { display: flex; gap: .5rem; padding: 1rem 1.6rem 0; flex-wrap: wrap; }
+.defense-slide { min-height: 490px; padding: 2rem 2.5rem; }
+.defense-slide[hidden] { display: none; }
+.defense-slide h3 { font-size: clamp(1.55rem, 3vw, 2.5rem); color: var(--wine); margin: 0 0 1.3rem; line-height: 1.2; }
+.defense-slide p { font-size: 1.15rem; line-height: 1.6; }
+.defense .defense-lead { font-size: clamp(1.8rem, 4vw, 3.1rem); font-weight: 800; max-width: 850px; line-height: 1.2; margin: 2rem 0; }
+.defense .method-note { border-left: 4px solid var(--wine); padding-left: 1rem; margin-top: 2rem; color: #57534e; font-size: 1rem; }
+.defense-chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; margin: 1.8rem 0; }
+.defense figure { margin: 0; }
+.defense figcaption { font-size: 1.03rem; font-weight: 700; margin-bottom: 1rem; }
+.defense-bar { margin: 1rem 0; }
+.defense-bar-label { display: flex; justify-content: space-between; gap: 1rem; font-size: .95rem; margin-bottom: .4rem; }
+.defense-bar-track { background: #e9e3d9; height: 24px; }
+.defense-bar-fill { height: 100%; background: var(--wine); }
+.defense-bar-fill.export { background: #247873; }
+.defense-highlights { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: space-between; }
+.defense-highlights strong { display: block; font-size: 1.65rem; color: var(--wine); }
+.defense .source-note { font-size: .78rem; color: #666; }
+.defense table { width: 100%; margin: 1.6rem 0; font-size: 1rem; table-layout: auto; }
+.defense th { background: var(--wine); color: #fff; }
+.defense td, .defense th { padding: .9rem; border: 1px solid #ddd5c8; overflow-wrap: anywhere; }
+.defense tr:nth-child(even) td { background: #f0ece3; }
+.defense-controls { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.6rem; border-top: 1px solid #e5ded1; gap: 1rem; }
+.defense-controls button:disabled { opacity: .4; cursor: default; background: transparent; color: var(--wine); }
+.defense:fullscreen { overflow-y: auto; border-radius: 0; max-width: none; }
+.defense:fullscreen .defense-slide { min-height: calc(100vh - 230px); }
+.defense-script { background: white; padding: 1.5rem 2rem; border-radius: 12px; }
+.defense-script h2 { margin-top: 0; font-size: 1.3rem; }
+.defense-script details { border-top: 1px solid #e2e8f0; padding: 1rem 0; }
+.defense-script summary { cursor: pointer; font-weight: 700; color: #7d263d; }
+.defense-script p { max-width: 850px; line-height: 1.8; }
+@media(max-width: 650px) {
+ .toolbar { position: static; }
+ .defense-slide { padding: 1.5rem 1rem; min-height: 540px; }
+ .defense-head, .defense-tabs, .defense-controls { padding-left: 1rem; padding-right: 1rem; }
+ .defense-chart-grid { grid-template-columns: 1fr; gap: 1.4rem; }
+ .defense table { font-size: .85rem; }
+ .defense td, .defense th { padding: .65rem .4rem; }
+ .defense td:first-child, .defense th:first-child { width: 27%; white-space: nowrap; }
+ .defense td:last-child, .defense th:last-child { width: 23%; white-space: nowrap; }
+ .defense-script { padding: 1.2rem; }
+}
