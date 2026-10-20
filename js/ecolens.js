@@ -158,6 +158,7 @@
   let detector = null;
   let cocoFallbackModel = null;
   let stream = null;
+  let isCameraStarting = false;
   let activeSource = null;
   let facingMode = 'environment';
   let activeThreshold = CONFIG.DEFAULT_THRESHOLD;
@@ -252,7 +253,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=40.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=41.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -1183,7 +1184,7 @@
   // 10. Control de Linterna LED Física de la Cámara Trasera
   async function toggleTorch() {
     if (!stream) {
-      alert('Inicia la cámara primero para encender la linterna LED.');
+      dom.statusText.textContent = 'Inicia la cámara primero para encender la linterna LED.';
       return;
     }
 
@@ -1192,17 +1193,14 @@
 
     try {
       const nextState = !isTorchOn;
-
-      await track.applyConstraints({
-        advanced: [{ torch: nextState }]
-      });
-
+      await track.applyConstraints({ advanced: [{ torch: nextState }] });
       isTorchOn = nextState;
       updateTorchUI();
       playSound('click');
+      dom.statusText.textContent = isTorchOn ? '● Linterna LED encendida.' : '● Linterna LED apagada.';
     } catch (err) {
       console.warn('EcoLens: Linterna LED no disponible en este sensor/navegador:', err);
-      alert('La linterna LED solo está disponible en la cámara trasera en dispositivos móviles (Android/Brave). Asegúrate de tener la cámara trasera activa.');
+      dom.statusText.textContent = 'Linterna LED no admitida por esta cámara (solo trasera en móviles compatibles).';
       isTorchOn = false;
       updateTorchUI();
     }
@@ -1218,18 +1216,20 @@
   }
 
   async function startCamera() {
+    if (isCameraStarting) return;
     stopActiveSource();
-    dom.statusText.textContent = 'Conectando sensor óptico...';
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      dom.statusText.textContent = 'Cámara en vivo requiere HTTPS o localhost. Abriendo captura HD con cámara del móvil...';
-      if (dom.nativeCameraInput) {
-        dom.nativeCameraInput.click();
-      }
-      return;
-    }
-
+    isCameraStarting = true;
     try {
+      const myGeneration = sourceGeneration;
+      dom.statusText.textContent = 'Conectando sensor óptico...';
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        dom.statusText.textContent = 'Cámara en vivo requiere HTTPS o localhost. Abriendo captura HD con cámara del móvil...';
+        if (dom.nativeCameraInput) {
+          dom.nativeCameraInput.click();
+        }
+        return;
+      }
       // Solicitar resolución 640x480 nativa: óptima para YOLO (640x640) y 60 FPS fluidos en cualquier smartphone
       let mediaStream = null;
       try {
@@ -1254,7 +1254,20 @@
         }
       }
 
+      if (myGeneration !== sourceGeneration) {
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       stream = mediaStream;
+      const vTrack = stream.getVideoTracks()[0];
+      if (vTrack) {
+        vTrack.addEventListener('ended', () => {
+          console.warn('EcoLens: Video track finalizado por el dispositivo.');
+          stopActiveSource();
+          dom.statusText.textContent = 'Cámara desconectada o suspendida por el dispositivo.';
+        });
+      }
       dom.video.muted = true;
       dom.video.playsInline = true;
       dom.video.setAttribute('playsinline', '');
@@ -1349,12 +1362,19 @@
       }
     } catch (err) {
       console.error('Error al iniciar cámara:', err);
-      dom.statusText.textContent = 'No se pudo activar la cámara. Revisa los permisos en tu navegador.';
+      if (stream) {
+        dom.statusText.textContent = 'Cámara conectada, pero el detector tardó en responder. Reintentando...';
+      } else {
+        dom.statusText.textContent = 'No se pudo activar la cámara. Revisa los permisos en tu navegador.';
+      }
       stopActiveSource();
+    } finally {
+      isCameraStarting = false;
     }
   }
 
   function stopActiveSource() {
+    isCameraStarting = false;
     sourceGeneration++;
     trackers = [];
     visibleBoxes = [];
@@ -1561,7 +1581,7 @@
   // 12. Captura Inmediata Manual de Botellas Visibles
   async function forceManualScan() {
     if (!activeSource) {
-      alert('Primero inicia la cámara o sube una fotografía.');
+      dom.statusText.textContent = 'Primero inicia la cámara o sube una fotografía para escanear.';
       return;
     }
     if (!detector) {
@@ -2689,6 +2709,7 @@
     });
 
     window.addEventListener('resize', syncCanvasDimensions);
+    window.addEventListener('orientationchange', () => setTimeout(syncCanvasDimensions, 250));
   }
 
   // Inicialización Automática
