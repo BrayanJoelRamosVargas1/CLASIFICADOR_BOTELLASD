@@ -156,6 +156,7 @@
 
   // Estado del Sistema
   let detector = null;
+  let cocoFallbackModel = null;
   let stream = null;
   let activeSource = null;
   let facingMode = 'environment';
@@ -256,8 +257,20 @@
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
         const threads = (window.ort && window.ort.env && window.ort.env.wasm && window.ort.env.wasm.numThreads) || 1;
-        dom.hardwareBadge.innerHTML = detector.backend === 'webgpu'
-          ? '<span class="dot"></span> YOLO · WebGPU FP16'
+        // Precalentar modelo de respaldo en segundo plano sin bloquear el hilo principal
+        if (window.cocoSsd && !cocoFallbackModel) {
+          window.cocoSsd.load({ modelUrl: './models/coco-ssd/model.json' })
+            .then(m => { cocoFallbackModel = m; })
+            .catch(() => {
+              if (window.cocoSsd) {
+                window.cocoSsd.load({ base: 'lite_mobilenet_v2' })
+                  .then(m => { cocoFallbackModel = m; })
+                  .catch(() => {});
+              }
+            });
+        }
+        dom.hardwareBadge.innerHTML = detector.backend === 'webgpu' 
+          ? '<span class="dot"></span> YOLO · WebGPU'
           : `<span class="dot"></span> YOLO · WASM ${threads > 1 ? threads + 'T' : 'SIMD'}`;
         if (dom.btnManualScan) dom.btnManualScan.disabled = false;
         return detector;
@@ -747,7 +760,28 @@
         if (generation !== sourceGeneration) return;
 
         // Compartir exactamente el mismo filtrado con la evaluación de fotografías.
-        const filtered = window.BottleDetection.select(rawPredictions, srcW, srcH, activeThreshold);
+        let filtered = window.BottleDetection.select(rawPredictions, srcW, srcH, activeThreshold);
+
+        // Si YOLO no detectó envases en este frame y el modelo de respaldo está listo, intentar rescate
+        if (filtered.length === 0 && cocoFallbackModel && isLoopActive) {
+          try {
+            const cocoRaw = await cocoFallbackModel.detect(activeSource, 15, 0.12);
+            const cocoMapped = cocoRaw.filter(p => {
+              if (p.class === 'bottle' || p.class === 'wine glass') return true;
+              const isElongated = Math.max(p.bbox[2], p.bbox[3]) > Math.min(p.bbox[2], p.bbox[3]) * 1.30;
+              return (p.class === 'cup' || p.class === 'vase') && isElongated;
+            }).map(p => ({
+              class: 'bottle',
+              rawClass: p.class === 'wine glass' ? 'wine glass' : 'bottle',
+              score: p.score * (p.class === 'bottle' ? 1.0 : 0.92),
+              bbox: p.bbox
+            }));
+            if (cocoMapped.length > 0) {
+              const cocoFiltered = window.BottleDetection.select(cocoMapped, srcW, srcH, activeThreshold);
+              if (cocoFiltered.length > 0) filtered = cocoFiltered;
+            }
+          } catch (eCoco) {}
+        }
 
         // 4. Tracking Espacial 1-a-1 Rápido (Permite cambio inmediato de botella)
         const matchedTrackerIds = new Set();
@@ -1377,13 +1411,15 @@
     if ('createImageBitmap' in window) {
       try {
         const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const maxDim = 1280;
+        const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
         const c = document.createElement('canvas');
-        c.width = bmp.width;
-        c.height = bmp.height;
+        c.width = Math.round(bmp.width * scale);
+        c.height = Math.round(bmp.height * scale);
         const ctx = c.getContext('2d');
-        ctx.drawImage(bmp, 0, 0);
+        ctx.drawImage(bmp, 0, 0, c.width, c.height);
         bmp.close();
-        previewDataUrl = c.toDataURL('image/jpeg', 0.92);
+        previewDataUrl = c.toDataURL('image/jpeg', 0.88);
         const img = new Image();
         await new Promise((res, rej) => {
           img.onload = res;
@@ -1448,6 +1484,51 @@
       onNewBottlesRegistered(found);
     }
     renderCanvasHUD();
+
+    if (visibleBoxes.length === 0 && activeSource) {
+      try {
+        const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
+        const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
+        if (srcW && srcH) {
+          let rescuePreds = [];
+          if (detector) {
+            const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.08);
+            rescuePreds.push(...raw);
+          }
+          if (cocoFallbackModel) {
+            const cRaw = await cocoFallbackModel.detect(activeSource, 15, 0.10);
+            rescuePreds.push(...cRaw.filter(p => p.class === 'bottle' || p.class === 'wine glass').map(p => ({
+              class: 'bottle', rawClass: p.class, score: p.score, bbox: p.bbox
+            })));
+          }
+          const candidates = window.BottleDetection.select(rescuePreds, srcW, srcH, 0.09);
+          if (candidates.length > 0) {
+            const photoItems = candidates.map(c => {
+              const meta = inspectMaterial(c.x, c.y, c.w, c.h, c.rawClass);
+              return {
+                id: `ECO-${String(nextTrackId++).padStart(3, '0')}`,
+                x: c.x, y: c.y, w: c.w, h: c.h,
+                vx: 0, vy: 0,
+                score: c.score,
+                rawClass: c.rawClass,
+                meta,
+                label: meta.label,
+                hits: 2,
+                lastSeen: Date.now(),
+                missed: 0,
+                registered: true
+              };
+            });
+            trackers = photoItems;
+            visibleBoxes = photoItems;
+            onNewBottlesRegistered(photoItems);
+            renderCanvasHUD();
+          }
+        }
+      } catch (eRescue) {
+        console.warn('EcoLens: Foto rescue error:', eRescue);
+      }
+    }
 
     if (visibleBoxes.length > 0) {
       dom.statusText.textContent = `✓ ¡${visibleBoxes.length} botella(s) detectada(s) en la fotografía! (${Math.round(visibleBoxes[0].score * 100)}%)`;

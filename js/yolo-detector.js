@@ -64,11 +64,11 @@
 
       let session = null;
       let backend = 'wasm';
+      const modelSource = await YoloBottleDetector.fetchModelCached(resolvedUrl);
+
       if (await YoloBottleDetector.hasWebGPU()) {
         try {
           ort.env.wasm.proxy = false;
-          const fp16Url = resolvedUrl.replace(/model\.onnx(\?.*)?$/, 'model_fp16.onnx$1');
-          const modelSource = await YoloBottleDetector.fetchModelCached(fp16Url);
           const gpuSession = await ort.InferenceSession.create(modelSource, {
             executionProviders: ['webgpu'],
             graphOptimizationLevel: 'all'
@@ -97,12 +97,12 @@
             session = null;
           }
         } catch (e) {
+          console.warn('[YOLO] WebGPU initialization exception, falling back to WASM SIMD:', e);
           session = null;
         }
       }
       if (!session) {
         ort.env.wasm.proxy = false;
-        const modelSource = await YoloBottleDetector.fetchModelCached(resolvedUrl);
         session = await ort.InferenceSession.create(modelSource, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all'
@@ -175,8 +175,12 @@
         if (!mode) {
           // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.25), prioritize rot90
           const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.25));
+          // If direct pass detected a close-up container filling >70% of frame height, prioritize zoomout
+          const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.70));
           if (hasHorizontalCandidate) {
             mode = 'rot90';
+          } else if (hasCloseUpCandidate) {
+            mode = 'zoomout';
           } else {
             if (++this.videoFrameCount % 2 !== 0) return direct;
             mode = modes[(this.videoFrameCount >> 1) % modes.length];
