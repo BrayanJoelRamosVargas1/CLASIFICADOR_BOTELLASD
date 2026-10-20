@@ -8,21 +8,43 @@ const bottle = { class: 'bottle', score: 0.9, bbox: [10, 20, 50, 100] };
 function engine(detect) {
   let now = 10000;
   class Clock extends Date { static now() { return now; } }
-  const element = () => ({ style: {}, classList: { remove() {}, toggle() {} }, getContext: () => ({}) });
+  const mockCtx = {
+    clearRect() {}, save() {}, restore() {}, beginPath() {}, arc() {},
+    fill() {}, stroke() {}, rect() {}, roundRect() {}, fillText() {},
+    measureText: () => ({ width: 10 }), drawImage() {}, setLineDash() {},
+    createLinearGradient: () => ({ addColorStop() {} })
+  };
+  const element = () => ({
+    style: {},
+    classList: { add() {}, remove() {}, toggle() {} },
+    getContext: () => mockCtx,
+    setAttribute() {},
+    addEventListener() {},
+    removeEventListener() {},
+    play: async () => {},
+    textContent: ''
+  });
   const sandbox = { window: { BottleDetection }, navigator: {}, console, Date: Clock,
+    performance: globalThis.performance || { now: () => Date.now() },
     document: { getElementById: element, querySelector: element, createElement: element, addEventListener() {} },
-    cancelAnimationFrame() {}, clearTimeout() {} };
+    requestAnimationFrame: (cb) => 1,
+    cancelAnimationFrame() {}, clearTimeout() {}, setTimeout: (cb) => { cb(); return 1; } };
   const code = fs.readFileSync(require.resolve('../js/ecolens.js'), 'utf8').replace(/\}\)\(\);\s*$/, `
     const registrations = [];
     onNewBottlesRegistered = items => registrations.push(...items.map(x => x.id));
     globalThis.harness = {
-      processVisualFrame, stopActiveSource, registrations,
+      processVisualFrame, stopActiveSource, startCamera, toggleTorch, forceManualScan, registrations,
       getTrackers: () => trackers,
+      getDom: () => dom,
+      getIsCameraStarting: () => isCameraStarting,
+      getStream: () => stream,
       setSource: () => { activeSource = { width: 640, height: 480, readyState: 2 }; },
+      clearSource: () => { activeSource = null; },
       setDetector: value => { detector = value; }
     };
   })();`);
   vm.runInNewContext(code, sandbox);
+  sandbox.harness.sandbox = sandbox;
   sandbox.harness.setDetector({ detect });
   sandbox.harness.setSource();
   sandbox.harness.advanceTime = ms => { now += ms; };
@@ -139,6 +161,63 @@ test('detects bottles and wine glasses processed through WebGL fallback pipeline
   assert.equal(trackers.length, 2);
   assert.equal(trackers[0].rawClass, 'bottle');
   assert.equal(trackers[1].rawClass, 'wine glass');
+});
+
+test('camera startup mutex, track ended event, and non-blocking manual scan guard', async () => {
+  const h = engine(async () => []);
+  const dom = h.getDom();
+
+  // 1. Non-blocking guard on manual scan when no camera or photo is active
+  h.clearSource();
+  await h.forceManualScan();
+  assert.match(dom.statusText.textContent, /Primero inicia la cámara o sube una fotografía/);
+
+  // 2. Non-blocking guard on toggleTorch when stream is null
+  await h.toggleTorch();
+  assert.match(dom.statusText.textContent, /Inicia la cámara primero para encender la linterna LED/);
+
+  // 3. Mutex: concurrent startCamera calls do not duplicate getUserMedia
+  let gUMCalls = 0;
+  let resolveGUM;
+  const mockTrack = {
+    stop() {},
+    addEventListener(evt, fn) {
+      if (evt === 'ended') this.onEnded = fn;
+    }
+  };
+  const mockStream = {
+    getVideoTracks: () => [mockTrack],
+    getTracks: () => [mockTrack]
+  };
+
+  h.sandbox.navigator.mediaDevices = {
+    getUserMedia: () => {
+      gUMCalls++;
+      return new Promise(res => { resolveGUM = () => res(mockStream); });
+    }
+  };
+
+  const p1 = h.startCamera();
+  assert.equal(h.getIsCameraStarting(), true);
+
+  // Rapid second click during camera initialization
+  const p2 = h.startCamera();
+  assert.equal(gUMCalls, 1, 'getUserMedia must not be called twice concurrently');
+
+  // Finish first stream connection
+  resolveGUM();
+  await p1;
+  await p2;
+  assert.equal(h.getIsCameraStarting(), false);
+  assert.ok(h.getStream());
+
+  // 4. Track ended event (e.g. phone incoming call or camera disconnected)
+  mockTrack.onEnded();
+  assert.equal(h.getStream(), null);
+  assert.match(dom.statusText.textContent, /Cámara desconectada o suspendida/);
+
+  // Clean shutdown
+  h.stopActiveSource();
 });
 
 
