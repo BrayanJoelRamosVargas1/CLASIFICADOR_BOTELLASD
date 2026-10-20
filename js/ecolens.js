@@ -253,7 +253,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=41.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=42.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -781,7 +781,7 @@
               bbox: p.bbox
             }));
             if (cocoMapped.length > 0) {
-              const cocoFiltered = window.BottleDetection.select(cocoMapped, srcW, srcH, activeThreshold);
+              const cocoFiltered = window.BottleDetection.select(cocoMapped, srcW, srcH, Math.min(activeThreshold, 0.12));
               if (cocoFiltered.length > 0) filtered = cocoFiltered;
             }
           } catch (eCoco) {}
@@ -1515,7 +1515,18 @@
         if (srcW && srcH) {
           let rescuePreds = [];
           if (detector) {
-            const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.08);
+            let scanSource = activeSource;
+          if (activeSource.videoWidth) {
+            try {
+              const snap = document.createElement('canvas');
+              snap.width = srcW;
+              snap.height = srcH;
+              const sCtx = snap.getContext('2d');
+              sCtx.drawImage(activeSource, 0, 0, srcW, srcH);
+              scanSource = snap;
+            } catch (eSnap) {}
+          }
+          const raw = await detector.detect(scanSource, window.BottleDetection.config.maxBoxes, 0.08);
             rescuePreds.push(...raw);
           }
           if (!cocoFallbackModel && window.cocoSsd) {
@@ -1652,7 +1663,18 @@
         const srcW = activeSource.videoWidth || activeSource.naturalWidth || activeSource.width;
         const srcH = activeSource.videoHeight || activeSource.naturalHeight || activeSource.height;
         if (srcW && srcH) {
-          const raw = await detector.detect(activeSource, window.BottleDetection.config.maxBoxes, 0.08);
+          let scanSource = activeSource;
+          if (activeSource.videoWidth) {
+            try {
+              const snap = document.createElement('canvas');
+              snap.width = srcW;
+              snap.height = srcH;
+              const sCtx = snap.getContext('2d');
+              sCtx.drawImage(activeSource, 0, 0, srcW, srcH);
+              scanSource = snap;
+            } catch (eSnap) {}
+          }
+          const raw = await detector.detect(scanSource, window.BottleDetection.config.maxBoxes, 0.08);
           let candidates = window.BottleDetection.select(raw, srcW, srcH, 0.10);
           if (candidates.length === 0 && cocoFallbackModel) {
             try {

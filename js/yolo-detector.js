@@ -152,7 +152,7 @@
       const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.14;
       const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
       const isVideo = Boolean(source.videoWidth);
-      if (isVideo && bestDirect >= threshold) {
+      if (isVideo && bestDirect >= 0.45) {
         this.lastAuxMode = null;
         return this.rememberTarget(direct, threshold);
       }
@@ -169,16 +169,16 @@
         if (this.lastLatencyMs > 850) {
           return this.rememberTarget(direct, threshold);
         }
-        // Throttle auxiliary pass to every 2nd empty frame and lock onto active mode.
-        const modes = ['crop', 'zoomout', 'rot90', 'rot180', 'rot270'];
+        // Mode order prioritized by empirical recall boost: zoomout (context restoration) -> rot180 -> rot90 (horizontal) -> crop -> rot270
+        const modes = ['zoomout', 'rot180', 'rot90', 'crop', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
-          // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.25), prioritize rot90
-          const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.25));
-          // If direct pass detected a close-up container filling >70% of frame height, prioritize zoomout
-          const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.70));
-          // If direct pass detected a low-confidence candidate (score 0.08..threshold), prioritize rot180 inversion
-          const hasLowConfCandidate = direct.some(p => p.score >= 0.08 && p.score < threshold);
+          // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.20), prioritize rot90
+          const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.20));
+          // If direct pass detected a close-up container filling >45% of frame height, prioritize zoomout
+          const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.45));
+          // If direct pass detected a low-confidence candidate (score 0.08..0.45), prioritize rot180 inversion
+          const hasLowConfCandidate = direct.some(p => p.score >= 0.08 && p.score < 0.45);
           if (hasHorizontalCandidate) {
             mode = 'rot90';
           } else if (hasCloseUpCandidate) {
@@ -450,7 +450,7 @@
           const isElongated = Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.25;
           if (classId === 39) {
             bottles.push({ class: 'bottle', rawClass: 'bottle', score, bbox });
-          } else if (classId === 40 && score >= 0.20 && isElongated) {
+          } else if (classId === 40 && score >= 0.15 && isElongated) {
             // Glass bottle / wine bottle (COCO class 40: wine glass)
             bottles.push({ class: 'bottle', rawClass: 'wine glass', score: score * 0.95, bbox });
           } else if (classId === 75 && score >= 0.14 && isElongated) {
