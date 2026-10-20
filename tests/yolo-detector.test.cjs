@@ -168,4 +168,18 @@ test('recognizes elongated glass wine bottles (class 40) and slender bottles (cl
   assert.ok(predictions[1].score > 0.60);
 });
 
+test('recognizes elongated cylindrical container (class 10) and handles options object in detect()', async () => {
+  // Red cylindrical container (class 10, aspect ratio > 1.65: [120, 100, 200, 320] -> w=80, h=220, h/w=2.75)
+  const h = setup([
+    [[120, 100, 200, 320, 0.65, 10]],
+    [],
+    []
+  ]);
+  const predictions = await h.detector.detect({ width: 640, height: 480 }, { threshold: 0.10, maxBoxes: 10 });
+  assert.equal(predictions.length, 1);
+  assert.equal(predictions[0].class, 'bottle');
+  assert.ok(predictions[0].score > 0.50);
+});
+
+
 

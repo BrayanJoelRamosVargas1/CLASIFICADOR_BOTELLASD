@@ -71,6 +71,9 @@
     modeInstant: document.getElementById('modeInstant'),
     modeManual: document.getElementById('modeManual'),
     modeRvm: document.getElementById('modeRvm'),
+    sensHigh: document.getElementById('sensHigh'),
+    sensMedium: document.getElementById('sensMedium'),
+    sensStrict: document.getElementById('sensStrict'),
     btnShutterViewport: document.getElementById('btnShutterViewport'),
     shutterFlash: document.getElementById('shutterFlashOverlay'),
     btnNativeCamera: document.getElementById('btnNativeCamera'),
@@ -188,6 +191,44 @@
   let nextTrackId = 1;
   let captureMode = 'rvm'; // 'instant' | 'manual' | 'rvm' (rvm por defecto garantiza suite de tests)
 
+  const SENSITIVITY_LEVELS = {
+    high: 0.09,    // Alta sensibilidad para botellas transparentes (PET), luz tenue o botellas delgadas
+    medium: 0.14,  // Calibrada estándar recomendada (equilibrio precisión-recall)
+    strict: 0.22   // Filtrada estricta para escenas complejas con personas o mucho ruido
+  };
+  let currentSensitivity = 'medium';
+
+  function setSensitivity(level, save = true) {
+    if (!SENSITIVITY_LEVELS[level]) return;
+    currentSensitivity = level;
+    activeThreshold = SENSITIVITY_LEVELS[level];
+    const sensTabs = [
+      { el: dom.sensHigh, id: 'high' },
+      { el: dom.sensMedium, id: 'medium' },
+      { el: dom.sensStrict, id: 'strict' }
+    ];
+    sensTabs.forEach(t => {
+      if (t.el && t.el.classList) {
+        t.el.classList.toggle('active', t.id === level);
+      }
+    });
+    if (save) {
+      try { localStorage.setItem('ecolens_sensitivity_pref', level); } catch (e) {}
+    }
+    if (dom.statusText && isLoopActive) {
+      if (level === 'high') {
+        dom.statusText.textContent = '⚡ Sensibilidad Alta (0.09): Óptima para botellas transparentes (PET) y luz tenue.';
+      } else if (level === 'medium') {
+        dom.statusText.textContent = '🎯 Sensibilidad Calibrada (0.14): Balance óptimo de precisión y captura.';
+      } else if (level === 'strict') {
+        dom.statusText.textContent = '🛡️ Sensibilidad Estricta (0.22): Menos falsos positivos en entornos concurridos.';
+      }
+    }
+    if (activeSource && !isDetecting) {
+      processVisualFrame(true).catch(() => {});
+    }
+  }
+
   function setCaptureMode(mode) {
     captureMode = mode;
     const tabs = [
@@ -263,7 +304,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=43.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=44.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -788,6 +829,28 @@
 
         // Compartir exactamente el mismo filtrado con la evaluación de fotografías.
         let filtered = window.BottleDetection.select(rawPredictions, srcW, srcH, activeThreshold);
+
+        // Asistencia de Retícula Central: si no hay botellas con activeThreshold, rescatar candidato enfocado
+        if (filtered.length === 0 && rawPredictions && rawPredictions.length > 0 && isLoopActive) {
+          const reticleThreshold = Math.min(activeThreshold, 0.09);
+          const reticleMatches = rawPredictions.filter(p => {
+            if (p.class !== 'bottle' || p.score < reticleThreshold) return false;
+            const [bx, by, bw, bh] = p.bbox;
+            const cx = (bx + bw * 0.5) / srcW;
+            const cy = (by + bh * 0.5) / srcH;
+            return cx >= 0.20 && cx <= 0.80 && cy >= 0.15 && cy <= 0.85;
+          });
+          if (reticleMatches.length > 0) {
+            const rescued = window.BottleDetection.select(reticleMatches, srcW, srcH, reticleThreshold);
+            if (rescued.length > 0) {
+              filtered = rescued;
+              if (dom.reticleGuideText) {
+                dom.reticleGuideText.textContent = '✓ Botella en retícula';
+                setTimeout(() => { if (dom.reticleGuideText) dom.reticleGuideText.textContent = 'Encuadra tus botellas aquí'; }, 1000);
+              }
+            }
+          }
+        }
 
         // Si YOLO no detectó envases en este frame y el modelo de respaldo está listo, intentar rescate
         if (filtered.length === 0 && cocoFallbackModel && isLoopActive) {
@@ -2631,6 +2694,17 @@
     if (dom.modeInstant) dom.modeInstant.addEventListener('click', () => { setCaptureMode('instant'); playSound('click'); });
     if (dom.modeManual) dom.modeManual.addEventListener('click', () => { setCaptureMode('manual'); playSound('click'); });
     if (dom.modeRvm) dom.modeRvm.addEventListener('click', () => { setCaptureMode('rvm'); playSound('click'); });
+
+    if (dom.sensHigh) dom.sensHigh.addEventListener('click', () => { setSensitivity('high'); playSound('click'); });
+    if (dom.sensMedium) dom.sensMedium.addEventListener('click', () => { setSensitivity('medium'); playSound('click'); });
+    if (dom.sensStrict) dom.sensStrict.addEventListener('click', () => { setSensitivity('strict'); playSound('click'); });
+
+    try {
+      const savedSens = localStorage.getItem('ecolens_sensitivity_pref');
+      if (savedSens && SENSITIVITY_LEVELS[savedSens]) {
+        setSensitivity(savedSens, false);
+      }
+    } catch (e) {}
 
     // Eventos de Planilla de Control Diario
     if (dom.dailyInitialInput && dom.dailyInitialInput.addEventListener) {

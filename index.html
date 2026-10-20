@@ -22,7 +22,7 @@
   <script src="coi-serviceworker.js"></script>
 
   <!-- Hoja de Estilos Exclusiva EcoLens Nordic Eco-Tech -->
-  <link rel="stylesheet" href="css/ecolens.css?v=43.0">
+  <link rel="stylesheet" href="css/ecolens.css?v=44.0">
 </head>
 <body>
 
@@ -200,6 +200,22 @@
           <button id="modeRvm" type="button" class="capture-mode-tab" data-mode="rvm" title="Conteo continuo con doble confirmación para cinta">
             <i class="bx bx-sync"></i> <span>🔄 Auto RVM</span>
           </button>
+        </div>
+
+        <!-- Selector de Sensibilidad de Detección IA -->
+        <div class="sensitivity-selector-bar" role="group" aria-label="Sensibilidad de Detección">
+          <span class="sens-title"><i class="bx bx-slider-alt"></i> Sensibilidad:</span>
+          <div class="sens-pill-group">
+            <button id="sensHigh" type="button" class="sens-tab" data-sens="high" title="Alta Sensibilidad (0.09) — Botellas transparentes de agua, contraluz o fondos difíciles">
+              <i class="bx bx-water"></i> <span>Alta (PET Transparente)</span>
+            </button>
+            <button id="sensMedium" type="button" class="sens-tab active" data-sens="medium" title="Sensibilidad Calibrada (0.14) — Balance óptimo estándar">
+              <i class="bx bx-check-circle"></i> <span>Calibrada</span>
+            </button>
+            <button id="sensStrict" type="button" class="sens-tab" data-sens="strict" title="Sensibilidad Estricta (0.22) — Ambientes con mucho ruido visual o personas">
+              <i class="bx bx-shield-quarter"></i> <span>Estricta</span>
+            </button>
+          </div>
         </div>
 
         <!-- Viewport con Escaneo Láser y HUD -->
@@ -618,14 +634,14 @@
   </footer>
 
   <!-- Motor neuronal GPU WebGL de alta resiliencia y respaldo universal -->
-  <script src="js/tf.min.js?v=43.0"></script>
-  <script src="js/coco-ssd.min.js?v=43.0"></script>
+  <script src="js/tf.min.js?v=44.0"></script>
+  <script src="js/coco-ssd.min.js?v=44.0"></script>
 
   <!-- Detector local de botellas y ONNX Runtime Web (WebGPU + WASM) servido localmente -->
-  <script src="js/ort/ort.min.js?v=43.0"></script>
-  <script src="js/yolo-detector.js?v=43.0"></script>
-  <script src="js/bottle-detection.js?v=43.0"></script>
-  <script src="js/ecolens.js?v=43.0"></script>
+  <script src="js/ort/ort.min.js?v=44.0"></script>
+  <script src="js/yolo-detector.js?v=44.0"></script>
+  <script src="js/bottle-detection.js?v=44.0"></script>
+  <script src="js/ecolens.js?v=44.0"></script>
 
 </body>
 </html>

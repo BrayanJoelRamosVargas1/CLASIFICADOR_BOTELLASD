@@ -146,13 +146,17 @@
       return preds;
     }
     async detect(source, maxBoxes = 30, minScore = 0.08) {
+      if (typeof maxBoxes === 'object' && maxBoxes !== null) {
+        minScore = maxBoxes.threshold ?? maxBoxes.minScore ?? minScore;
+        maxBoxes = maxBoxes.maxBoxes ?? 30;
+      }
       const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       const direct = await this.detectOnce(source, maxBoxes, minScore);
       this.lastLatencyMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.14;
+      const threshold = (window.BottleDetection && window.BottleDetection.config.threshold) || 0.11;
       const bestDirect = direct.reduce((m, p) => Math.max(m, p.score), 0);
       const isVideo = Boolean(source.videoWidth);
-      if (isVideo && bestDirect >= 0.45) {
+      if (isVideo && bestDirect >= 0.40) {
         this.lastAuxMode = null;
         return this.rememberTarget(direct, threshold);
       }
@@ -164,27 +168,25 @@
       if (!width || !height) return direct;
 
       if (isVideo) {
-        // Live camera stream: single-pass inference is paramount to maintain smooth 60fps UI.
-        // If single inference pass exceeds 850ms (very slow mobile CPU WASM), avoid secondary pass to prevent severe freeze.
+        // Live camera stream: maintain high framerate and low latency.
+        // If single inference pass exceeds 850ms (very slow mobile CPU WASM), avoid secondary pass.
         if (this.lastLatencyMs > 850) {
           return this.rememberTarget(direct, threshold);
         }
-        // Mode order prioritized by empirical recall boost: zoomout (context restoration) -> rot180 -> rot90 (horizontal) -> crop -> rot270
-        const modes = ['zoomout', 'rot180', 'rot90', 'crop', 'rot270'];
+        // Mode order prioritized by empirical recall boost: zoomout (perifoveal scale) -> rot90 (horizontal) -> rot180 -> crop -> rot270
+        const modes = ['zoomout', 'rot90', 'rot180', 'crop', 'rot270'];
         let mode = this.lastAuxMode;
         if (!mode) {
-          // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.20), prioritize rot90
-          const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.20));
-          // If direct pass detected a close-up container filling >45% of frame height, prioritize zoomout
-          const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.45));
-          // If direct pass detected a low-confidence candidate (score 0.08..0.45), prioritize rot180 inversion
-          const hasLowConfCandidate = direct.some(p => p.score >= 0.08 && p.score < 0.45);
+          // If direct pass detected an elongated horizontal container (aspect ratio w > h * 1.15), prioritize rot90
+          const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.15));
+          // If direct pass detected a close-up container filling >40% of frame height, prioritize zoomout
+          const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.40));
+          // If direct pass detected a candidate near threshold (0.08..0.40), prioritize zoomout context recovery
+          const hasWeakCandidate = direct.some(p => p.score >= 0.08 && p.score < 0.40);
           if (hasHorizontalCandidate) {
             mode = 'rot90';
-          } else if (hasCloseUpCandidate) {
+          } else if (hasCloseUpCandidate || hasWeakCandidate) {
             mode = 'zoomout';
-          } else if (hasLowConfCandidate) {
-            mode = 'rot180';
           } else {
             if (++this.videoFrameCount % 2 !== 0) return direct;
             mode = modes[(this.videoFrameCount >> 1) % modes.length];
@@ -371,6 +373,9 @@
       if (!YoloBottleDetector.HARD_NEGATIVE_CLASSES.has(other.classId)) return false;
       // Do not let toothbrush (79) suppress large containers/bottles (toothbrushes are thin <45px, not wide bottles)
       if (other.classId === 79 && Math.min(other.bbox[2], other.bbox[3]) > 45) return false;
+      // Do not let elongated cylinders (10) suppress bottles
+      const otherAspect = Math.max(other.bbox[2], other.bbox[3]) / Math.max(1, Math.min(other.bbox[2], other.bbox[3]));
+      if (other.classId === 10 && otherAspect >= 1.50) return false;
       const iou = YoloBottleDetector.boxIoU(bottle.bbox, other.bbox);
       return iou >= 0.50 && other.score >= 0.50 && other.score > bottle.score * 1.35;
     }
@@ -450,14 +455,18 @@
           const bbox = [x1 * width / resizedW, y1 * height / resizedH,
             (x2 - x1) * width / resizedW, (y2 - y1) * height / resizedH];
           const isElongated = Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.25;
+          const isVeryElongated = Math.max(bbox[2], bbox[3]) > Math.min(bbox[2], bbox[3]) * 1.65;
           if (classId === 39) {
             bottles.push({ class: 'bottle', rawClass: 'bottle', score, bbox });
-          } else if (classId === 40 && score >= 0.15 && isElongated) {
+          } else if (classId === 40 && score >= 0.14 && isElongated) {
             // Glass bottle / wine bottle (COCO class 40: wine glass)
             bottles.push({ class: 'bottle', rawClass: 'wine glass', score: score * 0.95, bbox });
           } else if (classId === 75 && score >= 0.14 && isElongated) {
             // Slender glass/clear bottles (COCO class 75: vase)
             bottles.push({ class: 'bottle', rawClass: 'bottle', score: score * 0.88, bbox });
+          } else if (classId === 10 && score >= 0.20 && isVeryElongated) {
+            // Elongated cylindrical bottle / thermos (COCO class 10: fire hydrant lookalike)
+            bottles.push({ class: 'bottle', rawClass: 'bottle', score: score * 0.85, bbox });
           } else {
             otherClasses.push({ classId, score, bbox });
           }

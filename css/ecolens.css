@@ -1597,3 +1597,67 @@ body {
   }
 }
 
+
+/* Selector de Sensibilidad de Detección IA */
+.sensitivity-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: #f8fafc;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+}
+
+.sens-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sens-pill-group {
+  display: flex;
+  background: #e2e8f0;
+  padding: 0.18rem;
+  border-radius: 10px;
+  gap: 0.2rem;
+  flex: 1;
+  max-width: 440px;
+}
+
+.sens-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.sens-tab:hover {
+  color: var(--text-main);
+}
+
+.sens-tab.active {
+  background: white;
+  color: var(--primary-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
