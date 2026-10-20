@@ -177,10 +177,14 @@
           const hasHorizontalCandidate = direct.some(p => p.bbox && (p.bbox[2] > p.bbox[3] * 1.25));
           // If direct pass detected a close-up container filling >70% of frame height, prioritize zoomout
           const hasCloseUpCandidate = direct.some(p => p.bbox && (p.bbox[3] > height * 0.70));
+          // If direct pass detected a low-confidence candidate (score 0.08..threshold), prioritize rot180 inversion
+          const hasLowConfCandidate = direct.some(p => p.score >= 0.08 && p.score < threshold);
           if (hasHorizontalCandidate) {
             mode = 'rot90';
           } else if (hasCloseUpCandidate) {
             mode = 'zoomout';
+          } else if (hasLowConfCandidate) {
+            mode = 'rot180';
           } else {
             if (++this.videoFrameCount % 2 !== 0) return direct;
             mode = modes[(this.videoFrameCount >> 1) % modes.length];

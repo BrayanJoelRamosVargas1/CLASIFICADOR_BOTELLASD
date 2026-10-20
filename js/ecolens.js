@@ -252,7 +252,7 @@
           throw new Error('ONNX Runtime no cargó');
         }
         dom.statusText.textContent = '⏳ Preparando detector IA (descarga única en caché)...';
-        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=39.0');
+        detector = await window.YoloBottleDetector.load('./models/yolov10n/model.onnx?v=40.0');
         dom.statusText.textContent = isLoopActive
           ? '● Cámara activa. Apunta hacia tus botellas.'
           : '● Detector listo. Inicia la cámara o sube una foto para clasificar.';
@@ -863,7 +863,7 @@
         // ByteTrack Stage 2 (ifzhang/ByteTrack & r/computervision): associate low-confidence boxes (0.11..threshold)
         // ONLY with already-active trackers so momentary glare/refraction on transparent bottles never drops the track.
         if (trackers.some(t => !matchedTrackerIds.has(t.id))) {
-          const lowCandidates = window.BottleDetection.select(rawPredictions, srcW, srcH, 0.11)
+          const lowCandidates = window.BottleDetection.select(rawPredictions, srcW, srcH, CONFIG.MIN_INFERENCE_SCORE)
             .filter(b => b.score < activeThreshold);
           for (const lowBox of lowCandidates) {
             let bestMatch = null;
